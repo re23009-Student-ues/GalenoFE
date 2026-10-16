@@ -1,0 +1,41 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "lanzarBrowserSync",
+            "command": "browser-sync start --server src -f \"**/*\" ./src --no-open",
+            "type": "shell",
+            "presentation": {
+                "reveal": "silent",
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "debugBrowserSync",
+            "command": "browser-sync start --server ./ -f \"**/*\" ./ --no-open",
+            "type": "shell",
+            "presentation": {
+                "reveal": "silent",
+            },
+            "isBackground": true,
+            "problemMatcher": []
+        },
+        {
+            "label": "apagarBrowserSync",
+            "type": "shell",
+            "command": "echo ${input:terminate}",
+            "problemMatcher": [],
+        }
+        
+    ],
+    "inputs": [
+        {
+            "id": "matarBrowserSinc",
+            "type": "command",
+            "command": "workbench.action.tasks.terminate",
+            "args": "terminateALL",
+        }
+        
+    ]
+}

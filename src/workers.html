@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<htmllang=en>
+    <head>
+        
+        <title>documento</title>
+    </head>
+    <body>
+        <input type="button" value="iniciar" onclick="iniciarWorker();"/>
+        <input type="button" value="reiniciar" onclick="reiniciarWorker(50);"/>
+        <input type="button" value="detener" onclick="detenerWoker();"/>
+
+        <div id="contendor">
+
+        </div>
+
+        <script>
+            function iniciarWorker(){
+                if(typeof w == "undefined"){
+                    w=new Worker("./js/boundary/contador.js");
+                    w.onmessage=function(e){
+                        document.getElementById("contendor").innerHTML=e.data;
+                    }
+                }
+            }
+
+            function reiniciarWorker(_numero){
+                w.postMessage(_numero);
+            }
+
+            function detenerWoker(){
+                w.terminate();
+                w=undefined;
+            }
+        </script>
+    </body>
+
+</html>
+
+

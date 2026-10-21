@@ -22,7 +22,7 @@
             "port": 9222,
             "request": "launch",
             "name": "debug BrowserSync",
-            "url": "http://localhost:3000",
+            "url": "http://localhost:3000/test/tipoExamen_test.html",
             "webRoot": "${workspaceFolder}/",
             "preLaunchTask": "debugBrowserSync",
             "postDebugTask": "apagarBrowserSync"

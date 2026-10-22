@@ -1,0 +1,29 @@
+:host {
+    display: block;
+    font-family: sans-serif;
+    border: 1px solid var(--oscuro);
+    border-radius: 8px;
+    padding: 16px;
+    max-width: 300px;
+    box-shadow: 2px 2px 5px var(--oscuro);
+    background: var(--oscuro);
+}
+
+.header {
+    font-weight: bold;
+    font-size: 1.2em;
+    border-bottom: 1px solid var(--oscuro);
+    padding-bottom: 8px;
+    color: var(--oscuro);
+}
+
+.body {
+    padding: 8px 0;
+    color: var(--oscuro);
+}
+
+.footer {
+    font-size: 0.9em;
+    color: var(--mate);
+    text-align: right;
+}

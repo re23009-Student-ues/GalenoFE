@@ -1,4 +1,56 @@
 :root{
-
+    --oscuro: #1D3461;
+    --mate: #829CBC;
+    --sombra: #EEE183;
+    --claro: #F8F4E3;
+    --acento: #6290C8;
 }
 
+main {
+    display: grid;
+    height: 100vh;
+    grid-template-columns: 1fr 6fr;
+    grid-template-rows: 1fr 4fr 1fr;
+    grid-template-areas: "menu cabecera" "menu centro" "pie pie";
+}
+
+header {
+    background: var(--claro);
+    color: var(--oscuro);
+    grid-area: cabecera;
+}
+
+nav {
+    grid-area: menu;
+    background: var(--sombra);
+}
+
+article {
+    grid-area: centro;
+    background: var(--mate);
+}
+
+footer {
+    grid-area: pie;
+    background: var(--oscuro);
+}
+
+@media screen and (min-width: 30em){
+    main{
+    display: grid;
+    height: 100vh;
+    grid-template-columns: 1fr 6fr;
+    grid-template-rows: 1fr 4fr 1fr;
+    grid-template-areas: "menu cabecera" "menu centro" "pie pie";
+    }
+}
+
+@media screen and (max-width: 30em){
+ main{
+     display: grid;
+    height: 100vh;
+    grid-template-columns: 1fr 2fr;
+    grid-template-rows: 2fr 1fr;
+    grid-template-areas: "cabecera cabecera" "centro centro" "nav nav" "pie pie";
+ }
+}

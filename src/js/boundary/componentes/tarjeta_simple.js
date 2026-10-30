@@ -24,11 +24,11 @@ class TarjetaSimple  extends HTMLElement {
         pie.setAttribute("class","footer");
         let slotPie=document.createElement("slot");
         slotPie.setAttribute("name","pie");
-        slotPie.innerText="agregar pie";
+        slotPie.textContent = "";
         pie.appendChild(slotPie);
 
         //<link rel="stylesheet" href="./Recursos/estilos/tarjeta.css" />
-        let estilo=document.createElement("links");
+        let estilo = document.createElement("link");
         estilo.setAttribute("rel","stylesheet");
         estilo.setAttribute("href","./Recursos/estilos/tarjeta.css")
 

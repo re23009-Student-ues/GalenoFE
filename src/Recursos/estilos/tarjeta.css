@@ -4,15 +4,16 @@
     border: 1px solid var(--oscuro);
     border-radius: 8px;
     padding: 16px;
-    max-width: 300px;
+    margin: 12px;
+    max-width: 320px;
     box-shadow: 2px 2px 5px var(--oscuro);
-    background: var(--oscuro);
+    background: var(--claro);
 }
 
 .header {
     font-weight: bold;
-    font-size: 1.2em;
-    border-bottom: 1px solid var(--oscuro);
+    font-size: 1.1em;
+    border-bottom: 1px solid var(--mate);
     padding-bottom: 8px;
     color: var(--oscuro);
 }
@@ -24,6 +25,6 @@
 
 .footer {
     font-size: 0.9em;
-    color: var(--mate);
+    color: var(--acento);
     text-align: right;
 }

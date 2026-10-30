@@ -1,28 +1,61 @@
-<!DOCTYPE html>
-<html lang='en'>
-<head>
-    <meta charset='utf-8'>
-    <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <title>Document</title>
-</head>
-<body>
-    <main>
-        <header id="chepe" class="maria">
-            Encabezado
-        </header>
-        <nav class="maria">
-            Navegación
-        </nav>
-        <article>
-            cuerpo
-            <consulta-controller></consulta-controller>
-        </article>
-        <footer>
-            pie de pagina
-        </footer>
-    </main>
-    <link rel="stylesheet" href="./Recursos/estilos/principal.css" />
-    <script type="module" src="./js/boundary/consulta_controller.js"></script>
-</body>
-</html>
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GalenoFE - Clínica</title>
+    <link rel="stylesheet" href="Recursos/estilos/principal.css?v=6" />
+  </head>
+  <body>
+    <div class="contenedor-app">
+      <!-- Menú Lateral -->
+      <aside class="sidebar">
+        <div class="sidebar-header">
+          <h2>GalenoSV</h2>
+        </div>
+        <nav id="menu-lateral">
+          <!-- data-route coincide con las rutas de main.js -->
+          <a href="#" data-route="/inicio" class="activo">Inicio</a>
+          <a href="#" data-route="/personas">Gestión de Personas</a>
+          <a href="#" data-route="/consultas">Agenda Médica</a>
+          <a href="#" data-route="/procedimientos">Atención y Procedimientos</a>
+          <a href="#" data-route="/laboratorio">Laboratorio</a>
 
+          <!-- Botón enviado al fondo -->
+          <a href="#" data-route="/configuracion" class="btn-config"
+            >Configuración</a
+          >
+        </nav>
+      </aside>
+
+      <!-- Contenido Dinámico -->
+      <main class="contenido-principal">
+        <header class="topbar">
+          <button id="btn-menu-movil" class="menu-movil" aria-label="Abrir menú">☰</button>
+          <h1 id="titulo-pagina">Resumen</h1>
+          <div class="usuario">
+            <div class="avatar" id="usuario-avatar">--</div>
+            <div class="usuario-datos">
+              <strong id="usuario-nombre">Cargando…</strong>
+              <small id="usuario-detalle"></small>
+            </div>
+            <button class="btn-salir" id="btn-salir" type="button">Cerrar sesión</button>
+          </div>
+        </header>
+
+        <!-- Aquí se renderizará el contenido -->
+        <div id="app-root"></div>
+
+        <footer class="pie">Galenos · Gestión clínica</footer>
+      </main>
+    </div>
+
+    <!-- Pantalla de ingreso (la llena login.js) -->
+    <div id="pantalla-login" class="pantalla-login" hidden></div>
+
+    <!-- Chart.js (debe cargar antes de main.js) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <!-- Script principal con parámetro para evitar caché -->
+    <script src="js/main.js?v=8" type="module" defer></script>
+  </body>
+</html>

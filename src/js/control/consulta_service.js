@@ -1,4 +1,4 @@
-import DefaultService from "./default_service";
+import DefaultService from "./default_service.js";
 class ConsultaService extends DefaultService {
     constructor(){
         super();

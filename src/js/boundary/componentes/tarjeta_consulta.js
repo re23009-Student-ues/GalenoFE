@@ -1,23 +1,24 @@
 import tarjetaConsulta from './tarjeta_simple.js';
 import consulta from '../../entity/consulta.js';
+import { formatoFecha, estadoConsulta } from "../../control/fechas.js";
 class TarjetaConsulta extends HTMLElement {
     constructor() {
-        super();
-        this.tarjetaConsulta = new tarjetaConsulta();
-        this.consulta = new consulta();
-        this.root = this.attachShadow({ mode: "open" });
-    }
+    super();
+    this.tarjeta = new tarjetaConsulta();
+    this.consulta = new consulta();
+    this.root = this.attachShadow({ mode: "open" });
+}
 
     connectedCallback() {
         //<p slot="titulo"></p>
         let titulo=document.createElement("p");
         titulo.setAttribute("slot","titulo");
         //remplazar el idConsulta por informacion importante
-        titulo.innerText=this.consulta.idConsulta;
+        titulo.textContent = formatoFecha(this.consulta.fechaInicio);
         
         let contenido=document.createElement("p");
         contenido.setAttribute("slot","contenido");
-        contenido.innerText='paciente: ${this.consulta.idPersonalRol.identificadorPersona}, Clinica: ${this.Consulta.idPersonaRol.identificarClinica}';
+       contenido.textContent = `${this.consulta.idPersonaRol?.idClinica?.nombre ?? ""} · ${estadoConsulta(this.consulta)}`;
 
         //TODO: footer
 

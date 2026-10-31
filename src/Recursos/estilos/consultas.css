@@ -1,46 +1,11 @@
-/* Vista Consultas */
+/* Pantalla Consultas (Agenda Médica). Las tarjetas se estilan en tarjeta.css. */
 
-/* ===== Vista de consultas ===== */
+consulta-controller {
+    display: block;
+}
+
 .lista-consultas {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 16px;
 }
-
-.tarjeta-consulta {
-    background: #fff;
-    border-radius: 14px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.tarjeta-consulta header {
-    background: var(--cielo);
-    padding: 14px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-}
-
-.tarjeta-consulta p {
-    padding: 12px 16px 0;
-    font-size: 14px;
-}
-
-.tarjeta-consulta p:last-child { padding-bottom: 14px; }
-.tarjeta-consulta .obs { color: var(--texto-suave); }
-
-.estado {
-    font-size: 12px;
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: #fff;
-    white-space: nowrap;
-}
-
-.estado--programada { color: var(--azul-fuerte); }
-.estado--en-curso   { color: #b26a00; }
-.estado--finalizada { color: var(--texto-suave); }

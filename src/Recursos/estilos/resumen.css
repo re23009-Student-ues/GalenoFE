@@ -1,4 +1,7 @@
 /* Vista Resumen (dashboard) */
+resumen-controller {
+    display: block;
+}
 
 /* ===== Dashboard: tarjetas de resumen ===== */
 .stats {

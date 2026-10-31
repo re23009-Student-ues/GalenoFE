@@ -1,0 +1,184 @@
+/* Vista Resumen (dashboard) */
+
+/* ===== Dashboard: tarjetas de resumen ===== */
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.stat {
+    border-radius: 14px;
+    padding: 16px 18px;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.stat strong {
+    font-size: 34px;
+    line-height: 1;
+}
+
+.stat small {
+    opacity: 0.85;
+}
+
+.stat--cielo  { background: var(--cielo); color: var(--marino); }
+.stat--medio  { background: var(--azul-medio); }
+.stat--marino { background: var(--marino); }
+.stat--fuerte { background: var(--azul-fuerte); }
+
+/* ===== Dashboard: paneles ===== */
+.dash-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.panel {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px;
+    min-width: 0;
+}
+
+.panel h3 {
+    margin-bottom: 14px;
+    font-size: 16px;
+}
+
+.panel--proximas {
+    grid-row: span 2;
+}
+
+.panel--recientes {
+    grid-column: span 2;
+}
+
+.vacio {
+    color: var(--texto-suave);
+    font-style: italic;
+}
+
+.lista-proximas {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.lista-proximas li strong {
+    display: block;
+    font-size: 14px;
+}
+
+.lista-proximas li small {
+    color: var(--texto-suave);
+}
+
+.grafica-caja {
+    position: relative;
+    height: 220px;
+}
+
+/* Dona hecha con conic-gradient (el degradado se calcula en main.js) */
+.dona {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    margin: 6px auto 14px;
+    position: relative;
+}
+
+.dona::after {
+    content: "";
+    position: absolute;
+    inset: 24%;
+    background: #fff;
+    border-radius: 50%;
+}
+
+.dona-centro {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.1;
+}
+
+.dona-centro strong { font-size: 24px; }
+.dona-centro small  { font-size: 12px; color: var(--texto-suave); }
+
+.leyenda {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 14px;
+    font-size: 13px;
+}
+
+.leyenda i {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+/* ===== Tabla de consultas recientes ===== */
+.tabla-caja {
+    overflow-x: auto; /* la tabla scrollea sola en móvil */
+}
+
+.tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.tabla th {
+    text-align: left;
+    color: var(--texto-suave);
+    font-weight: normal;
+    padding: 8px 10px;
+    border-bottom: 1px solid #e6ecf2;
+}
+
+.tabla td {
+    padding: 10px;
+    border-bottom: 1px solid #f0f4f8;
+}
+
+/* ===== Tablets ===== */
+@media (max-width: 1100px) {
+    .dash-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .panel--grafica {
+        grid-column: 1 / -1;
+    }
+    .panel--proximas {
+        grid-row: auto;
+    }
+    .panel--recientes {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ===== Teléfonos ===== */
+@media (max-width: 768px) {
+    .dash-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .panel--recientes {
+        grid-column: auto;
+    }
+}

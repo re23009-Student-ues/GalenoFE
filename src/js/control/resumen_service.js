@@ -1,52 +1,5 @@
 import ConsultaService from "./consulta_service.js";
-import PersonaRolService from "./personaRol_service.js";
 import { parseFecha } from "./fechas.js";
-
-const PAGINA = 50;   // el REST rechaza max > 50
-const TOPE = 1000;   // límite de seguridad de registros a traer
-const CLAVE_SESION = "sesionPersonaRol";
-
-/**
- * Recorre un servicio paginado (findRange) hasta traer todos los registros.
- * @param {DefaultService} servicio
- * @returns {Promise<Array>}
- */
-async function traerTodo(servicio) {
-    let todos = [];
-    while (todos.length < TOPE) {
-        const resp = await servicio.findRange(todos.length, PAGINA);
-        todos = todos.concat(resp.datos);
-        if (resp.datos.length < PAGINA) break;
-    }
-    return todos;
-}
-
-// ---------- Sesión ----------
-
-/** Todos los persona_rol (clínica + rol + persona) para armar el login. */
-export function listarPersonaRoles() {
-    return traerTodo(new PersonaRolService());
-}
-
-/** Recuerda quién inició sesión (se borra al cerrar la pestaña). */
-export function guardarSesion(idPersonaRol) {
-    sessionStorage.setItem(CLAVE_SESION, idPersonaRol);
-}
-
-export function cerrarSesion() {
-    sessionStorage.removeItem(CLAVE_SESION);
-}
-
-/**
- * persona_rol de la sesión guardada, o null si no hay sesión.
- * @returns {Promise<Object|null>}
- */
-export async function obtenerUsuario() {
-    const guardado = sessionStorage.getItem(CLAVE_SESION);
-    if (!guardado) return null;
-    const roles = await listarPersonaRoles();
-    return roles.find(pr => pr.idPersonaRol === guardado) ?? null;
-}
 
 // ---------- Consultas ----------
 
@@ -60,7 +13,7 @@ async function consultasVisibles(usuario) {
 
     // Se descartan duplicados por si el paginado repite registros
     const porId = new Map();
-    (await traerTodo(new ConsultaService())).forEach(c => porId.set(c.idConsulta, c));
+    (await new ConsultaService().findAll()).forEach(c => porId.set(c.idConsulta, c));
 
     return [...porId.values()]
         .filter(c => !idClinica || c.idPersonaRol?.idClinica?.idClinica === idClinica)

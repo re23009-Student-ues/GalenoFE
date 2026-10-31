@@ -1,4 +1,5 @@
-import { obtenerUsuario, cargarResumen, listarConsultas, cerrarSesion } from "./control/resumen_service.js";
+import { obtenerUsuario, cerrarSesion } from "./control/sesion_service.js";
+import { cargarResumen, listarConsultas } from "./control/resumen_service.js";
 import { formatoFecha, estadoConsulta } from "./control/fechas.js";
 import { mostrarLogin } from "./boundary/login.js";
 

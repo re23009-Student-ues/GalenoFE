@@ -1,4 +1,4 @@
-import { listarPersonaRoles, guardarSesion } from "../control/resumen_service.js";
+import { listarPersonaRoles, guardarSesion } from "../control/sesion_service.js";
 
 const PLANTILLA = `
     <form class="login-caja" id="login-form">

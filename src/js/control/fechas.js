@@ -15,3 +15,8 @@ export function estadoConsulta(c, ahora = new Date()) {
     if (inicio && inicio > ahora) return "Programada";
     return "En curso";
 }
+
+
+export function formatoCorto(fecha) {
+    return fecha.toLocaleString("es-SV", { dateStyle: "medium", timeStyle: "short" });
+}

@@ -1,7 +1,7 @@
 # GalenoFE
 
-Estructura de carpetas
-
+## Estructura de carpetas
+```
 GalenoFE/
 ├── src/                          ← TODO el código de la aplicación
 │   ├── index.html                ← única página; define el layout (menú, topbar, #app-root)
@@ -29,4 +29,5 @@ GalenoFE/
 │       └── lib/                  ← librerías de prueba (chai, mocha, sinon) — NO tocar
 ├── .vscode/                      ← configuración de depuración y tareas
 ├── .gitignore
-└── repomix-output.xml            ← volcado del repo para IA; se ignora en git, no editar.
+└── repomix-output.xml            ← volcado del repo para IA; se ignora en git, no editar
+```

@@ -1,5 +1,5 @@
 class DefaultError {
-    contructor(){
+    constructor(){
         this.mensaje="";
         this.error= null;
     }

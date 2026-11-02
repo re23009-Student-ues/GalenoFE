@@ -3,7 +3,7 @@ import DefaultResponse from "../entity/default_response.js";
 
 class DefaultService {
     constructor() {
-        this.BASE_URL = "http://localhost:9080/GalenoSV-1.0-SNAPSHOT/resources/v1/"; 
+        this.BASE_URL = `http://${location.hostname}:9080/GalenoSV-1.0-SNAPSHOT/resources/v1/`;
         this.URL = this.BASE_URL;
     }
 
@@ -41,6 +41,24 @@ class DefaultService {
         });
         return salida;
     }
+
+
+    /**
+     * Recorre findRange hasta traer todos los registros.
+     * @param {number} [tope=1000] limite de seguridad de registros a traer
+     * @returns {Promise.<Array>} una promesa que se resuelve con todos los registros
+     */
+    async findAll(tope = 1000) {
+        const PAGINA = 50;   // el REST rechaza max > 50
+        let todos = [];
+        while (todos.length < tope) {
+            const resp = await this.findRange(todos.length, PAGINA);
+            todos = todos.concat(resp.datos);
+            if (resp.datos.length < PAGINA) break;
+        }
+        return todos;
+    }
+
 }
 
 export default DefaultService;

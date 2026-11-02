@@ -1,0 +1,104 @@
+/* Pantalla de ingreso */
+
+/* ===== Pantalla de ingreso ===== */
+.pantalla-login {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: #e4f1fc url("../imagenes/fondo-login.svg") center / cover no-repeat;
+    display: flex;
+    justify-content: center;
+    padding: 16px;
+    overflow-y: auto;
+}
+
+/* Teléfono en vertical: fondo pensado para pantallas altas */
+@media (orientation: portrait) {
+    .pantalla-login {
+        background-image: url("../imagenes/fondo-login-vertical.svg");
+    }
+}
+
+.pantalla-login[hidden] {
+    display: none;
+}
+
+.login-caja {
+    background: #fff;
+    border-radius: 20px;
+    padding: 26px 26px 28px;
+    width: 100%;
+    max-width: 400px;
+    margin: auto; /* centra, y permite scroll si la pantalla es baja */
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    box-shadow: 0 20px 50px rgba(16, 46, 90, 0.18);
+}
+
+.login-logo {
+    width: 190px;
+    max-width: 70%;
+    height: auto;
+    align-self: center;
+}
+
+.login-sub {
+    color: var(--texto-suave);
+    font-size: 14px;
+    text-align: center;
+    margin-top: -4px;
+}
+
+.login-caja label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.login-caja select {
+    padding: 10px;
+    border: 1px solid #d5dde6;
+    border-radius: 8px;
+    font-size: 15px;
+    background: #fff;
+}
+
+.login-caja select:disabled {
+    background: #f1f5f9;
+    color: var(--texto-suave);
+}
+
+.login-aviso {
+    color: var(--texto-suave);
+    font-size: 13px;
+    min-height: 16px;
+}
+
+.login-caja button[type="submit"] {
+    background: var(--azul-fuerte);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 12px;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.login-caja button[type="submit"]:disabled {
+    background: #b9c7d6;
+    cursor: not-allowed;
+}
+
+.login-reintentar {
+    border: 1px solid #d5dde6;
+    background: #fff;
+    border-radius: 999px;
+    padding: 8px;
+    cursor: pointer;
+}
+
+.login-reintentar[hidden] {
+    display: none;
+}

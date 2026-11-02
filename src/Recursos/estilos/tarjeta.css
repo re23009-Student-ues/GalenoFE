@@ -1,0 +1,58 @@
+/* Estilos de <tarjeta-simple> (viven dentro de su shadow DOM).
+   Los colores salen de las variables de la paleta definidas en principal.css:
+   las variables CSS sí atraviesan el shadow DOM. */
+
+:host {
+    display: block;
+    background: #fff;
+    border-radius: 14px;
+    overflow: hidden;
+    font-size: 14px;
+    color: var(--texto, #26313f);
+}
+
+/* Los elementos que llegan por los slots no llevan márgenes propios */
+::slotted(*) {
+    margin: 0;
+}
+
+.header {
+    background: var(--cielo, #d6e9f8);
+    color: var(--marino, #1f3a5f);
+    font-weight: bold;
+    padding: 14px 16px;
+}
+
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 16px;
+}
+
+.footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px 14px;
+    font-size: 13px;
+    color: var(--texto-suave, #6f7b8a);
+}
+
+::slotted(.obs) {
+    color: var(--texto-suave, #6f7b8a);
+}
+
+/* Insignia de estado (la consulta la manda al pie) */
+::slotted(.estado) {
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--fondo, #eef5fc);
+    white-space: nowrap;
+}
+
+::slotted(.estado--programada) { color: var(--azul-fuerte, #1a73e8); }
+::slotted(.estado--en-curso)   { color: #b26a00; }
+::slotted(.estado--finalizada) { color: var(--texto-suave, #6f7b8a); }

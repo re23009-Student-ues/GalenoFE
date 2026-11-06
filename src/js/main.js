@@ -3,6 +3,7 @@ import { mostrarLogin } from "./boundary/login.js";
 import { iniciarMenu } from "./boundary/menu_lateral.js";
 import { pintarUsuario } from "./boundary/topbar.js";
 import { crearRouter } from "./router.js";
+import "./boundary/componentes/instalador_app.js";
 
 document.addEventListener("DOMContentLoaded", () => {
     let usuario = null;   // persona_rol de la sesión actual

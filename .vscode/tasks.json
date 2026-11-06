@@ -22,10 +22,10 @@
             "problemMatcher": []
         },
         {
-            "label": "apagarBrowserSync",
-            "type": "shell",
-            "command": "echo ${input:terminate}",
-            "problemMatcher": [],
+             "label": "apagarBrowserSync",
+             "type": "shell",
+             "command": "pkill -f '[b]rowser-sync start' || true",
+             "problemMatcher": []
         }
         
     ],
@@ -34,7 +34,7 @@
             "id": "matarBrowserSinc",
             "type": "command",
             "command": "workbench.action.tasks.terminate",
-            "args": "terminateALL",
+            "args": "terminateAll",
         }
         
     ]

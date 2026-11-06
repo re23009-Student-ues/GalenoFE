@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="Recursos/estilos/login.css" />
     <link rel="stylesheet" href="Recursos/estilos/resumen.css" />
     <link rel="stylesheet" href="Recursos/estilos/consultas.css" />
+    <link rel="manifest" href="manifest.json" />
   </head>
   <body>
     <div class="contenedor-app">
@@ -46,6 +47,7 @@
             ☰
           </button>
           <h1 id="titulo-pagina">Resumen</h1>
+          <instalador-app></instalador-app>
           <div class="usuario">
             <div class="avatar" id="usuario-avatar">--</div>
             <div class="usuario-datos">
@@ -72,5 +74,14 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <!-- Script principal con parámetro para evitar caché -->
     <script src="js/main.js?v=8" type="module" defer></script>
+
+    <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('serviceWorker.js')
+        .catch(err => console.error('No se registró el SW:', err));
+    });
+  }
+</script>
   </body>
 </html>

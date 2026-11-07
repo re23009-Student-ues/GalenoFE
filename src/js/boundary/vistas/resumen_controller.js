@@ -1,3 +1,4 @@
+import { BarChart } from "../componentes/charts/index.js";
 import { cargarResumen } from "../../control/resumen_service.js";
 import { formatoCorto } from "../../control/fechas.js";
 import { esc } from "../util_html.js";
@@ -28,6 +29,8 @@ class ResumenController extends HTMLElement {
     }
 
     async cargar() {
+        this.grafica?.destroy();
+        this.grafica = null;
         this.innerHTML = `<p class="aviso">Cargando resumen…</p>`;
 
         let d;
@@ -74,7 +77,7 @@ class ResumenController extends HTMLElement {
             <section class="dash-grid">
                 <div class="panel panel--grafica">
                     <h3>Consultas por mes · ${d.anio}</h3>
-                    <div class="grafica-caja"><canvas id="grafica-mes"></canvas></div>
+                    <div id="grafica-mes"></div>
                 </div>
 
                 <div class="panel">
@@ -132,27 +135,13 @@ function gradienteDona(manana, tarde, noche) {
     return `conic-gradient(${c1} 0 ${p1}%, ${c2} ${p1}% ${p2}%, ${c3} ${p2}% 100%)`;
 }
 
-/** Gráfica de barras con Chart.js (cargado desde index.html). */
-function dibujarGraficaMes(canvas, porMes) {
-    if (!canvas || typeof Chart === 'undefined') return null;
-
-    return new Chart(canvas, {
-        type: 'bar',
-        data: {
-            labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
-            datasets: [{
-                data: porMes,
-                backgroundColor: '#1a73e8',
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } } }
-        }
-    });
+/** Adaptación de los datos del servicio a la interfaz del componente. */
+function dibujarGraficaMes(container, porMes) {
+    const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    return new BarChart(container, {
+        data: porMes.map((value, index) => ({ label: meses[index], value })),
+       height: 260, colors: ['#1a73e8']
+    }).render();
 }
 
 customElements.define("resumen-controller", ResumenController);

@@ -78,12 +78,21 @@
     <script src="js/main.js?v=8" type="module" defer></script>
 
     <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('serviceWorker.js')
-        .catch(err => console.error('No se registró el SW:', err));
-    });
-  }
-</script>
+      if ('serviceWorker' in navigator) {
+        // Una pestaña controlada por la versión anterior debe cargar los módulos nuevos.
+        const teniaControlador = Boolean(navigator.serviceWorker.controller);
+        let recargando = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (teniaControlador && !recargando) {
+            recargando = true;
+            window.location.reload();
+          }
+        });
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('serviceWorker.js', { updateViaCache: 'none' })
+            .catch(error => console.error('No se registró el SW:', error));
+        });
+      }
+    </script>
   </body>
 </html>

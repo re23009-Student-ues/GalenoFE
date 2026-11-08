@@ -1,9 +1,12 @@
-const CACHE = 'galenosv-v2';
+const CACHE = 'galenosv-v3';
 const ARCHIVOS = [
   './',
   'index.html',
   'manifest.json',
+  'Recursos/estilos/calendar.css',
+  'Recursos/estilos/charts.css',
   'Recursos/estilos/consultas.css',
+  'Recursos/estilos/dataTable.css',
   'Recursos/estilos/login.css',
   'Recursos/estilos/notificacion.css',
   'Recursos/estilos/paciente.css',

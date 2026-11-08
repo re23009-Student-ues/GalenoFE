@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calendarios de citas · Galeno</title>
+    <link rel="stylesheet" href="../Recursos/estilos/principal.css">
+    <link rel="stylesheet" href="../js/boundary/componentes/calendar/calendar.css">
+    <style>
+        .calendar-demo { max-width: 1120px; margin: auto; padding: 20px; }
+        .calendar-demo h1, .calendar-demo h2, .calendar-demo p { margin-bottom: 16px; }
+        .calendar-demo__columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+        .calendar-demo__columns section { min-width: 0; }
+        .calendar-demo__controls { display: flex; gap: 12px; flex-wrap: wrap; margin: 20px 0; }
+        .calendar-demo__controls button { padding: 8px 12px; cursor: pointer; }
+        @media (max-width: 760px) { .calendar-demo__columns { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <main class="calendar-demo">
+        <h1>Calendarios de citas</h1>
+        <p>Ejemplo local con datos ficticios. Selecciona el 12 de noviembre de 2026 para consultar sus eventos.</p>
+        <div class="calendar-demo__columns">
+            <section>
+                <h2>Con lista de eventos</h2>
+                <div id="appointmentsCalendar"></div>
+            </section>
+            <section>
+                <h2>Con panel externo</h2>
+                <div id="agendaCalendar"></div>
+                <p id="external-events" role="status">Selecciona una fecha para ver sus eventos aquí.</p>
+            </section>
+        </div>
+        <div class="calendar-demo__controls">
+            <button id="add-event" type="button">Agregar cita ficticia</button>
+            <button id="remove-event" type="button">Eliminar esa cita</button>
+            <button id="update-events" type="button">Actualizar eventos ficticios</button>
+            <button id="destroy-calendars" type="button">Destruir calendarios</button>
+        </div>
+        <p id="calendar-feedback" role="status"></p>
+    </main>
+    <script type="module" src="./calendar.js"></script>
+</body>
+</html>

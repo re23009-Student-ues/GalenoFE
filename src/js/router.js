@@ -2,6 +2,8 @@
 // Una ruta sin `tag` todavía no tiene pantalla y muestra "en construcción".
 import "./boundary/vistas/resumen_controller.js";
 import "./boundary/vistas/consulta_controller.js";
+import "./boundary/vistas/paciente_controller.js";
+import { esPaciente } from "./control/roles.js";
 
 const rutas = {
     '/inicio': { titulo: 'Resumen', tag: 'resumen-controller' },
@@ -10,6 +12,11 @@ const rutas = {
     '/procedimientos': { titulo: 'Atención y Procedimientos' },
     '/laboratorio': { titulo: 'Laboratorio' },
     '/configuracion': { titulo: 'Configuración' }
+};
+
+const rutasPaciente = {
+    '/inicio': { titulo: 'Mi inicio', tag: 'paciente-controller', vista: 'inicio' },
+    '/consultas': { titulo: 'Mis consultas', tag: 'paciente-controller', vista: 'consultas' }
 };
 
 /**
@@ -21,7 +28,9 @@ const rutas = {
 export function crearRouter({ contenedor, tituloEl, obtenerUsuario }) {
 
     function manejarRuta(ruta) {
-        const { titulo, tag } = rutas[ruta] ?? rutas['/inicio'];
+        const usuario = obtenerUsuario();
+        const disponibles = esPaciente(usuario) ? rutasPaciente : rutas;
+        const { titulo, tag, vista } = disponibles[ruta] ?? disponibles['/inicio'];
         tituloEl.textContent = titulo;
 
         // replaceChildren desconecta el controller anterior (su disconnectedCallback limpia lo suyo)
@@ -34,13 +43,16 @@ export function crearRouter({ contenedor, tituloEl, obtenerUsuario }) {
         }
 
         const pantalla = document.createElement(tag);
-        pantalla.usuario = obtenerUsuario();   // el controller lo lee al conectarse
+        pantalla.vista = vista;
+        pantalla.usuario = usuario;   // el controller lo lee al conectarse
         contenedor.replaceChildren(pantalla);
     }
 
     function navegarA(ruta) {
-        window.history.pushState({}, '', ruta);
-        manejarRuta(ruta);
+        const disponibles = esPaciente(obtenerUsuario()) ? rutasPaciente : rutas;
+        const destino = disponibles[ruta] ? ruta : '/inicio';
+        window.history.pushState({}, '', destino);
+        manejarRuta(destino);
     }
 
     /** Vacía la pantalla (p. ej. al cerrar sesión). */

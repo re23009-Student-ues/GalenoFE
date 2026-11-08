@@ -1,4 +1,5 @@
 import ConsultaService from "./consulta_service.js";
+import { esPaciente } from "./roles.js";
 import { parseFecha } from "./fechas.js";
 
 // ---------- Consultas ----------
@@ -9,7 +10,8 @@ import { parseFecha } from "./fechas.js";
  */
 async function consultasVisibles(usuario) {
     const idClinica = usuario?.idClinica?.idClinica ?? null;
-    const esPaciente = usuario?.idRol?.nombre?.toLowerCase() === "paciente";
+    const paciente = esPaciente(usuario);
+    if (paciente && (!idClinica || !usuario.idPersonaRol)) return [];
 
     // Se descartan duplicados por si el paginado repite registros
     const porId = new Map();
@@ -17,7 +19,7 @@ async function consultasVisibles(usuario) {
 
     return [...porId.values()]
         .filter(c => !idClinica || c.idPersonaRol?.idClinica?.idClinica === idClinica)
-        .filter(c => !esPaciente || c.idPersonaRol?.idPersonaRol === usuario.idPersonaRol)
+        .filter(c => !paciente || c.idPersonaRol?.idPersonaRol === usuario.idPersonaRol)
         .filter(c => parseFecha(c.fechaInicio));
 }
 
@@ -69,6 +71,8 @@ export async function cargarResumen(usuario) {
     });
 
     return {
+        // Se reutilizan las consultas ya filtradas para la agenda personal, sin otra petición.
+        consultas: consultas.map(({ _inicio, ...consulta }) => consulta),
         anio: ahora.getFullYear(),
         clinica: usuario?.idClinica?.nombre ?? "Todas las clínicas",
         consultasAnio: delAnio.length,

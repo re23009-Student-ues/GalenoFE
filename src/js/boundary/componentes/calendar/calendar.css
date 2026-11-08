@@ -1,0 +1,57 @@
+.calendar {
+    --calendar-text: var(--texto, #26313f);
+    --calendar-muted: #526173;
+    --calendar-accent: var(--azul-fuerte, #1a73e8);
+    --calendar-selected: var(--marino, #1f3a5f);
+    --calendar-background: #fff;
+    --calendar-border: #e2e8f0;
+    --calendar-hover: #edf5fc;
+    --calendar-font: Arial, sans-serif;
+    --calendar-dot-size: 6px;
+    --calendar-dot-gap: 3px;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--calendar-border);
+    border-radius: 12px;
+    background: var(--calendar-background);
+    color: var(--calendar-text);
+    font: 14px var(--calendar-font);
+}
+.calendar--responsive { container-type: inline-size; }
+.calendar__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.calendar__heading { font-size: 17px; margin: 0; overflow-wrap: anywhere; }
+.calendar__navigation { display: flex; gap: 6px; }
+.calendar__button { padding: 7px 12px; background: var(--calendar-background); color: var(--calendar-text); border: 1px solid var(--calendar-border); border-radius: 6px; font: inherit; cursor: pointer; }
+.calendar__button:hover:enabled { background: var(--calendar-hover); }
+.calendar__button:disabled { opacity: .5; cursor: not-allowed; }
+.calendar__grid { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 3px; }
+.calendar__weekdays th { text-align: center; padding: 6px 0; color: var(--calendar-muted); font-size: 12px; overflow: hidden; }
+.calendar__weekdays abbr { text-decoration: none; }
+.calendar__cell { padding: 0; vertical-align: top; }
+.calendar__day { box-sizing: border-box; width: 100%; min-width: 0; height: 64px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: inherit; font: inherit; cursor: pointer; padding: 6px 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.calendar__day:hover { background: var(--calendar-hover); }
+.calendar__day--outside { color: var(--calendar-muted); background: #f8fafc; }
+.calendar__day--today .calendar__number { border-bottom: 2px solid var(--calendar-accent); font-weight: bold; }
+.calendar__day--selected, .calendar__day--selected:hover { background: var(--calendar-selected); color: #fff; }
+.calendar__day--selected .calendar__number { border-color: #fff; }
+.calendar__number { line-height: 1.4; }
+.calendar__dots { display: flex; align-items: center; justify-content: center; gap: var(--calendar-dot-gap); max-width: 100%; height: 12px; overflow: hidden; white-space: nowrap; }
+.calendar__dot { box-sizing: border-box; display: inline-block; width: var(--calendar-dot-size); height: var(--calendar-dot-size); border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 1px #64748b; }
+.calendar__more { font-size: 10px; flex-shrink: 0; }
+.calendar__event-list { border-top: 1px solid var(--calendar-border); margin-top: 16px; padding-top: 16px; }
+.calendar__list-heading { font-size: 14px; margin: 0 0 12px; }
+.calendar__events { margin: 0; padding: 0; list-style: none; }
+.calendar__event { display: flex; align-items: center; gap: 10px; box-sizing: border-box; width: 100%; border: 0; border-bottom: 1px solid var(--calendar-border); padding: 12px 4px; font: inherit; text-align: left; color: inherit; background: transparent; cursor: pointer; flex-wrap: wrap; }
+.calendar__event:hover { background: var(--calendar-hover); }
+.calendar__event-title { flex: 1 1 140px; overflow-wrap: anywhere; }
+.calendar__time { font-variant-numeric: tabular-nums; }
+.calendar__event-status { font-size: 12px; color: var(--calendar-muted); overflow-wrap: anywhere; }
+.calendar__empty { color: var(--calendar-muted); margin: 0; line-height: 1.5; }
+.calendar :is(button):focus-visible { outline: 2px solid var(--calendar-accent); outline-offset: 2px; }
+@container (max-width: 360px) {
+    .calendar--responsive .calendar__more { display: none; }
+    .calendar--responsive .calendar__day { height: 56px; }
+    .calendar--responsive .calendar__event-title { flex-basis: 100%; }
+}

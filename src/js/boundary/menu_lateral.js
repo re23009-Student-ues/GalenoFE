@@ -1,13 +1,27 @@
+import { esPaciente } from "../control/roles.js";
+
 /**
  * Barra lateral: menú hamburguesa en móvil, clics de navegación y ítem activo.
  * @param {Object} opciones
  * @param {function(string): void} opciones.onNavegar se llama con la ruta (data-route) del enlace pulsado
- * @returns {{marcarActiva: function(string): void, cerrar: function(): void}}
+ * @returns {{marcarActiva: function(string): void, cerrar: function(): void, configurarUsuario: function(Object): void}}
  */
 export function iniciarMenu({ onNavegar }) {
     const sidebar = document.querySelector('.sidebar');
     const btnMenu = document.getElementById('btn-menu-movil');
     const menuLateral = document.getElementById('menu-lateral');
+
+    const enlaces = [...(menuLateral?.querySelectorAll('a[data-route]') ?? [])].map(enlace => ({ enlace, texto: enlace.textContent }));
+
+    const configurarUsuario = usuario => {
+        const paciente = esPaciente(usuario);
+        const titulos = { '/inicio': 'Mi inicio', '/consultas': 'Mis consultas' };
+        enlaces.forEach(({ enlace, texto }) => {
+            const titulo = titulos[enlace.dataset.route];
+            enlace.hidden = paciente && !titulo;
+            enlace.textContent = paciente && titulo ? titulo : texto;
+        });
+    };
 
     const cerrar = () => sidebar?.classList.remove('abierta');
 
@@ -34,7 +48,7 @@ export function iniciarMenu({ onNavegar }) {
     // Clics en los enlaces del menú
     if (menuLateral) {
         menuLateral.addEventListener('click', (e) => {
-            if (e.target.tagName !== 'A') return;
+            if (e.target.tagName !== 'A' || e.target.hidden) return;
             e.preventDefault();
 
             const ruta = e.target.getAttribute('data-route');
@@ -44,5 +58,5 @@ export function iniciarMenu({ onNavegar }) {
         });
     }
 
-    return { marcarActiva, cerrar };
+    return { marcarActiva, cerrar, configurarUsuario };
 }

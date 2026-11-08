@@ -32,6 +32,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if (!usuario) usuario = await mostrarLogin();
 
+        menu.configurarUsuario(usuario);
         pintarUsuario(usuario);
         menu.marcarActiva('/inicio');
         router.manejarRuta('/inicio');

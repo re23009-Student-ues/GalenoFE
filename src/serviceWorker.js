@@ -50,6 +50,7 @@ const ARCHIVOS = [
   'js/control/resumen_service.js',
   'js/control/roles.js',
   'js/control/sesion_service.js',
+  'js/control/tipoDocumento_service.js',
   'js/control/tipoExamen_service.js',
   'js/entity/consulta.js',
   'js/entity/default_error.js',

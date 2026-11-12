@@ -15,7 +15,7 @@ export function iniciarMenu({ onNavegar }) {
 
     const configurarUsuario = usuario => {
         const paciente = esPaciente(usuario);
-        const titulos = { '/inicio': 'Mi inicio', '/consultas': 'Mis consultas' };
+        const titulos = { '/dashboard': 'Mi inicio', '/consultas': 'Mis consultas' };
         enlaces.forEach(({ enlace, texto }) => {
             const titulo = titulos[enlace.dataset.route];
             enlace.hidden = paciente && !titulo;

@@ -33,7 +33,7 @@ suite('Login simulado y portal del paciente', () => {
         sandbox.stub(ConsultaProcedimientoPasoService.prototype, 'listarParaConsultas').resolves([]);
         fixture = document.querySelector('#fixtures');
         fixture.innerHTML = `<aside class="sidebar"><nav id="menu-lateral">
-            <a data-route="/inicio">Inicio</a><a data-route="/personas">Gestión de Personas</a>
+            <a data-route="/dashboard">Inicio</a><a data-route="/personas">Gestión de Personas</a>
             <a data-route="/consultas">Agenda Médica</a><a data-route="/configuracion">Configuración</a>
             </nav></aside><h1 id="test-title"></h1><div id="test-root"></div><div id="pantalla-login" hidden></div>`;
         actual = paciente;
@@ -69,7 +69,7 @@ suite('Login simulado y portal del paciente', () => {
         assert.equal(resumen.proximas[0].observaciones, 'Consulta personal');
     });
     test('Inicio personal en lugar del resumen de gestión', async () => {
-        router.manejarRuta('/inicio'); await settle();
+        router.manejarRuta('/dashboard'); await settle();
         assert.equal(fixture.querySelector('#test-title').textContent, 'Mi inicio');
         assert.exists(fixture.querySelector('paciente-controller'));
         assert.notExists(fixture.querySelector('resumen-controller'));
@@ -98,7 +98,7 @@ suite('Login simulado y portal del paciente', () => {
         assert.equal(fixture.querySelector('[data-route="/consultas"]').textContent, 'Agenda Médica');
     });
     test('Otros roles conservan el resumen y agenda existentes', async () => {
-        actual = medico; router.manejarRuta('/inicio'); await settle();
+        actual = medico; router.manejarRuta('/dashboard'); await settle();
         assert.exists(fixture.querySelector('resumen-controller'));
         assert.equal(fixture.querySelector('#test-title').textContent, 'Resumen');
         router.manejarRuta('/consultas'); await settle();
@@ -121,7 +121,7 @@ suite('Login simulado y portal del paciente', () => {
             { ...consultas[0], fechaInicio:`${hoy}T09:00:00-06:00[America/El_Salvador]` },
             { ...consultas[1], fechaInicio:`${hoy}T10:00:00-06:00[America/El_Salvador]` }
         ]);
-        router.manejarRuta('/inicio'); await settle();
+        router.manejarRuta('/dashboard'); await settle();
         const pantalla = fixture.querySelector('paciente-controller');
         assert.equal(pantalla.calendario.getSelectedDate(), hoy);
         assert.equal(fixture.querySelector(`[data-date="${hoy}"]`).getAttribute('aria-pressed'), 'true');
@@ -147,7 +147,7 @@ suite('Login simulado y portal del paciente', () => {
                 idPersonaRol:{idPersona:{nombres:'Luis',apellidos:'Pérez'},idRol:{nombre:'Médico'}},
                 idProcedimientoPaso:{nombre:'Evaluación inicial'} }
         ]);
-        router.manejarRuta('/inicio'); await settle();
+        router.manejarRuta('/dashboard'); await settle();
         assert.include(fixture.querySelector('.paciente__citas-dia').textContent, 'No tienes citas para esta fecha');
         const pantalla = fixture.querySelector('paciente-controller');
         pantalla.calendario.goToDate(otraFecha);
@@ -169,7 +169,7 @@ suite('Login simulado y portal del paciente', () => {
                 idPersonaRol:{idPersona:{nombres:'Sara',apellidos:'Díaz'},idRol:{nombre:'Atencion al publico'}},
                 idProcedimientoPaso:{nombre:'Registro del paciente',idRol:{nombre:'Doctor'}},estado:'PENDIENTE' }
         ]);
-        router.manejarRuta('/inicio'); await settle();
+        router.manejarRuta('/dashboard'); await settle();
         const tarjeta = fixture.querySelector('.paciente__cita');
         assert.include(tarjeta.textContent,'Responsable: Sara Díaz (Atencion al publico)');
         assert.notInclude(tarjeta.textContent,'Doctor:');
@@ -178,7 +178,7 @@ suite('Login simulado y portal del paciente', () => {
     });
     test('Error al cargar pasos se muestra y permite reintentar sin inventar asignaciones', async () => {
         ConsultaProcedimientoPasoService.prototype.listarParaConsultas.rejects({mensaje:'No se pudieron cargar los pasos'});
-        router.manejarRuta('/inicio'); await settle();
+        router.manejarRuta('/dashboard'); await settle();
         assert.include(fixture.textContent,'No se pudieron cargar los pasos');
         assert.notExists(fixture.querySelector('.paciente__cita'));
         ConsultaProcedimientoPasoService.prototype.listarParaConsultas.resolves([]);

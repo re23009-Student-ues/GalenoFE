@@ -1,4 +1,3 @@
-import PersonaRolService from "./personaRol_service.js";
 import DefaultService from "./default_service.js";
 import DefaultError from "../entity/default_error.js";
 import { esPaciente } from "./roles.js";
@@ -6,22 +5,20 @@ import { esPaciente } from "./roles.js";
 const CLAVE_SESION = "sesionPersonaRol";
 const CLAVE_PERSONA = "sesionPersona";
 
-/** Todos los persona_rol (clínica + rol + persona) para armar el login. */
-export function listarPersonaRoles() {
-    return new PersonaRolService().findAll();
-}
-
 /** Recuerda quién inició sesión (se borra al cerrar la pestaña). */
 export function guardarSesion(persona) {
-    // Compatibilidad con el login actual hasta integrar HU2.
-    if (typeof persona === 'string') {
-        sessionStorage.removeItem(CLAVE_PERSONA);
-        sessionStorage.setItem(CLAVE_SESION, persona);
-        return;
-    }
     const { idPersona, nombres, apellidos } = persona;
     sessionStorage.setItem(CLAVE_PERSONA, JSON.stringify({ idPersona, nombres, apellidos }));
     sessionStorage.removeItem(CLAVE_SESION);
+}
+
+/** Contexto de clínica y rol elegido por el empleado (HU3). */
+export function establecerContexto(personaRol) {
+    sessionStorage.setItem(CLAVE_SESION, personaRol.idPersonaRol);
+}
+
+export function obtenerContexto() {
+    return sessionStorage.getItem(CLAVE_SESION);
 }
 
 /** Persona de HU2, sin roles ni clínica persistidos. */
@@ -95,15 +92,4 @@ export async function autenticarEmpleado(tipoDocumento, valor) {
     const personaRoles = (await rolesDePersona(persona.idPersona)).filter(rol => !esPaciente(rol));
     if (!personaRoles.length) throw errorSesion('Solo el personal puede ingresar');
     return { persona, personaRoles };
-}
-
-/**
- * persona_rol de la sesión guardada, o null si no hay sesión.
- * @returns {Promise<Object|null>}
- */
-export async function obtenerUsuario() {
-    const guardado = sessionStorage.getItem(CLAVE_SESION);
-    if (!guardado) return null;
-    const roles = await listarPersonaRoles();
-    return roles.find(pr => pr.idPersonaRol === guardado) ?? null;
 }

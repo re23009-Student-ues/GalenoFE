@@ -4,7 +4,7 @@ import DefaultError from '../../../src/js/entity/default_error.js';
 import TipoDocumentoService from '../../../src/js/control/tipoDocumento_service.js';
 import {
     autenticarEmpleado, buscarDocumento, rolesDePersona,
-    guardarSesion, obtenerSesion, cerrarSesion
+    guardarSesion, obtenerSesion, cerrarSesion, establecerContexto, obtenerContexto
 } from '../../../src/js/control/sesion_service.js';
 
 mocha.setup('tdd');
@@ -129,7 +129,7 @@ suite('Autenticación del personal por documento (HU2)', () => {
     });
 
     test('guarda solo la identidad de la persona y cerrar borra la sesión', () => {
-        guardarSesion('rol-anterior');
+        establecerContexto({ idPersonaRol: 'rol-anterior' });
         guardarSesion({ ...persona, idRol: { nombre: 'Médico' }, idClinica: { idClinica: '1' } });
         assert.deepEqual(obtenerSesion(), persona);
         assert.deepEqual(JSON.parse(sessionStorage.getItem('sesionPersona')), persona);
@@ -140,10 +140,13 @@ suite('Autenticación del personal por documento (HU2)', () => {
         assert.isNull(obtenerSesion());
     });
 
-    test('mantiene la compatibilidad del login anterior sin mezclar sesiones', () => {
+    test('establece el contexto por separado y cerrar borra persona y contexto', () => {
         guardarSesion(persona);
-        guardarSesion('rol-actual');
-        assert.equal(sessionStorage.getItem('sesionPersonaRol'), 'rol-actual');
+        establecerContexto({ idPersonaRol: 'rol-actual', idClinica: { idClinica: '1' } });
+        assert.equal(obtenerContexto(), 'rol-actual');
+        assert.deepEqual(obtenerSesion(), persona);
+        cerrarSesion();
+        assert.isNull(obtenerContexto());
         assert.isNull(obtenerSesion());
     });
 

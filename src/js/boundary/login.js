@@ -1,18 +1,17 @@
-import { listarPersonaRoles, guardarSesion } from "../control/sesion_service.js";
+import { autenticarEmpleado, guardarSesion } from "../control/sesion_service.js";
+import TipoDocumentoService from "../control/tipoDocumento_service.js";
 
 const PLANTILLA = `
     <form class="login-caja" id="login-form">
         <img class="login-logo" src="Recursos/imagenes/logo.png" alt="GalenoSV · Tu salud, nuestra prioridad" />
-        <p class="login-sub">Elige cómo quieres entrar</p>
+        <p class="login-sub">Ingresa con tu documento</p>
 
-        <label>Clínica
-            <select id="login-clinica" disabled></select>
+        <label>Tipo de documento
+            <select id="login-tipo-documento" aria-describedby="login-indicaciones" disabled></select>
         </label>
-        <label>Rol
-            <select id="login-rol" disabled></select>
-        </label>
-        <label>Persona
-            <select id="login-persona" disabled></select>
+        <p class="login-aviso" id="login-indicaciones"></p>
+        <label>Número de documento
+            <input id="login-documento" type="text" autocomplete="off" aria-describedby="login-indicaciones" />
         </label>
 
         <p class="login-aviso" id="login-aviso">Cargando…</p>
@@ -20,14 +19,12 @@ const PLANTILLA = `
         <button type="submit" id="login-entrar" disabled>Entrar</button>
     </form>`;
 
-/** Opciones únicas [{valor, texto}] de una lista, ordenadas por texto. */
-function unicos(lista, fnValor, fnTexto) {
-    const mapa = new Map();
-    lista.forEach(item => mapa.set(fnValor(item), fnTexto(item)));
-    return [...mapa]
-        .map(([valor, texto]) => ({ valor, texto }))
-        .sort((a, b) => a.texto.localeCompare(b.texto, "es"));
+class LoginFormulario extends HTMLElement {
+    connectedCallback() {
+        this.innerHTML = PLANTILLA;
+    }
 }
+customElements.define('login-formulario', LoginFormulario);
 
 /** Llena un <select> con opciones (se usa Option: el texto nunca se interpreta como HTML). */
 function llenar(select, opciones, textoInicial) {
@@ -41,18 +38,18 @@ function llenar(select, opciones, textoInicial) {
 }
 
 /**
- * Muestra la pantalla de ingreso: clínica → rol → persona.
- * @returns {Promise<Object>} el persona_rol elegido (ya guardado como sesión)
+ * Autentica al personal por documento, sin elegir clínica ni rol.
+ * @returns {Promise<{persona: Object, personaRoles: Array}>}
  */
 export async function mostrarLogin() {
     const pantalla = document.getElementById("pantalla-login");
-    pantalla.innerHTML = PLANTILLA;
+    pantalla.replaceChildren(document.createElement('login-formulario'));
     pantalla.hidden = false;
 
     const form = pantalla.querySelector("#login-form");
-    const selClinica = pantalla.querySelector("#login-clinica");
-    const selRol = pantalla.querySelector("#login-rol");
-    const selPersona = pantalla.querySelector("#login-persona");
+    const selTipo = pantalla.querySelector("#login-tipo-documento");
+    const documento = pantalla.querySelector("#login-documento");
+    const indicaciones = pantalla.querySelector("#login-indicaciones");
     const aviso = pantalla.querySelector("#login-aviso");
     const btnEntrar = pantalla.querySelector("#login-entrar");
     const btnReintentar = pantalla.querySelector("#login-reintentar");
@@ -63,8 +60,7 @@ export async function mostrarLogin() {
         aviso.textContent = "Cargando…";
         btnReintentar.hidden = true;
         try {
-            lista = (await listarPersonaRoles())
-                .filter(pr => pr.idClinica && pr.idRol && pr.idPersona);
+            lista = (await new TipoDocumentoService().findAll()).filter(tipo => tipo.activo === true);
             break;
         } catch (err) {
             console.error(err);
@@ -75,50 +71,44 @@ export async function mostrarLogin() {
     }
 
     if (!lista.length) {
-        aviso.textContent = "No hay personas registradas en el sistema.";
+        aviso.textContent = "No hay tipos de documento activos.";
     } else {
         aviso.textContent = "";
     }
 
-    // 2. Selects encadenados
-    const nombreCompleto = pr => `${pr.idPersona.nombres ?? ""} ${pr.idPersona.apellidos ?? ""}`.trim() || "Sin nombre";
-
-    const alElegirClinica = () => {
-        const roles = lista.filter(pr => pr.idClinica.idClinica === selClinica.value);
-        llenar(selRol, unicos(roles, pr => pr.idRol.idRol, pr => pr.idRol.nombre ?? "Sin nombre"), "Elige un rol");
-        alElegirRol();
+    let consultando = false;
+    const actualizar = () => {
+        const tipo = lista.find(tipo => String(tipo.idTipoDocumento) === selTipo.value);
+        indicaciones.textContent = tipo?.indicaciones ?? '';
+        btnEntrar.disabled = consultando || !tipo || !documento.value.trim();
     };
-
-    const alElegirRol = () => {
-        const personas = lista.filter(pr =>
-            pr.idClinica.idClinica === selClinica.value && pr.idRol.idRol === selRol.value);
-        llenar(selPersona, unicos(personas, pr => pr.idPersonaRol, nombreCompleto), "Elige una persona");
-        alElegirPersona();
-    };
-
-    const alElegirPersona = () => {
-        btnEntrar.disabled = !selPersona.value;
-    };
-
-    selClinica.addEventListener("change", alElegirClinica);
-    selRol.addEventListener("change", alElegirRol);
-    selPersona.addEventListener("change", alElegirPersona);
-
-    llenar(selClinica,
-        unicos(lista, pr => pr.idClinica.idClinica, pr => pr.idClinica.nombre ?? "Sin nombre"),
-        "Elige una clínica");
-    alElegirClinica();
+    selTipo.addEventListener('change', actualizar);
+    documento.addEventListener('input', actualizar);
+    llenar(selTipo, lista.map(tipo => ({ valor: tipo.idTipoDocumento, texto: tipo.nombre })), 'Elige un tipo');
+    actualizar();
 
     // 3. Esperar a que la persona entre
     return new Promise(resolve => {
-        form.addEventListener("submit", e => {
+        form.addEventListener("submit", async e => {
             e.preventDefault();
-            const elegido = lista.find(pr => pr.idPersonaRol === selPersona.value);
-            if (!elegido) return;
-            guardarSesion(elegido.idPersonaRol);
-            pantalla.hidden = true;
-            pantalla.innerHTML = "";
-            resolve(elegido);
+            if (consultando || btnEntrar.disabled) return;
+            const tipo = lista.find(tipo => String(tipo.idTipoDocumento) === selTipo.value);
+            consultando = true;
+            actualizar();
+            aviso.textContent = 'Consultando…';
+            try {
+                const resultado = await autenticarEmpleado(tipo, documento.value.trim());
+                const { idPersona, nombres, apellidos } = resultado.persona;
+                guardarSesion({ idPersona, nombres, apellidos });
+                pantalla.hidden = true;
+                pantalla.innerHTML = "";
+                resolve(resultado);
+            } catch (err) {
+                aviso.textContent = err.mensaje ?? 'No se pudo iniciar sesión';
+            } finally {
+                consultando = false;
+                actualizar();
+            }
         });
     });
 }

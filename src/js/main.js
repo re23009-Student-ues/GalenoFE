@@ -1,11 +1,12 @@
-import { obtenerUsuario, cerrarSesion } from "./control/sesion_service.js";
+import { obtenerSesion, rolesDePersona, establecerContexto, obtenerContexto, cerrarSesion } from "./control/sesion_service.js";
+import { esPaciente } from "./control/roles.js";
 import { mostrarLogin } from "./boundary/login.js";
 import { iniciarMenu } from "./boundary/menu_lateral.js";
 import { pintarUsuario } from "./boundary/topbar.js";
 import { crearRouter } from "./router.js";
 import "./boundary/componentes/instalador_app.js";
 
-document.addEventListener("DOMContentLoaded", () => {
+export function iniciarAplicacion() {
     let usuario = null;   // persona_rol de la sesión actual
     let loginEnCurso = false;
 
@@ -21,7 +22,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (loginEnCurso) return;
         loginEnCurso = true;
         try {
-            usuario = await mostrarLogin();
+            const { personaRoles } = await mostrarLogin();
+            usuario = personaRoles[0];
+            establecerContexto(usuario);
             menu.configurarUsuario(usuario);
             pintarUsuario(usuario);
             router.navegarA(router.tomarPendiente('/dashboard'));
@@ -36,6 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Cerrar sesión: vuelve a la pantalla de ingreso
     document.getElementById('btn-salir')?.addEventListener('click', () => {
         cerrarSesion();
+        router.navegarA('/login');
         entrar();
     });
 
@@ -44,11 +48,22 @@ document.addEventListener("DOMContentLoaded", () => {
         router.detener();   // cancela cualquier carga pendiente
         menu.cerrar();
 
-        usuario = await obtenerUsuario().catch(err => {
+        usuario = null;
+        let falloSesion = false;
+        try {
+            const persona = obtenerSesion();
+            if (persona) {
+                const roles = (await rolesDePersona(persona.idPersona)).filter(rol => !esPaciente(rol));
+                usuario = roles.find(rol => String(rol.idPersonaRol) === obtenerContexto()) ?? null;
+                if (!usuario) throw new Error('El contexto de la sesión ya no está disponible');
+            }
+        } catch (err) {
             console.error(err);
-            return null;
-        });
+            cerrarSesion();
+            falloSesion = true;
+        }
         router.iniciar();
+        if (falloSesion) router.navegarA('/login');
         if (usuario && window.location.hash === '#/login') {
             router.navegarA('/dashboard');
         }
@@ -58,5 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
         menu.marcarActiva(window.location.hash.slice(1));
     }
 
-    entrar();
-});
+    return { router, listo: entrar() };
+}
+
+document.addEventListener("DOMContentLoaded", iniciarAplicacion);

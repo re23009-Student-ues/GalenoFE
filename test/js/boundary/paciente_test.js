@@ -1,12 +1,10 @@
 import { assert } from '../lib/chai/index.js';
 import sinon from '../lib/sinon/sinon-esm.js';
-import { mostrarLogin } from '../../../src/js/boundary/login.js';
-import { obtenerUsuario } from '../../../src/js/control/sesion_service.js';
+import { establecerContexto, obtenerContexto } from '../../../src/js/control/sesion_service.js';
 import { esPaciente } from '../../../src/js/control/roles.js';
 import { iniciarMenu } from '../../../src/js/boundary/menu_lateral.js';
 import { crearRouter } from '../../../src/js/router.js';
 import { cargarResumen, listarConsultas } from '../../../src/js/control/resumen_service.js';
-import PersonaRolService from '../../../src/js/control/personaRol_service.js';
 import ConsultaService from '../../../src/js/control/consulta_service.js';
 import ConsultaProcedimientoPasoService from '../../../src/js/control/consultaProcedimientoPaso_service.js';
 import { todayKey, addDays } from '../../../src/js/boundary/componentes/calendar/calendar_dates.js';
@@ -23,12 +21,11 @@ const consultas = [
 const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
 mocha.setup('tdd');
-suite('Login simulado y portal del paciente', () => {
+suite('Contexto y portal del paciente', () => {
     let fixture, sandbox, router, actual, sesionPrevia;
     setup(() => {
         sesionPrevia = sessionStorage.getItem('sesionPersonaRol'); sessionStorage.removeItem('sesionPersonaRol');
         sandbox = sinon.createSandbox();
-        sandbox.stub(PersonaRolService.prototype, 'findAll').resolves([paciente, otro, medico, otraClinica]);
         sandbox.stub(ConsultaService.prototype, 'findAll').resolves(consultas);
         sandbox.stub(ConsultaProcedimientoPasoService.prototype, 'listarParaConsultas').resolves([]);
         fixture = document.querySelector('#fixtures');
@@ -44,16 +41,11 @@ suite('Login simulado y portal del paciente', () => {
         if (sesionPrevia === null) sessionStorage.removeItem('sesionPersonaRol');
         else sessionStorage.setItem('sesionPersonaRol', sesionPrevia);
     });
-    test('Seleccionar Paciente en el login guarda y restaura esa sesión', async () => {
-        const ingreso = mostrarLogin(); await settle();
-        const clinica = fixture.querySelector('#login-clinica'); clinica.value = 'clinica-1'; clinica.dispatchEvent(new Event('change'));
-        const rol = fixture.querySelector('#login-rol'); rol.value = 'paciente'; rol.dispatchEvent(new Event('change'));
-        const persona = fixture.querySelector('#login-persona'); persona.value = 'paciente-1'; persona.dispatchEvent(new Event('change'));
-        assert.isFalse(fixture.querySelector('#login-entrar').disabled);
-        fixture.querySelector('form').dispatchEvent(new Event('submit', { cancelable:true }));
-        assert.strictEqual(await ingreso, paciente);
-        assert.equal(sessionStorage.getItem('sesionPersonaRol'), 'paciente-1');
-        assert.strictEqual(await obtenerUsuario(), paciente);
+    test('El contexto conserva el persona_rol usado por el portal', () => {
+        establecerContexto(paciente);
+        assert.equal(obtenerContexto(), paciente.idPersonaRol);
+        establecerContexto(medico);
+        assert.equal(obtenerContexto(), medico.idPersonaRol);
     });
     test('Detección de rol tolera mayúsculas y espacios', () => {
         assert.isTrue(esPaciente({...paciente,idRol:{nombre:' PACIENTE '}}));

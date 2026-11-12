@@ -1,33 +1,23 @@
-import { listarPersonaRoles, guardarSesion } from "../control/sesion_service.js";
+import { autenticarEmpleado, guardarSesion } from "../control/sesion_service.js";
+import TipoDocumentoService from "../control/tipoDocumento_service.js";
 
 const PLANTILLA = `
     <form class="login-caja" id="login-form">
         <img class="login-logo" src="Recursos/imagenes/logo.png" alt="GalenoSV · Tu salud, nuestra prioridad" />
-        <p class="login-sub">Elige cómo quieres entrar</p>
+        <p class="login-sub">Ingresa con tu documento</p>
 
-        <label>Clínica
-            <select id="login-clinica" disabled></select>
+        <label for="login-tipo-documento">Tipo de documento
+            <select id="login-tipo-documento" aria-describedby="login-indicaciones" disabled></select>
         </label>
-        <label>Rol
-            <select id="login-rol" disabled></select>
-        </label>
-        <label>Persona
-            <select id="login-persona" disabled></select>
+        <p class="login-aviso" id="login-indicaciones"></p>
+        <label for="login-documento">Número de documento
+            <input id="login-documento" type="text" autocomplete="off" aria-describedby="login-indicaciones" />
         </label>
 
-        <p class="login-aviso" id="login-aviso">Cargando…</p>
+        <p class="login-aviso" id="login-aviso" role="alert" aria-live="assertive" aria-atomic="true">Cargando…</p>
         <button type="button" id="login-reintentar" class="login-reintentar" hidden>Reintentar</button>
         <button type="submit" id="login-entrar" disabled>Entrar</button>
     </form>`;
-
-/** Opciones únicas [{valor, texto}] de una lista, ordenadas por texto. */
-function unicos(lista, fnValor, fnTexto) {
-    const mapa = new Map();
-    lista.forEach(item => mapa.set(fnValor(item), fnTexto(item)));
-    return [...mapa]
-        .map(([valor, texto]) => ({ valor, texto }))
-        .sort((a, b) => a.texto.localeCompare(b.texto, "es"));
-}
 
 /** Llena un <select> con opciones (se usa Option: el texto nunca se interpreta como HTML). */
 function llenar(select, opciones, textoInicial) {
@@ -40,85 +30,93 @@ function llenar(select, opciones, textoInicial) {
     }
 }
 
-/**
- * Muestra la pantalla de ingreso: clínica → rol → persona.
- * @returns {Promise<Object>} el persona_rol elegido (ya guardado como sesión)
- */
-export async function mostrarLogin() {
-    const pantalla = document.getElementById("pantalla-login");
-    pantalla.innerHTML = PLANTILLA;
-    pantalla.hidden = false;
+/** Formulario autónomo: autentica y comunica el resultado al shell. */
+class GalenoLogin extends HTMLElement {
+    connectedCallback() { this.iniciar(); }
+    disconnectedCallback() { this.escuchas?.abort(); }
 
-    const form = pantalla.querySelector("#login-form");
-    const selClinica = pantalla.querySelector("#login-clinica");
-    const selRol = pantalla.querySelector("#login-rol");
-    const selPersona = pantalla.querySelector("#login-persona");
-    const aviso = pantalla.querySelector("#login-aviso");
-    const btnEntrar = pantalla.querySelector("#login-entrar");
-    const btnReintentar = pantalla.querySelector("#login-reintentar");
+    async iniciar() {
+        this.escuchas?.abort();
+        const escuchas = this.escuchas = new AbortController();
+        const { signal } = escuchas;
+        const vigente = () => this.isConnected && !signal.aborted;
+        const pantalla = this;
+        pantalla.innerHTML = PLANTILLA;
 
-    // 1. Traer los datos (con reintento si el servidor no responde)
-    let lista;
-    while (true) {
-        aviso.textContent = "Cargando…";
-        btnReintentar.hidden = true;
-        try {
-            lista = (await listarPersonaRoles())
-                .filter(pr => pr.idClinica && pr.idRol && pr.idPersona);
-            break;
-        } catch (err) {
-            console.error(err);
-            aviso.textContent = `${err.mensaje ?? "No se pudo conectar"}. Revisa que el servidor esté en marcha.`;
-            btnReintentar.hidden = false;
-            await new Promise(r => btnReintentar.addEventListener("click", r, { once: true }));
+        const form = pantalla.querySelector("#login-form");
+        const selTipo = pantalla.querySelector("#login-tipo-documento");
+        const documento = pantalla.querySelector("#login-documento");
+        const indicaciones = pantalla.querySelector("#login-indicaciones");
+        const aviso = pantalla.querySelector("#login-aviso");
+        const btnEntrar = pantalla.querySelector("#login-entrar");
+        const btnReintentar = pantalla.querySelector("#login-reintentar");
+
+        // 1. Traer los datos (con reintento si el servidor no responde)
+        let lista;
+        while (true) {
+            aviso.textContent = "Cargando…";
+            btnReintentar.hidden = true;
+            try {
+                lista = (await new TipoDocumentoService().findAll()).filter(tipo => tipo.activo === true);
+                if (!vigente()) return;
+                break;
+            } catch (err) {
+                if (!vigente()) return;
+                console.error(err);
+                aviso.textContent = `${err.mensaje ?? "No se pudo conectar"}. Revisa que el servidor esté en marcha.`;
+                btnReintentar.hidden = false;
+                await new Promise(r => {
+                    btnReintentar.addEventListener("click", r, { once: true, signal });
+                    signal.addEventListener('abort', r, { once: true });
+                });
+                if (!vigente()) return;
+            }
         }
-    }
 
-    if (!lista.length) {
-        aviso.textContent = "No hay personas registradas en el sistema.";
-    } else {
-        aviso.textContent = "";
-    }
+        if (!lista.length) {
+            aviso.textContent = "No hay tipos de documento activos.";
+        } else {
+            aviso.textContent = "";
+        }
 
-    // 2. Selects encadenados
-    const nombreCompleto = pr => `${pr.idPersona.nombres ?? ""} ${pr.idPersona.apellidos ?? ""}`.trim() || "Sin nombre";
+        let consultando = false;
+        let autenticado = false;
+        const actualizar = () => {
+            const tipo = lista.find(tipo => String(tipo.idTipoDocumento) === selTipo.value);
+            indicaciones.textContent = tipo?.indicaciones ?? '';
+            btnEntrar.disabled = consultando || autenticado || !tipo || !documento.value.trim();
+        };
+        selTipo.addEventListener('change', actualizar, { signal });
+        documento.addEventListener('input', actualizar, { signal });
+        llenar(selTipo, lista.map(tipo => ({ valor: tipo.idTipoDocumento, texto: tipo.nombre })), 'Elige un tipo');
+        actualizar();
+        if (!selTipo.disabled) selTipo.focus();
 
-    const alElegirClinica = () => {
-        const roles = lista.filter(pr => pr.idClinica.idClinica === selClinica.value);
-        llenar(selRol, unicos(roles, pr => pr.idRol.idRol, pr => pr.idRol.nombre ?? "Sin nombre"), "Elige un rol");
-        alElegirRol();
-    };
-
-    const alElegirRol = () => {
-        const personas = lista.filter(pr =>
-            pr.idClinica.idClinica === selClinica.value && pr.idRol.idRol === selRol.value);
-        llenar(selPersona, unicos(personas, pr => pr.idPersonaRol, nombreCompleto), "Elige una persona");
-        alElegirPersona();
-    };
-
-    const alElegirPersona = () => {
-        btnEntrar.disabled = !selPersona.value;
-    };
-
-    selClinica.addEventListener("change", alElegirClinica);
-    selRol.addEventListener("change", alElegirRol);
-    selPersona.addEventListener("change", alElegirPersona);
-
-    llenar(selClinica,
-        unicos(lista, pr => pr.idClinica.idClinica, pr => pr.idClinica.nombre ?? "Sin nombre"),
-        "Elige una clínica");
-    alElegirClinica();
-
-    // 3. Esperar a que la persona entre
-    return new Promise(resolve => {
-        form.addEventListener("submit", e => {
+        // 3. Esperar a que la persona entre
+        form.addEventListener("submit", async e => {
             e.preventDefault();
-            const elegido = lista.find(pr => pr.idPersonaRol === selPersona.value);
-            if (!elegido) return;
-            guardarSesion(elegido.idPersonaRol);
-            pantalla.hidden = true;
-            pantalla.innerHTML = "";
-            resolve(elegido);
-        });
-    });
+            if (consultando || btnEntrar.disabled) return;
+            const tipo = lista.find(tipo => String(tipo.idTipoDocumento) === selTipo.value);
+            consultando = true;
+            actualizar();
+            aviso.textContent = 'Consultando…';
+            try {
+                const resultado = await autenticarEmpleado(tipo, documento.value.trim());
+                if (!vigente()) return;
+                const { idPersona, nombres, apellidos } = resultado.persona;
+                guardarSesion({ idPersona, nombres, apellidos });
+                autenticado = true;
+                this.dispatchEvent(new CustomEvent('galeno-login-exitoso', {
+                    detail: resultado, bubbles: true, composed: true
+                }));
+            } catch (err) {
+                if (!vigente()) return;
+                aviso.textContent = err.mensaje ?? 'No se pudo iniciar sesión';
+            } finally {
+                consultando = false;
+                if (vigente()) actualizar();
+            }
+        }, { signal });
+    }
 }
+customElements.define('galeno-login', GalenoLogin);

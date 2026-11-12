@@ -1,0 +1,63 @@
+galeno-app, galeno-outlet {
+    display: block;
+}
+
+galeno-app[restaurando] .contenedor-app {
+    visibility: hidden;
+}
+
+galeno-menu, galeno-topbar, .topbar-controles {
+    display: contents;
+}
+
+galeno-app[modo="publico"] .topbar {
+    justify-content: space-between;
+}
+
+galeno-topbar [hidden] {
+    display: none;
+}
+
+.logo-publico {
+    display: block;
+    width: 150px;
+    height: auto;
+}
+
+galeno-topbar a {
+    color: var(--marino);
+}
+
+galeno-topbar .menu-movil {
+    order: -1;
+}
+
+galeno-topbar .topbar {
+    flex-wrap: wrap;
+}
+
+galeno-topbar instalador-app {
+    order: 1;
+}
+
+galeno-topbar .usuario,
+galeno-topbar a[href="#/login"] {
+    order: 2;
+}
+
+@media (max-width: 768px) {
+    .logo-publico {
+        width: 110px;
+    }
+}
+
+galeno-estado-conexion {
+    display: block;
+    padding: 12px 24px;
+    background: var(--cielo);
+    color: var(--marino);
+}
+
+galeno-estado-conexion[hidden] {
+    display: none;
+}

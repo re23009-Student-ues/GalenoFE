@@ -23,6 +23,10 @@
     display: none;
 }
 
+galeno-login {
+    display: contents;
+}
+
 .login-caja {
     background: #fff;
     border-radius: 20px;
@@ -57,7 +61,8 @@
     font-size: 14px;
 }
 
-.login-caja select {
+.login-caja select,
+.login-caja input {
     padding: 10px;
     border: 1px solid #d5dde6;
     border-radius: 8px;

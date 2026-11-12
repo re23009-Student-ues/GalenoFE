@@ -48,7 +48,27 @@ suite('Router por hash', () => {
         assert.equal(tituloEl.textContent, 'Gestión de Personas');
     });
 
-    test('redirige una ruta protegida sin sesión al login', async () => {
+    test('sin hash y sin sesión abre citas sin solicitar login ni guardar pendiente', async () => {
+        obtenerUsuario.returns(null);
+        window.location.hash = '';
+        router.iniciar();
+        await cambio();
+        assert.equal(window.location.hash, '#/citas');
+        assert.equal(tituloEl.textContent, 'Búsqueda de citas');
+        sinon.assert.notCalled(alRequerirLogin);
+        assert.equal(router.tomarPendiente('/sin-pendiente'), '/sin-pendiente');
+    });
+
+    test('sin hash y con sesión abre dashboard', async () => {
+        window.location.hash = '';
+        router.iniciar();
+        await cambio();
+        assert.equal(window.location.hash, '#/dashboard');
+        assert.equal(tituloEl.textContent, 'Resumen');
+        sinon.assert.notCalled(alRequerirLogin);
+    });
+
+    test('redirige una ruta protegida sin sesión al login y recuerda la pendiente', async () => {
         obtenerUsuario.returns(null);
         window.location.hash = '/consulta/42';
         router.iniciar();
@@ -57,6 +77,7 @@ suite('Router por hash', () => {
         assert.equal(tituloEl.textContent, 'Iniciar sesión');
         assert.isNull(contenedor.firstChild);
         sinon.assert.calledOnce(alRequerirLogin);
+        assert.equal(router.tomarPendiente(), '/consulta/42');
     });
 
     test('login es público y no entra en un ciclo de redirección', async () => {

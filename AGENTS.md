@@ -1,4 +1,5 @@
  # Reglas del proyecto
+- Leer docs/guia-tecnica.md antes de trabajar en el proyecto.
 - Solo ECMAScript. Prohibido frameworks, librerías, CSS de terceros.
 - Todo elemento de UI es un Web Component propio (customElements.define).
 - Estilos propios en src/Recursos/estilos.

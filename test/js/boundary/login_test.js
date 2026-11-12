@@ -35,15 +35,12 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
             throw new Error(`Petición inesperada: ${url}`);
         });
         fixture = document.getElementById('fixtures');
-        fixture.innerHTML = `<aside class="sidebar"><nav id="menu-lateral"><a data-route="/dashboard">Inicio</a></nav></aside>
-            <h1 id="titulo-pagina"></h1><div id="app-root"></div><div id="pantalla-login" hidden></div>
-            <span id="usuario-nombre"></span><span id="usuario-detalle"></span><span id="usuario-avatar"></span>
-            <button id="btn-salir">Salir</button>`;
+        fixture.innerHTML = '<galeno-app></galeno-app>';
         // Conserva el router real; evita peticiones de las vistas al conectarlas.
         sandbox.stub(fixture.querySelector('#app-root'), 'replaceChildren');
     });
     teardown(async () => {
-        aplicacion?.router.detener();
+        aplicacion?.detener();
         aplicacion = null;
         fixture.replaceChildren();
         sandbox.restore();
@@ -138,14 +135,15 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
         assert.isNull(obtenerSesion());
     });
 
-    test('cierre de sesión limpia persona y contexto y abre login', async () => {
+    test('cierre de sesión limpia persona y contexto y abre citas en modo público', async () => {
         guardarSesion(persona); establecerContexto(segundo);
         window.location.hash = '/dashboard';
         aplicacion = iniciarAplicacion(); await aplicacion.listo; await pausa();
         fixture.querySelector('#btn-salir').click(); await pausa();
         assert.isNull(obtenerSesion()); assert.isNull(obtenerContexto());
-        assert.equal(window.location.hash, '#/login');
-        assert.exists(fixture.querySelector('#login-form'));
+        assert.equal(window.location.hash, '#/citas');
+        assert.isNull(fixture.querySelector('#login-form'));
+        assert.equal(fixture.querySelector('galeno-app').getAttribute('modo'), 'publico');
     });
 
     test('citas permanece pública y navegar a una protegida abre login', async () => {
@@ -155,6 +153,36 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
         sinon.assert.notCalled(fetchStub);
         aplicacion.router.navegarA('/consultas'); await pausa();
         assert.exists(fixture.querySelector('#login-form'));
+    });
+
+    test('main sin hash y sin sesión abre citas sin mostrar login', async () => {
+        window.location.hash = '';
+        aplicacion = iniciarAplicacion(); await aplicacion.listo; await pausa();
+        assert.equal(window.location.hash, '#/citas');
+        assert.isNull(fixture.querySelector('#login-form'));
+        sinon.assert.notCalled(fetchStub);
+    });
+
+    test('main sin hash restaura la sesión antes de abrir dashboard', async () => {
+        guardarSesion(persona); establecerContexto(segundo);
+        window.location.hash = '';
+        aplicacion = iniciarAplicacion(); await aplicacion.listo; await pausa();
+        assert.equal(window.location.hash, '#/dashboard');
+        assert.isNull(fixture.querySelector('#login-form'));
+        assert.include(fixture.querySelector('#usuario-detalle').textContent, 'Norte');
+    });
+
+    test('desconectar el shell impide reactivar el router tras una restauración pendiente', async () => {
+        guardarSesion(persona); establecerContexto(rol);
+        let resolver;
+        fetchStub.withArgs(sinon.match(/persona_rol\/persona/)).returns(new Promise(resolve => { resolver = resolve; }));
+        const app = fixture.querySelector('galeno-app');
+        aplicacion = iniciarAplicacion(app);
+        const iniciar = sandbox.spy(aplicacion.router, 'iniciar');
+        app.remove();
+        resolver(json([rol]));
+        await aplicacion.listo;
+        sinon.assert.notCalled(iniciar);
     });
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

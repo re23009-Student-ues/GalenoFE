@@ -60,9 +60,9 @@ export function crearRouter({ contenedor, tituloEl, obtenerUsuario, alRequerirLo
         return { ...disponibles['/dashboard'], parametros: {}, ruta: '/dashboard' };
     }
 
-    function manejarRuta(ruta = window.location.hash.slice(1) || '/dashboard') {
+    function manejarRuta(ruta = window.location.hash.slice(1)) {
         const usuario = obtenerUsuario();
-        const destino = resolver(ruta, usuario);
+        const destino = resolver(ruta || (usuario ? '/dashboard' : '/citas'), usuario);
         if (!destino.publica && !usuario) {
             pendiente = destino.ruta;
             loginNotificado = false;

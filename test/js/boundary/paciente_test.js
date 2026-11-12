@@ -2,7 +2,7 @@ import { assert } from '../lib/chai/index.js';
 import sinon from '../lib/sinon/sinon-esm.js';
 import { establecerContexto, obtenerContexto } from '../../../src/js/control/sesion_service.js';
 import { esPaciente } from '../../../src/js/control/roles.js';
-import { iniciarMenu } from '../../../src/js/boundary/menu_lateral.js';
+import '../../../src/js/boundary/menu_lateral.js';
 import { crearRouter } from '../../../src/js/router.js';
 import { cargarResumen, listarConsultas } from '../../../src/js/control/resumen_service.js';
 import ConsultaService from '../../../src/js/control/consulta_service.js';
@@ -29,10 +29,7 @@ suite('Contexto y portal del paciente', () => {
         sandbox.stub(ConsultaService.prototype, 'findAll').resolves(consultas);
         sandbox.stub(ConsultaProcedimientoPasoService.prototype, 'listarParaConsultas').resolves([]);
         fixture = document.querySelector('#fixtures');
-        fixture.innerHTML = `<aside class="sidebar"><nav id="menu-lateral">
-            <a data-route="/dashboard">Inicio</a><a data-route="/personas">Gestión de Personas</a>
-            <a data-route="/consultas">Agenda Médica</a><a data-route="/configuracion">Configuración</a>
-            </nav></aside><h1 id="test-title"></h1><div id="test-root"></div><div id="pantalla-login" hidden></div>`;
+        fixture.innerHTML = `<galeno-menu></galeno-menu><h1 id="test-title"></h1><div id="test-root"></div><div id="pantalla-login" hidden></div>`;
         actual = paciente;
         router = crearRouter({ contenedor:fixture.querySelector('#test-root'), tituloEl:fixture.querySelector('#test-title'), obtenerUsuario:()=>actual });
     });
@@ -82,10 +79,10 @@ suite('Contexto y portal del paciente', () => {
         assert.exists(fixture.querySelector('paciente-controller'));
     });
     test('Menú personal y restauración de enlaces de otros roles', () => {
-        const menu = iniciarMenu({onNavegar:()=>{}}); menu.configurarUsuario(paciente);
+        const menu = fixture.querySelector('galeno-menu'); menu.usuario = paciente;
         assert.isTrue(fixture.querySelector('[data-route="/personas"]').hidden);
         assert.equal(fixture.querySelector('[data-route="/consultas"]').textContent, 'Mis consultas');
-        menu.configurarUsuario(medico);
+        menu.usuario = medico;
         assert.isFalse(fixture.querySelector('[data-route="/personas"]').hidden);
         assert.equal(fixture.querySelector('[data-route="/consultas"]').textContent, 'Agenda Médica');
     });

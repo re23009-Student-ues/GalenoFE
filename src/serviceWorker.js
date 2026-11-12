@@ -1,4 +1,5 @@
 const CACHE = 'galenosv-v3';
+const CACHE_API = 'galeno-api-v1';
 const ARCHIVOS = [
   './',
   'index.html',
@@ -34,9 +35,10 @@ const ARCHIVOS = [
   'js/boundary/componentes/notificacion_emergente.js',
   'js/boundary/componentes/tarjeta_consulta.js',
   'js/boundary/componentes/tarjeta_simple.js',
-  'js/boundary/login.js',
+  'js/boundary/login.js', // Registra <galeno-login>, montado por galeno-app.
   'js/boundary/galeno_app.js',
   'js/boundary/galeno_outlet.js',
+  'js/boundary/galeno_estado_conexion.js',
   'js/boundary/menu_lateral.js',
   'js/boundary/topbar.js',
   'js/boundary/util_html.js',
@@ -76,15 +78,49 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const nombres = await caches.keys();
-    await Promise.all(nombres.filter(nombre => nombre.startsWith('galenosv-') && nombre !== CACHE).map(nombre => caches.delete(nombre)));
+    await Promise.all(nombres.filter(nombre =>
+      (nombre.startsWith('galenosv-') && nombre !== CACHE) ||
+      (nombre.startsWith('galeno-api-') && nombre !== CACHE_API)
+    ).map(nombre => caches.delete(nombre)));
     await self.clients.claim();
   })());
 });
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  // Solo recursos estáticos propios. Las respuestas REST nunca se guardan aquí.
-  if (event.request.method !== 'GET' || url.origin !== self.location.origin || !RUTAS_ESTATICAS.has(url.pathname)) return;
+  if (event.request.method !== 'GET') return;
+  // Incluye el origen REST del puerto 9080 y el prefijo de despliegue, si existe.
+  if (url.pathname.includes('/resources/v1/')) {
+    event.respondWith((async () => {
+      let cache;
+      try { cache = await caches.open(CACHE_API); } catch (error) { console.warn('Caché API no disponible:', error); }
+      const controller = new AbortController();
+      let temporizador;
+      try {
+        const timeout = new Promise((resolve, reject) => {
+          temporizador = setTimeout(() => {
+            controller.abort();
+            reject(new Error('Tiempo de espera de API agotado'));
+          }, 3000);
+        });
+        const response = await Promise.race([
+          fetch(event.request, { cache: 'no-cache', signal: controller.signal }), timeout
+        ]);
+        if (response.status === 200 && ['cors', 'basic'].includes(response.type)) {
+          try { await cache?.put(event.request, response.clone()); } catch (error) { console.warn('No se pudo guardar la respuesta API:', error); }
+        }
+        return response;
+      } catch (error) {
+        const cached = await cache?.match(event.request);
+        if (cached) return cached;
+        throw error;
+      } finally {
+        clearTimeout(temporizador);
+      }
+    })());
+    return;
+  }
+  if (url.origin !== self.location.origin || !RUTAS_ESTATICAS.has(url.pathname)) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {

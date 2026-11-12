@@ -33,9 +33,10 @@ export function obtenerSesion() {
     }
 }
 
-export function cerrarSesion() {
+export async function cerrarSesion() {
     sessionStorage.removeItem(CLAVE_SESION);
     sessionStorage.removeItem(CLAVE_PERSONA);
+    try { await globalThis.caches?.delete('galeno-api-v1'); } catch { /* El cierre local sigue siendo válido. */ }
 }
 
 function errorSesion(mensaje, error = null) {
@@ -46,21 +47,26 @@ function errorSesion(mensaje, error = null) {
 }
 
 async function consultar(ruta, permitirNoEncontrado = false) {
+    const url = `${new DefaultService().BASE_URL}${ruta}`;
     let respuesta;
     try {
-        respuesta = await fetch(`${new DefaultService().BASE_URL}${ruta}`, { method: 'GET' });
+        respuesta = await fetch(url, { method: 'GET' });
     } catch (error) {
-        throw errorSesion('Error al acceder al repositorio', error);
+        throw errorSesion(navigator.onLine === false
+            ? 'Sin conexión y sin datos guardados para esta pantalla'
+            : 'Error al acceder al repositorio', error);
     }
     if (permitirNoEncontrado && respuesta.status === 404) return null;
     if (respuesta.status !== 200) {
         throw errorSesion(`Error al obtener los datos: ${respuesta.status}`);
     }
+    let datos;
     try {
-        return await respuesta.json();
+        datos = await respuesta.json();
     } catch (error) {
         throw errorSesion('Error al procesar los datos de respuesta', error);
     }
+    return datos;
 }
 
 export function buscarDocumento(idTipoDocumento, valor) {

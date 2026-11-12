@@ -34,7 +34,9 @@ class DefaultService {
                     reject(errorSalida);
                 }
             }).catch(e => {
-                errorSalida.mensaje = "Error al acceder al repositorio";
+                errorSalida.mensaje = navigator.onLine === false
+                    ? "Sin conexión y sin datos guardados para esta pantalla"
+                    : "Error al acceder al repositorio";
                 errorSalida.error = e;
                 reject(errorSalida);
             });

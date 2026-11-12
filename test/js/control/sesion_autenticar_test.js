@@ -30,6 +30,7 @@ suite('Autenticación del personal por documento (HU2)', () => {
 
     setup(() => {
         sandbox = sinon.createSandbox();
+        sandbox.stub(window.caches, 'delete').resolves(true);
         fetchStub = sandbox.stub(window, 'fetch');
         sesionAnterior = sessionStorage.getItem('sesionPersonaRol');
         personaAnterior = sessionStorage.getItem('sesionPersona');
@@ -126,6 +127,28 @@ suite('Autenticación del personal por documento (HU2)', () => {
         fetchStub.callsFake(async () => new Response('no es JSON', { status: 200 }));
         await rechaza(buscarDocumento('dui', valor), 'Error al procesar los datos de respuesta');
         await rechaza(rolesDePersona('1'), 'Error al procesar los datos de respuesta');
+    });
+
+    test('roles usa fetch sin una segunda caché en el servicio', async () => {
+        const abrir = sandbox.spy(window.caches, 'open');
+        fetchStub.resolves(respuesta([paciente]));
+        assert.deepEqual(await rolesDePersona('1'), [paciente]);
+        sinon.assert.notCalled(abrir);
+    });
+
+    test('cerrar sesión elimina también la caché API', async () => {
+        guardarSesion(persona);
+        await cerrarSesion();
+        sinon.assert.calledWith(window.caches.delete, 'galeno-api-v1');
+        assert.isNull(obtenerSesion());
+    });
+
+    test('sin conexión y sin respuesta guardada informa el mensaje offline', async () => {
+        sandbox.stub(navigator, 'onLine').get(() => false);
+        fetchStub.rejects(new TypeError('Sin conexión'));
+        const mensaje = 'Sin conexión y sin datos guardados para esta pantalla';
+        await rechaza(new TipoDocumentoService().findRange(0, 10), mensaje);
+        await rechaza(rolesDePersona('1'), mensaje);
     });
 
     test('guarda solo la identidad de la persona y cerrar borra la sesión', () => {

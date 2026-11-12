@@ -1,46 +1,36 @@
 import { obtenerSesion, rolesDePersona, establecerContexto, obtenerContexto, cerrarSesion } from "./control/sesion_service.js";
 import { esPaciente } from "./control/roles.js";
-import { mostrarLogin } from "./boundary/login.js";
 import { crearRouter } from "./router.js";
 import "./boundary/galeno_app.js";
 
 export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     let usuario = null;   // persona_rol de la sesión actual
-    let loginEnCurso = false;
     let detenido = false;
 
     const router = crearRouter({
         contenedor: app.outlet,
         tituloEl: app.tituloEl,
         obtenerUsuario: () => usuario,
-        alRequerirLogin: iniciarLogin
+        alRequerirLogin: () => app.mostrarLogin()
     });
     const alNavegar = evento => router.navegarA(evento.detail.ruta);
     const marcarActiva = () => app.marcarActiva(window.location.hash.slice(1));
     app.addEventListener('galeno-navegar', alNavegar);
     window.addEventListener('hashchange', marcarActiva);
 
-    async function iniciarLogin() {
-        if (loginEnCurso) return;
-        loginEnCurso = true;
-        try {
-            const { personaRoles } = await mostrarLogin();
-            if (detenido) return;
-            usuario = personaRoles[0];
-            establecerContexto(usuario);
-            app.usuario = usuario;
-            router.navegarA(router.tomarPendiente('/dashboard'));
-            marcarActiva();
-        } catch (err) {
-            console.error(err);
-        } finally {
-            loginEnCurso = false;
-        }
+    function alLoginExitoso(evento) {
+        const { personaRoles } = evento.detail;
+        usuario = personaRoles[0];
+        establecerContexto(usuario);
+        app.usuario = usuario;
+        router.navegarA(router.tomarPendiente('/dashboard'));
+        marcarActiva();
     }
+    app.addEventListener('galeno-login-exitoso', alLoginExitoso);
 
     // Cerrar sesión: vuelve al acceso público
-    const alCerrarSesion = () => {
-        cerrarSesion();
+    const alCerrarSesion = async () => {
+        await cerrarSesion();
         router.navegarA('/citas');
         entrar();
     };
@@ -64,7 +54,7 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
             }
         } catch (err) {
             console.error(err);
-            cerrarSesion();
+            await cerrarSesion();
             falloSesion = true;
         } finally {
             app.usuario = usuario;
@@ -85,6 +75,7 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
         router.detener();
         app.removeEventListener('galeno-navegar', alNavegar);
         app.removeEventListener('galeno-cerrar-sesion', alCerrarSesion);
+        app.removeEventListener('galeno-login-exitoso', alLoginExitoso);
         window.removeEventListener('hashchange', marcarActiva);
         app.removeEventListener('galeno-desconectar', detener);
     }

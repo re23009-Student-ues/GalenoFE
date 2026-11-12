@@ -1,6 +1,6 @@
 import { assert } from '../lib/chai/index.js';
 import sinon from '../lib/sinon/sinon-esm.js';
-import { mostrarLogin } from '../../../src/js/boundary/login.js';
+import '../../../src/js/boundary/login.js';
 import { guardarSesion, obtenerSesion, establecerContexto, obtenerContexto, cerrarSesion } from '../../../src/js/control/sesion_service.js';
 
 mocha.setup('tdd');
@@ -11,7 +11,7 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
     const segundo = { ...rol, idPersonaRol: 'r2', idClinica: { nombre: 'Norte' } };
     const pausa = () => new Promise(resolve => setTimeout(resolve, 40));
     const json = (datos, status = 200) => new Response(JSON.stringify(datos), { status });
-    let sandbox, fetchStub, fixture, aplicacion, iniciarAplicacion, guardado, contexto, hash;
+    let sandbox, fetchStub, fixture, aplicacion, iniciarAplicacion, guardado, contexto, hash, exitoso;
 
     suiteSetup(async () => {
         // Importar después del DOMContentLoaded evita arrancar main fuera del fixture.
@@ -26,6 +26,7 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
         window.location.hash = '/login';
         await pausa();
         sandbox = sinon.createSandbox();
+        sandbox.stub(window.caches, 'delete').resolves(true);
         sandbox.stub(console, 'error');
         fetchStub = sandbox.stub(window, 'fetch').callsFake(async url => {
             const ruta = new URL(url).pathname;
@@ -36,12 +37,15 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
         });
         fixture = document.getElementById('fixtures');
         fixture.innerHTML = '<galeno-app></galeno-app>';
+        exitoso = sandbox.spy();
+        fixture.addEventListener('galeno-login-exitoso', exitoso, { once: true });
         // Conserva el router real; evita peticiones de las vistas al conectarlas.
         sandbox.stub(fixture.querySelector('#app-root'), 'replaceChildren');
     });
     teardown(async () => {
         aplicacion?.detener();
         aplicacion = null;
+        fixture.removeEventListener('galeno-login-exitoso', exitoso);
         fixture.replaceChildren();
         sandbox.restore();
         cerrarSesion();
@@ -59,16 +63,25 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
     }
 
     test('login exitoso: solo tipos activos, indicaciones y persona sin contexto', async () => {
-        const ingreso = mostrarLogin();
+        const ingreso = new Promise(resolve => fixture.addEventListener('galeno-login-exitoso', resolve, { once: true }));
+        fixture.querySelector('galeno-app').mostrarLogin();
         await pausa();
-        assert.exists(fixture.querySelector('login-formulario'));
+        assert.exists(fixture.querySelector('galeno-login'));
         assert.lengthOf(fixture.querySelectorAll('select'), 1);
         assert.lengthOf(fixture.querySelectorAll('input'), 1);
         assert.deepEqual([...fixture.querySelector('select').options].map(o => o.value), ['', 'dui']);
         assert.equal(fixture.querySelector('#login-indicaciones').textContent, tipo.indicaciones);
+        assert.strictEqual(document.activeElement, fixture.querySelector('#login-tipo-documento'));
+        assert.equal(fixture.querySelector('#login-aviso').getAttribute('aria-live'), 'assertive');
+        assert.equal(fixture.querySelector('label[for="login-documento"]').control, fixture.querySelector('#login-documento'));
         enviar();
         assert.isTrue(fixture.querySelector('#login-entrar').disabled);
-        assert.deepEqual(await ingreso, { persona, personaRoles: [rol, segundo] });
+        const evento = await ingreso;
+        assert.deepEqual(evento.detail, { persona, personaRoles: [rol, segundo] });
+        assert.isTrue(evento.bubbles);
+        assert.isTrue(evento.composed);
+        sinon.assert.calledOnce(exitoso);
+        assert.isNull(fixture.querySelector('galeno-login'));
         assert.deepEqual(obtenerSesion(), persona);
         assert.isNull(obtenerContexto());
         assert.isTrue(fixture.querySelector('#pantalla-login').hidden);
@@ -76,24 +89,60 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
 
     test('documento no registrado muestra el mensaje y permite reintentar', async () => {
         fetchStub.withArgs(sinon.match(/documento\/buscar/)).callsFake(async () => json(null, 404));
-        mostrarLogin(); await pausa(); enviar(); await pausa();
+        fixture.querySelector('galeno-app').mostrarLogin(); await pausa(); enviar(); await pausa();
         assert.equal(fixture.querySelector('#login-aviso').textContent, 'Documento no registrado');
         assert.isFalse(fixture.querySelector('#login-entrar').disabled);
         assert.isNull(obtenerSesion());
+        sinon.assert.notCalled(exitoso);
     });
 
     test('formato inválido se informa sin consultar el documento', async () => {
-        mostrarLogin(); await pausa(); enviar('incorrecto'); await pausa();
+        fixture.querySelector('galeno-app').mostrarLogin(); await pausa(); enviar('incorrecto'); await pausa();
         assert.equal(fixture.querySelector('#login-aviso').textContent, 'El formato del documento no es válido');
         assert.equal(fetchStub.callCount, 1);
         assert.isNull(obtenerSesion());
+        sinon.assert.notCalled(exitoso);
     });
 
     test('una persona que solo es paciente no inicia sesión', async () => {
         fetchStub.withArgs(sinon.match(/persona_rol\/persona/)).callsFake(async () => json([{ ...rol, idRol: { nombre: 'Paciente' } }]));
-        mostrarLogin(); await pausa(); enviar(); await pausa();
+        fixture.querySelector('galeno-app').mostrarLogin(); await pausa(); enviar(); await pausa();
         assert.equal(fixture.querySelector('#login-aviso').textContent, 'Solo el personal puede ingresar');
         assert.isNull(obtenerSesion());
+        sinon.assert.notCalled(exitoso);
+    });
+
+    test('montar login repetidamente no duplica el componente ni su petición de catálogo', async () => {
+        const app = fixture.querySelector('galeno-app');
+        app.mostrarLogin(); app.mostrarLogin();
+        await pausa();
+        assert.lengthOf(app.querySelectorAll('galeno-login'), 1);
+        assert.equal(fetchStub.callCount, 1);
+    });
+
+    test('error al cargar catálogo permite reintentar y devuelve el foco al primer campo', async () => {
+        const catalogo = fetchStub.withArgs(sinon.match(/tipo_documento/));
+        catalogo.onFirstCall().rejects(new TypeError('Sin conexión'));
+        catalogo.onSecondCall().resolves(json([tipo]));
+        fixture.querySelector('galeno-app').mostrarLogin(); await pausa();
+        assert.include(fixture.querySelector('#login-aviso').textContent, 'Error al acceder al repositorio');
+        assert.isFalse(fixture.querySelector('#login-reintentar').hidden);
+        fixture.querySelector('#login-reintentar').click(); await pausa();
+        assert.isFalse(fixture.querySelector('#login-tipo-documento').disabled);
+        assert.strictEqual(document.activeElement, fixture.querySelector('#login-tipo-documento'));
+        sinon.assert.notCalled(exitoso);
+    });
+
+    test('retirar el login durante la consulta impide guardar sesión o emitir éxito tardío', async () => {
+        let resolver;
+        fetchStub.withArgs(sinon.match(/documento\/buscar/)).returns(new Promise(resolve => { resolver = resolve; }));
+        fixture.querySelector('galeno-app').mostrarLogin(); await pausa();
+        const login = fixture.querySelector('galeno-login');
+        enviar();
+        login.remove();
+        resolver(json({ idPersona: persona })); await pausa();
+        assert.isNull(obtenerSesion());
+        sinon.assert.notCalled(exitoso);
     });
 
     test('main elige el primer contexto y vuelve a la consulta pendiente', async () => {
@@ -133,6 +182,7 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
         aplicacion = iniciarAplicacion(); await aplicacion.listo; await pausa();
         assert.exists(fixture.querySelector('#login-form'));
         assert.isNull(obtenerSesion());
+        sinon.assert.notCalled(exitoso);
     });
 
     test('cierre de sesión limpia persona y contexto y abre citas en modo público', async () => {

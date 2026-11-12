@@ -1,3 +1,5 @@
+import './componentes/instalador_app.js';
+
 /**
  * Muestra en la barra superior quién tiene la sesión abierta.
  * @param {Object} usuario persona_rol de la sesión
@@ -16,7 +18,9 @@ class GalenoTopbar extends HTMLElement {
     static get observedAttributes() { return ['titulo']; }
 
     connectedCallback() {
-        this.innerHTML = `<header class="topbar"><h1 id="titulo-pagina"></h1><div class="topbar-controles"></div></header>`;
+        if (!this.tituloEl) {
+            this.innerHTML = `<header class="topbar"><h1 id="titulo-pagina"></h1><instalador-app></instalador-app><div class="topbar-controles"></div></header>`;
+        }
         this.attributeChangedCallback();
         this.pintar();
     }

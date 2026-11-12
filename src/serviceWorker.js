@@ -13,6 +13,7 @@ const ARCHIVOS = [
   'Recursos/estilos/paciente.css',
   'Recursos/estilos/principal.css',
   'Recursos/estilos/shell.css',
+  'Recursos/estilos/instalador.css',
   'Recursos/estilos/resumen.css',
   'Recursos/estilos/tarjeta.css',
   'Recursos/imagenes/logo-menu-marino.png',

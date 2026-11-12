@@ -1,4 +1,4 @@
-const CACHE = 'galenosv-v3';
+const CACHE = 'galenosv-v5';
 const CACHE_API = 'galeno-api-v1';
 const ARCHIVOS = [
   './',
@@ -10,7 +10,6 @@ const ARCHIVOS = [
   'Recursos/estilos/dataTable.css',
   'Recursos/estilos/login.css',
   'Recursos/estilos/notificacion.css',
-  'Recursos/estilos/paciente.css',
   'Recursos/estilos/principal.css',
   'Recursos/estilos/shell.css',
   'Recursos/estilos/instalador.css',
@@ -22,6 +21,8 @@ const ARCHIVOS = [
   'Recursos/imagenes/fondo-login-vertical.svg',
   'Recursos/imagenes/galeno_logo_192x192_20261103.png',
   'Recursos/imagenes/galeno_logo_512x512_20261105.png',
+  'Recursos/imagenes/galeno_app_01.png',
+  'Recursos/imagenes/galeno_app_02.png',
   'js/boundary/componentes/calendar/calendar.js',
   'js/boundary/componentes/calendar/calendar_dates.js',
   'js/boundary/componentes/calendar/index.js',
@@ -33,7 +34,6 @@ const ARCHIVOS = [
   'js/boundary/componentes/data-display/data_table_model.js',
   'js/boundary/componentes/data-display/index.js',
   'js/boundary/componentes/instalador_app.js',
-  'js/boundary/componentes/notificacion_emergente.js',
   'js/boundary/componentes/tarjeta_consulta.js',
   'js/boundary/componentes/tarjeta_simple.js',
   'js/boundary/login.js', // Registra <galeno-login>, montado por galeno-app.
@@ -44,14 +44,11 @@ const ARCHIVOS = [
   'js/boundary/topbar.js',
   'js/boundary/util_html.js',
   'js/boundary/vistas/consulta_controller.js',
-  'js/boundary/vistas/paciente_controller.js',
   'js/boundary/vistas/resumen_controller.js',
   'js/control/consultaProcedimientoPaso_service.js',
   'js/control/consulta_service.js',
   'js/control/default_service.js',
   'js/control/fechas.js',
-  'js/control/generador_mensajes.js',
-  'js/control/paciente_agenda.js',
   'js/control/personaRol_service.js',
   'js/control/resumen_service.js',
   'js/control/roles.js',

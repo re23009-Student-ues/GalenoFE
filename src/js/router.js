@@ -2,8 +2,6 @@
 // Una ruta sin `tag` todavía no tiene pantalla y muestra "en construcción".
 import "./boundary/vistas/resumen_controller.js";
 import "./boundary/vistas/consulta_controller.js";
-import "./boundary/vistas/paciente_controller.js";
-import { esPaciente } from "./control/roles.js";
 
 const rutasPublicas = {
     '/login': { titulo: 'Iniciar sesión', publica: true },
@@ -13,17 +11,7 @@ const rutasPublicas = {
 const rutas = {
     '/dashboard': { publica: false, titulo: 'Resumen', tag: 'resumen-controller' },
     '/consulta/:idConsulta': { publica: false, titulo: 'Consulta', tag: 'consulta-controller' },
-    '/personas': { publica: false, titulo: 'Gestión de Personas' },
-    '/consultas': { publica: false, titulo: 'Agenda Médica', tag: 'consulta-controller' },
-    '/procedimientos': { publica: false, titulo: 'Atención y Procedimientos' },
-    '/laboratorio': { publica: false, titulo: 'Laboratorio' },
-    '/configuracion': { publica: false, titulo: 'Configuración' }
-};
-
-const rutasPaciente = {
-    '/dashboard': { publica: false, titulo: 'Mi inicio', tag: 'paciente-controller', vista: 'inicio' },
-    '/consulta/:idConsulta': { publica: false, titulo: 'Mi consulta', tag: 'paciente-controller', vista: 'consultas' },
-    '/consultas': { publica: false, titulo: 'Mis consultas', tag: 'paciente-controller', vista: 'consultas' }
+    '/consultas': { publica: false, titulo: 'Agenda Médica', tag: 'consulta-controller' }
 };
 
 /**
@@ -40,7 +28,7 @@ export function crearRouter({ contenedor, tituloEl, obtenerUsuario, alRequerirLo
     let loginNotificado = false;
 
     function resolver(ruta, usuario) {
-        const disponibles = { ...rutasPublicas, ...(esPaciente(usuario) ? rutasPaciente : rutas) };
+        const disponibles = { ...rutasPublicas, ...rutas };
         for (const [patron, configuracion] of Object.entries(disponibles)) {
             const nombres = [];
             const expresion = patron.replace(/:([^/]+)/g, (_, nombre) => {
@@ -57,7 +45,8 @@ export function crearRouter({ contenedor, tituloEl, obtenerUsuario, alRequerirLo
                 break; // Un parámetro mal codificado se trata como ruta desconocida.
             }
         }
-        return { ...disponibles['/dashboard'], parametros: {}, ruta: '/dashboard' };
+        const porDefecto = usuario ? '/dashboard' : '/citas';
+        return { ...disponibles[porDefecto], parametros: {}, ruta: porDefecto };
     }
 
     function manejarRuta(ruta = window.location.hash.slice(1)) {
@@ -70,7 +59,7 @@ export function crearRouter({ contenedor, tituloEl, obtenerUsuario, alRequerirLo
             return manejarRuta('/login');
         }
         if (window.location.hash !== `#${destino.ruta}`) window.location.hash = destino.ruta;
-        const { titulo, tag, vista, parametros } = destino;
+        const { titulo, tag, parametros } = destino;
         tituloEl.textContent = titulo;
 
         if (destino.ruta === '/login') {
@@ -94,7 +83,6 @@ export function crearRouter({ contenedor, tituloEl, obtenerUsuario, alRequerirLo
 
         const pantalla = document.createElement(tag);
         pantalla.parametros = parametros;
-        pantalla.vista = vista;
         pantalla.usuario = usuario;   // el controller lo lee al conectarse
         contenedor.replaceChildren(pantalla);
     }

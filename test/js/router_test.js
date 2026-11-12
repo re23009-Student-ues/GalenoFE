@@ -43,9 +43,9 @@ suite('Router por hash', () => {
         assert.equal(window.location.hash, '#/consultas');
         assert.equal(tituloEl.textContent, 'Agenda Médica');
         sinon.assert.notCalled(push);
-        window.location.hash = '/personas';
+        window.location.hash = '/dashboard';
         await cambio();
-        assert.equal(tituloEl.textContent, 'Gestión de Personas');
+        assert.equal(tituloEl.textContent, 'Resumen');
     });
 
     test('sin hash y sin sesión abre citas sin solicitar login ni guardar pendiente', async () => {
@@ -175,19 +175,33 @@ suite('Router por hash', () => {
     test('consulta la sesión de nuevo en cada hashchange', async () => {
         router.iniciar();
         obtenerUsuario.returns(null);
-        router.navegarA('/configuracion');
+        router.navegarA('/consultas');
         await cambio();
         assert.equal(window.location.hash, '#/login');
         assert.isNull(contenedor.firstChild);
     });
 
-    test('conserva las rutas del paciente y sus parámetros', () => {
-        obtenerUsuario.returns({ idRol: { nombre: 'Paciente' } });
-        window.location.hash = '/consulta/73';
-        router.iniciar();
-        assert.equal(contenedor.firstChild.localName, 'paciente-controller');
-        assert.equal(contenedor.firstChild.vista, 'consultas');
-        assert.deepEqual(contenedor.firstChild.parametros, { idConsulta: '73' });
+    test('rutas eliminadas con sesión caen en dashboard', async () => {
+        for (const ruta of ['/personas', '/procedimientos', '/laboratorio', '/configuracion']) {
+            window.location.hash = ruta;
+            router.iniciar(); await cambio();
+            assert.equal(window.location.hash, '#/dashboard');
+            assert.equal(contenedor.firstChild.localName, 'resumen-controller');
+            assert.deepEqual(contenedor.firstChild.parametros, {});
+        }
+        sinon.assert.notCalled(alRequerirLogin);
+    });
+
+    test('rutas eliminadas o desconocidas sin sesión caen en citas sin pedir login', async () => {
+        obtenerUsuario.returns(null);
+        for (const ruta of ['/personas', '/procedimientos', '/laboratorio', '/configuracion', '/desconocida', '/consulta/%ZZ']) {
+            window.location.hash = ruta;
+            router.iniciar(); await cambio();
+            assert.equal(window.location.hash, '#/citas');
+            assert.equal(tituloEl.textContent, 'Búsqueda de citas');
+        }
+        sinon.assert.notCalled(alRequerirLogin);
+        assert.equal(router.tomarPendiente('/sin-pendiente'), '/sin-pendiente');
     });
 
     test('hash vacío, desconocido o mal codificado vuelve a dashboard', () => {

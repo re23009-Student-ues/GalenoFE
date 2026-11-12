@@ -204,9 +204,9 @@ suite('Shell en Web Components', () => {
     test('atributos de entrada actualizan título y ruta; texto de usuario no se interpreta como HTML', () => {
         app.usuario = { ...usuario, idPersona: { nombres: '<img src=x>', apellidos: 'Prueba' } };
         app.topbar.setAttribute('titulo', 'Agenda');
-        app.menu.setAttribute('ruta', '/laboratorio');
+        app.menu.setAttribute('ruta', '/consultas');
         assert.equal(app.tituloEl.textContent, 'Agenda');
-        assert.isTrue(app.querySelector('[data-route="/laboratorio"]').classList.contains('activo'));
+        assert.isTrue(app.querySelector('[data-route="/consultas"]').classList.contains('activo'));
         assert.notExists(app.querySelector('#usuario-nombre img'));
         assert.include(app.querySelector('#usuario-nombre').textContent, '<img src=x>');
     });

@@ -39,7 +39,6 @@ class GalenoApp extends HTMLElement {
         this.setAttribute('modo', valor ? 'personal' : 'publico');
         if (valor) {
             if (!this.menu) this.querySelector('.contenedor-app').prepend(document.createElement('galeno-menu'));
-            this.menu.usuario = valor;
             this.marcarActiva(window.location.hash.slice(1));
         } else {
             this.menu?.remove();

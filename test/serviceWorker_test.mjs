@@ -50,7 +50,7 @@ function worker() {
     };
 }
 
-test('Precarga completa: archivos existentes y módulos importados del portal', async () => {
+test('Precarga completa: archivos existentes y módulos importados de la aplicación', async () => {
     const w = worker(); await w.lifecycle('install');
     const requests = [...w.stores.values()][0].installed;
     const paths = new Set(requests.map(request => new URL(request.url).pathname));
@@ -64,15 +64,24 @@ test('Precarga completa: archivos existentes y módulos importados del portal', 
             if (match[1].startsWith('.')) assert.ok(paths.has(new URL(match[1], request.url).pathname), `Falta dependencia ${match[1]} de ${path}`);
         }
     }
-    assert.ok(paths.has('/src/js/boundary/vistas/paciente_controller.js'));
-    assert.ok(paths.has('/src/Recursos/estilos/paciente.css'));
+    assert.ok(paths.has('/src/js/boundary/vistas/resumen_controller.js'));
+    assert.ok(paths.has('/src/js/boundary/vistas/consulta_controller.js'));
+    assert.ok(paths.has('/src/js/boundary/componentes/calendar/calendar.js'));
+    assert.ok(paths.has('/src/js/boundary/componentes/data-display/dataTable.js'));
+    const manifest = JSON.parse(await readFile(new URL('../src/manifest.json', import.meta.url), 'utf8'));
+    for (const recurso of [...manifest.icons, ...manifest.screenshots]) {
+        assert.ok(paths.has(new URL(recurso.src, scope).pathname), `Falta recurso del manifest: ${recurso.src}`);
+    }
+    for (const retirado of ['js/boundary/vistas/paciente_controller.js', 'js/control/paciente_agenda.js', 'Recursos/estilos/paciente.css', 'js/boundary/componentes/notificacion_emergente.js', 'js/control/generador_mensajes.js']) {
+        assert.ok(!paths.has(`/src/${retirado}`));
+    }
     assert.equal(w.waiting, 1);
 });
 
 test('Actualización elimina solo cachés anteriores de Galeno y toma control', async () => {
-    const w = worker(); w.store('galenosv-v1'); w.store('galeno-api-v0'); w.store('galeno-api-v1'); w.store('otra-app');
+    const w = worker(); w.store('galenosv-v1'); w.store('galenosv-v3'); w.store('galenosv-v4'); w.store('galeno-api-v0'); w.store('galeno-api-v1'); w.store('otra-app');
     await w.lifecycle('install'); await w.lifecycle('activate');
-    assert.deepEqual(w.deleted, ['galenosv-v1', 'galeno-api-v0']);
+    assert.deepEqual(w.deleted, ['galenosv-v1', 'galenosv-v3', 'galenosv-v4', 'galeno-api-v0']);
     assert.ok(w.stores.has('galeno-api-v1'));
     assert.ok(w.stores.has('otra-app')); assert.equal(w.claimed, 1);
 });
@@ -122,7 +131,7 @@ test('API de otro origen: red 200 cors se guarda con cuerpo y headers', async ()
     const guardada = await w.store('galeno-api-v1').match(ruta);
     assert.equal(guardada.headers.get('Total-registros'), '7');
     assert.deepEqual(await guardada.json(), [{ idConsulta: 'c1' }]);
-    assert.ok(!w.stores.has('galenosv-v3'));
+    assert.ok(!w.stores.has('galenosv-v5'));
 });
 
 test('API sin red usa caché por URL exacta, incluyendo parámetros', async () => {

@@ -87,6 +87,31 @@ export async function ticketPDF(idConsulta) {
     if (!blob.size) throw new Error('El ticket PDF está vacío');
     return blob;
 }
+/** Consultas de la clínica con algún paso definido para el rol activo, aun sin ejecución. */
+export async function filtrarConsultasPorRol(consultas, contexto) {
+    const idRol = contexto?.idRol?.idRol;
+    const idClinica = contexto?.idClinica?.idClinica;
+    if (!idRol || !idClinica || esPaciente(contexto)) return [];
+    const candidatas = consultas.filter(c => c.idPersonaRol?.idClinica?.idClinica === idClinica);
+    if (!candidatas.length) return [];
+    const ids = new Set(candidatas.map(c => c.idConsulta));
+    const procedimientos = (await listarCompleto('consulta_procedimiento', 'idConsultaProcedimiento'))
+        .filter(p => ids.has(p.idConsulta?.idConsulta));
+    const porProcedimiento = new Map();
+    for (const p of procedimientos) {
+        const id = p.idProcedimiento?.idProcedimiento;
+        if (!id) throw new Error('Procedimiento sin identificador');
+        if (!porProcedimiento.has(id)) {
+            const pasos = await listarCompleto(`procedimiento_paso/procedimiento/${encodeURIComponent(id)}`, 'idProcedimientoPaso');
+            porProcedimiento.set(id, pasos.some(paso => paso.idRol?.idRol === idRol));
+        }
+    }
+    const permitidas = new Set(procedimientos
+        .filter(p => porProcedimiento.get(p.idProcedimiento.idProcedimiento))
+        .map(p => p.idConsulta.idConsulta));
+    return candidatas.filter(c => permitidas.has(c.idConsulta));
+}
+
 /** Solo lectura: el rol permite localizar pasos; su elegibilidad no se infiere de estados sin contrato. */
 export async function cargarAgenda(contexto, desde, hasta) {
     validarRango(desde, hasta);

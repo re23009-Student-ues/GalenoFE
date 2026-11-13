@@ -250,5 +250,192 @@ suite('Wizard', () => {
         const wizard = create({ steps: steps().slice(0, 1) }); await wizard.next();
         assert.isFalse(fetch.called); assert.isFalse(storage.called);
     });
+
+    const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
+    async function layout() { await frame(); await frame(); await frame(); }
+    function carousel(count = 10, options = {}) {
+        const list = Array.from({ length: count }, (_, i) => ({ id: `carousel-${i}`, title: `Paso ${i + 1}`,
+            content: document.createElement('input') }));
+        const wizard = create({ steps: list, linear: false, stepCarousel: { smoothScroll: false }, ...options });
+        wizard.container.style.cssText = 'width: 340px; max-width: 100%;';
+        return wizard;
+    }
+    function visible(wizard) {
+        const viewport = wizard.viewport.getBoundingClientRect(), active = wizard.steps[wizard.current].item.getBoundingClientRect();
+        assert.isAtLeast(active.left, viewport.left - 1);
+        assert.isAtMost(active.right, viewport.right + 1);
+    }
+    for (const count of [2, 3, 10, 20]) {
+        test(`Carrusel: ${count} pasos se activan por desbordamiento real, sin comprimirlos`, async () => {
+            const wizard = carousel(count); await layout();
+            assert.isTrue(wizard.carouselActive);
+            assert.isFalse(wizard.carouselNext.hidden); assert.isTrue(wizard.carouselPrev.disabled);
+            assert.isAtLeast(wizard.steps[0].item.getBoundingClientRect().width, 159);
+            assert.isAtMost(wizard.root.scrollWidth, wizard.root.clientWidth + 1);
+            assert.equal(getComputedStyle(wizard.viewport).overflowX, 'auto');
+            visible(wizard);
+        });
+    }
+    test('Carrusel: pocos pasos caben, y ResizeObserver activa y desactiva sin resize global', async () => {
+        const wizard = carousel(3);
+        // Aislar el ancho del contenedor para verificar ambos estados también en móvil.
+        wizard.container.style.cssText = 'width: 800px;'; await layout();
+        assert.isFalse(wizard.carouselActive); assert.isTrue(wizard.carouselNext.hidden);
+        wizard.container.style.width = '300px'; await layout();
+        assert.isTrue(wizard.carouselActive);
+        wizard.container.style.width = '800px'; await layout();
+        assert.isFalse(wizard.carouselActive); assert.equal(wizard.viewport.tabIndex, -1);
+    });
+    test('Carrusel: flechas solo desplazan, con extremos y sin reconstruir formularios', async () => {
+        const wizard = carousel(); await layout();
+        const node = wizard.steps[0].content, panel = node.parentNode;
+        node.value = 'Borrador';
+        wizard.carouselNext.click(); await layout();
+        assert.isAbove(wizard.viewport.scrollLeft, 0); assert.isFalse(wizard.carouselPrev.disabled);
+        assert.equal(wizard.current, 0); assert.strictEqual(node.parentNode, panel); assert.equal(node.value, 'Borrador');
+        wizard.viewport.scrollTo({ left: wizard.viewport.scrollWidth, behavior: 'instant' }); await layout();
+        assert.isTrue(wizard.carouselNext.disabled);
+        wizard.carouselPrev.click(); await layout(); assert.isFalse(wizard.carouselNext.disabled);
+        wizard.viewport.scrollTo({ left: 0, behavior: 'instant' }); await layout();
+        assert.isTrue(wizard.carouselPrev.disabled);
+    });
+    test('Carrusel: goToStep, previous, next y reset mantienen visible el activo sin cambiar el foco extra', async () => {
+        const wizard = carousel(); await layout();
+        await wizard.goToStep('carousel-8'); await layout(); visible(wizard);
+        assert.equal(wizard.steps[8].button.getAttribute('aria-current'), 'step');
+        assert.strictEqual(document.activeElement, wizard.steps[8].heading);
+        await wizard.previous(); await layout(); visible(wizard);
+        await wizard.next(); await layout(); visible(wizard);
+        wizard.reset(); await layout(); visible(wizard);
+        const scroll = sinon.spy(wizard.viewport, 'scrollTo');
+        wizard.setData({ draft: true }); wizard.render(); await layout();
+        assert.isFalse(scroll.called);
+    });
+    test('Carrusel: teclado desplaza con flechas, Inicio y Fin sin navegar pasos', async () => {
+        const wizard = carousel(); await layout(); wizard.viewport.focus();
+        const key = value => wizard.viewport.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true }));
+        key('ArrowRight'); await layout(); assert.isAbove(wizard.viewport.scrollLeft, 0);
+        key('End'); await layout(); assert.isTrue(wizard.carouselNext.disabled);
+        key('ArrowLeft'); await layout(); assert.isFalse(wizard.carouselNext.disabled);
+        key('Home'); await layout(); assert.equal(wizard.viewport.scrollLeft, 0);
+        assert.equal(wizard.current, 0); assert.strictEqual(document.activeElement, wizard.viewport);
+        assert.equal(wizard.carouselNext.getAttribute('aria-controls'), wizard.viewport.id);
+        assert.isNotEmpty(wizard.carouselNext.getAttribute('aria-label'));
+    });
+    test('Carrusel: con espacio para un paso solo asegura visibilidad sin mover la página', async () => {
+        const wizard = carousel(); await layout();
+        const scroll = sinon.spy(wizard.viewport, 'scrollTo');
+        wizard.render(); await layout(); visible(wizard); assert.isFalse(scroll.called);
+        const x = window.scrollX, y = window.scrollY;
+        wizard.carouselNext.click(); await layout();
+        assert.equal(window.scrollX, x); assert.equal(window.scrollY, y);
+    });
+    test('Carrusel: centra el activo con al menos dos pasos visibles mediante next, previous y goToStep', async () => {
+        const wizard = carousel(); wizard.container.style.cssText = 'width: 650px;'; await layout();
+        const centrado = () => {
+            const viewport = wizard.viewport.getBoundingClientRect(), activo = wizard.steps[wizard.current].item.getBoundingClientRect();
+            assert.closeTo((activo.left + activo.right) / 2, (viewport.left + viewport.right) / 2, 1);
+        };
+        await wizard.goToStep('carousel-4'); await layout(); centrado();
+        await wizard.next(); await layout(); centrado();
+        await wizard.previous(); await layout(); centrado();
+        const scroll = sinon.spy(wizard.viewport, 'scrollTo');
+        wizard.render(); await layout(); assert.isFalse(scroll.called);
+    });
+    test('Carrusel: centra también el primero y el último con espacio a los lados', async () => {
+        const wizard = carousel(); wizard.container.style.cssText = 'width: 530px;'; await layout();
+        const centrado = () => {
+            const viewport = wizard.viewport.getBoundingClientRect(), activo = wizard.steps[wizard.current].item.getBoundingClientRect();
+            assert.closeTo((activo.left + activo.right) / 2, (viewport.left + viewport.right) / 2, 1);
+        };
+        assert.equal(wizard.viewport.scrollLeft, 0);
+        centrado();
+        await wizard.next(); await layout();
+        const viewport = wizard.viewport.getBoundingClientRect(), activo = wizard.steps[1].item.getBoundingClientRect();
+        assert.closeTo((activo.left + activo.right) / 2, (viewport.left + viewport.right) / 2, 1);
+        await wizard.goToStep('carousel-9'); await layout(); visible(wizard);
+        centrado();
+        assert.closeTo(wizard.viewport.scrollLeft, wizard.viewport.scrollWidth - wizard.viewport.clientWidth, 1);
+        assert.isTrue(wizard.carouselNext.disabled);
+        wizard.reset(); await layout(); assert.equal(wizard.viewport.scrollLeft, 0); assert.isTrue(wizard.carouselPrev.disabled);
+        centrado();
+    });
+    test('Carrusel: el espacio lateral desaparece cuando todos los pasos caben', async () => {
+        const wizard = carousel(6); wizard.container.style.cssText = 'width: 650px;'; await layout();
+        assert.isTrue(wizard.indicator.classList.contains('wizard__steps--centered'));
+        wizard.container.style.width = '2000px'; await layout();
+        assert.isFalse(wizard.carouselActive); assert.isTrue(wizard.carouselNext.hidden);
+        assert.isFalse(wizard.indicator.classList.contains('wizard__steps--centered'));
+        assert.isAtMost(wizard.viewport.scrollWidth, wizard.viewport.clientWidth + 1);
+        wizard.container.style.width = '650px'; await layout();
+        assert.isTrue(wizard.carouselActive); assert.isTrue(wizard.indicator.classList.contains('wizard__steps--centered'));
+    });
+    test('Carrusel: al ampliar el contenedor centra el activo sin cambiar el paso ni el foco', async () => {
+        const wizard = carousel(); await layout(); await wizard.goToStep('carousel-4'); await layout();
+        const foco = document.activeElement;
+        wizard.container.style.cssText = 'width: 650px;'; await layout();
+        const viewport = wizard.viewport.getBoundingClientRect(), activo = wizard.steps[4].item.getBoundingClientRect();
+        assert.closeTo((activo.left + activo.right) / 2, (viewport.left + viewport.right) / 2, 1);
+        assert.equal(wizard.current, 4); assert.strictEqual(document.activeElement, foco);
+    });
+    test('Carrusel: títulos largos y contenedor inicialmente oculto', async () => {
+        const wizard = carousel(20); wizard.container.hidden = true;
+        wizard.steps[0].button.querySelector('.wizard__step-title').textContent = 'TítuloExtremadamenteLargo'.repeat(10);
+        await layout(); assert.isFalse(wizard.carouselActive);
+        wizard.container.hidden = false; await layout(); assert.isTrue(wizard.carouselActive);
+        await wizard.goToStep('carousel-19'); await layout(); visible(wizard);
+        assert.isAtMost(wizard.root.scrollWidth, wizard.root.clientWidth + 1);
+    });
+    test('Carrusel: Modal, múltiples instancias y cambios de tamaño conservan el activo', async () => {
+        const first = carousel(), second = carousel();
+        const modal = new Modal({ title: 'Carrusel', animated: false }); modals.push(modal);
+        modal.setContent(first.container).open(); await layout();
+        await first.goToStep('carousel-9'); await layout(); visible(first);
+        first.container.style.width = '240px'; await layout(); visible(first);
+        assert.equal(second.current, 0); assert.equal(second.viewport.scrollLeft, 0);
+        assert.notEqual(first.viewport.id, second.viewport.id);
+        modal.close(); await layout(); modal.open(); await layout(); visible(first);
+    });
+    test('Carrusel: opciones parciales, sin flechas y sin autoScroll', async () => {
+        const wizard = carousel(10, { stepCarousel: { showArrows: false, autoScroll: false, smoothScroll: false } });
+        await layout(); assert.isTrue(wizard.carouselActive); assert.isTrue(wizard.carouselNext.hidden);
+        await wizard.goToStep('carousel-9'); await layout(); assert.equal(wizard.viewport.scrollLeft, 0);
+        wizard.viewport.dispatchEvent(new KeyboardEvent('keydown', { key: 'End' })); await layout();
+        assert.isAbove(wizard.viewport.scrollLeft, 0);
+        assert.isTrue(wizard.options.stepCarousel.enabled);
+    });
+    test('Carrusel: enabled=false conserva el indicador original sin observadores', async () => {
+        const observe = sinon.spy(ResizeObserver.prototype, 'observe');
+        const wizard = carousel(10, { stepCarousel: { enabled: false } }); await layout();
+        assert.notExists(wizard.viewport); assert.notExists(wizard.root.querySelector('.wizard__carousel-next'));
+        assert.equal(getComputedStyle(wizard.indicator).flexWrap, 'wrap'); assert.isFalse(observe.called);
+    });
+    test('Carrusel: respeta movimiento reducido y smoothScroll al desplazar', async () => {
+        const wizard = carousel(10, { stepCarousel: { smoothScroll: true } }); await layout();
+        const scroll = sinon.spy(wizard.viewport, 'scrollTo');
+        const media = sinon.stub(window, 'matchMedia').returns({ matches: true });
+        wizard.carouselNext.click(); assert.equal(scroll.lastCall.args[0].behavior, 'instant');
+        media.returns({ matches: false }); wizard.carouselNext.click();
+        assert.equal(scroll.lastCall.args[0].behavior, 'smooth');
+    });
+    test('Carrusel: destroy desconecta observador, cancela frames y permite otra instancia', async () => {
+        const wizard = carousel(); await layout();
+        const disconnect = sinon.spy(wizard.carouselObserver, 'disconnect');
+        const viewport = wizard.viewport, root = wizard.root, host = wizard.container;
+        const cancel = sinon.spy(window, 'cancelAnimationFrame');
+        wizard.render().render(); wizard.onCarouselResize(); wizard.destroy(); wizard.destroy();
+        assert.isTrue(disconnect.calledOnce); assert.isTrue(cancel.calledOnce);
+        viewport.dispatchEvent(new KeyboardEvent('keydown', { key: 'End' })); viewport.dispatchEvent(new Event('scroll'));
+        await layout(); assert.isFalse(root.isConnected);
+        const next = new Wizard(host, { steps: steps() }).render(); instances.push(next); await layout();
+        assert.lengthOf(host.querySelectorAll('galeno-wizard'), 1);
+    });
+    test('Carrusel: rechaza opciones inválidas antes de montar', () => {
+        const host = document.createElement('div'); fixture.append(host);
+        for (const stepCarousel of [false, null, [], { enabled: 1 }, { autoScroll: 'true' }, { smoothScroll: null }]) {
+            assert.throws(() => new Wizard(host, { steps: steps(), stepCarousel }), TypeError);
+        }
+        assert.equal(host.childElementCount, 0);
+    });
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

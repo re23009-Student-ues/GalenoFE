@@ -8,6 +8,8 @@
     --wizard-background: #fff;
     --wizard-spacing: 20px;
     --wizard-radius: 12px;
+    --wizard-step-space-start: 0px;
+    --wizard-step-space-end: 0px;
     display: block;
     box-sizing: border-box;
     width: 100%;
@@ -22,6 +24,17 @@
 .wizard__header { border-bottom: 1px solid var(--wizard-border); }
 .wizard__steps { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .wizard__step { flex: 1 1 140px; min-width: 0; border-bottom: 3px solid var(--wizard-border); padding-bottom: 8px; }
+.wizard__navigation, .wizard__steps-wrapper { min-width: 0; max-width: 100%; }
+.wizard__steps-wrapper { display: flex; align-items: center; gap: 8px; }
+.wizard__steps-viewport { flex: 1; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; scroll-behavior: smooth; padding: 4px; }
+.wizard__steps-viewport::-webkit-scrollbar { display: none; }
+.wizard__steps-viewport .wizard__steps { flex-wrap: nowrap; }
+.wizard__steps-viewport .wizard__steps--centered::before { content: ''; flex: 0 0 var(--wizard-step-space-start, 0px); }
+.wizard__steps-viewport .wizard__steps--centered::after { content: ''; flex: 0 0 var(--wizard-step-space-end, 0px); }
+.wizard .wizard__steps-viewport .wizard__step { flex: 1 0 160px; max-width: 100%; box-sizing: border-box; }
+.wizard__carousel-prev, .wizard__carousel-next { flex: 0 0 32px; height: 36px; padding: 0; border: 1px solid var(--wizard-border); border-radius: 6px; background: var(--wizard-background); color: var(--wizard-primary); font: inherit; font-size: 1.5rem; cursor: pointer; }
+.wizard__carousel-prev:disabled, .wizard__carousel-next:disabled { opacity: .5; cursor: default; }
+.wizard__steps-viewport:focus-visible { outline: 3px solid var(--wizard-primary); outline-offset: 2px; }
 .wizard__step-button { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
 .wizard__step-button:disabled { cursor: default; }
 .wizard__step-info { min-width: 0; overflow-wrap: anywhere; }
@@ -60,4 +73,7 @@
     .wizard__footer { position: sticky; bottom: 0; z-index: 1; background: var(--wizard-background); }
     .wizard__actions button { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 }
-@media (prefers-reduced-motion: reduce) { .wizard__loading::before { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+    .wizard__loading::before { animation: none; }
+    .wizard__steps-viewport { scroll-behavior: auto; }
+}

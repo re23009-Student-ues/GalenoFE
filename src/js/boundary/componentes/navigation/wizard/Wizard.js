@@ -2,6 +2,7 @@ let sequence = 0;
 const defaults = { steps: [], linear: true, showProgress: true, showStepNumbers: true,
     allowBackNavigation: true, previousText: 'Anterior', nextText: 'Siguiente',
     finishText: 'Finalizar', loadingText: 'Procesando…', data: {} };
+const carouselDefaults = { enabled: true, autoScroll: true, showArrows: true, smoothScroll: true };
 const labels = { initial: 'Inicial', 'in-progress': 'En progreso', validating: 'Validando…',
     'validation-error': 'Error de validación', completing: 'Finalizando…',
     'completion-error': 'Error al finalizar', completed: 'Proceso completado' };
@@ -31,6 +32,13 @@ export default class Wizard {
         if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('Wizard: opciones inválidas.');
         this.options = { ...defaults, ...options };
         const o = this.options;
+        if (o.stepCarousel !== undefined && (!o.stepCarousel || typeof o.stepCarousel !== 'object' || Array.isArray(o.stepCarousel))) {
+            throw new TypeError('Wizard: stepCarousel debe ser un objeto.');
+        }
+        o.stepCarousel = { ...carouselDefaults, ...o.stepCarousel };
+        if (Object.keys(carouselDefaults).some(key => typeof o.stepCarousel[key] !== 'boolean')) {
+            throw new TypeError('Wizard: las opciones de stepCarousel deben ser booleanas.');
+        }
         if (['linear', 'showProgress', 'showStepNumbers', 'allowBackNavigation'].some(key => typeof o[key] !== 'boolean') ||
             ['previousText', 'nextText', 'finishText', 'loadingText'].some(key => typeof o[key] !== 'string' || !o[key].trim()) ||
             ['onStepChange', 'onComplete'].some(key => o[key] !== undefined && typeof o[key] !== 'function') ||
@@ -73,6 +81,7 @@ export default class Wizard {
         this.header = element('header', 'wizard__header');
         const navigation = element('nav', 'wizard__navigation'); navigation.setAttribute('aria-label', 'Pasos del formulario');
         this.indicator = element('ol', 'wizard__steps'); navigation.append(this.indicator);
+        if (this.options.stepCarousel.enabled) this.mountCarousel(navigation);
         this.progress = element('progress', 'wizard__progress'); this.progress.max = this.enabled().length;
         this.progress.setAttribute('aria-label', 'Pasos completados'); this.progress.hidden = !this.options.showProgress;
         this.status = element('p', 'wizard__status'); this.status.setAttribute('role', 'status');
@@ -115,6 +124,8 @@ export default class Wizard {
             const button = event.target.closest('button');
             if (button === this.back) void this.previous();
             else if (button === this.forward) void this.next();
+            else if (button === this.carouselPrev) this.scrollIndicator(-1);
+            else if (button === this.carouselNext) this.scrollIndicator(1);
             else if (button?.parentNode?.parentNode === this.indicator) void this.goToStep(button.dataset.step);
         };
         this.onEdit = event => {
@@ -137,6 +148,112 @@ export default class Wizard {
         this.root.addEventListener('change', this.onEdit);
         this.root.addEventListener('submit', this.onSubmit);
         this.container.append(this.root);
+    }
+
+    mountCarousel(navigation) {
+        this.stepsWrapper = element('div', 'wizard__steps-wrapper');
+        this.viewport = element('div', 'wizard__steps-viewport');
+        this.viewport.id = `${this.id}-steps-viewport`;
+        this.viewport.setAttribute('role', 'region');
+        this.viewport.setAttribute('aria-label', 'Indicador de pasos; usa las flechas para desplazar');
+        this.viewport.tabIndex = -1;
+        this.carouselPrev = element('button', 'wizard__carousel-prev', '‹');
+        this.carouselNext = element('button', 'wizard__carousel-next', '›');
+        for (const [button, label] of [[this.carouselPrev, 'Desplazar pasos hacia la izquierda'], [this.carouselNext, 'Desplazar pasos hacia la derecha']]) {
+            button.type = 'button'; button.hidden = true; button.disabled = true;
+            button.setAttribute('aria-label', label);
+            button.setAttribute('aria-controls', this.viewport.id);
+        }
+        this.viewport.append(this.indicator);
+        this.stepsWrapper.append(this.carouselPrev, this.viewport, this.carouselNext);
+        navigation.append(this.stepsWrapper);
+        this.onIndicatorScroll = () => this.updateCarouselButtons();
+        this.onIndicatorKey = event => {
+            if (event.target !== this.viewport || !this.carouselActive || event.altKey || event.ctrlKey || event.metaKey) return;
+            if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+                event.preventDefault();
+                if (event.key === 'Home' || event.key === 'End') {
+                    this.scrollIndicatorTo(event.key === 'Home' ? 0 : this.viewport.scrollWidth);
+                } else this.scrollIndicator(event.key === 'ArrowLeft' ? -1 : 1);
+            }
+        };
+        this.viewport.addEventListener('scroll', this.onIndicatorScroll, { passive: true });
+        this.viewport.addEventListener('keydown', this.onIndicatorKey);
+        this.onCarouselResize = () => this.scheduleCarousel(true);
+        if (typeof ResizeObserver === 'function') {
+            this.carouselObserver = new ResizeObserver(this.onCarouselResize);
+            this.carouselObserver.observe(this.stepsWrapper);
+        } else window.addEventListener('resize', this.onCarouselResize);
+    }
+
+    scheduleCarousel(ensureActive = false, smooth = false) {
+        if (!this.viewport || this.destroyed) return;
+        this.carouselEnsureActive ||= ensureActive;
+        this.carouselSmooth ||= smooth;
+        if (this.carouselFrame) return;
+        this.carouselFrame = requestAnimationFrame(() => {
+            this.carouselFrame = null;
+            const ensure = this.carouselEnsureActive, animate = this.carouselSmooth;
+            this.carouselEnsureActive = this.carouselSmooth = false;
+            this.updateCarousel(ensure, animate);
+        });
+    }
+
+    updateCarousel(ensureActive, smooth) {
+        if (this.destroyed || !this.viewport) return;
+        // Medir primero sin flechas evita que su ancho mantenga un desbordamiento artificial.
+        this.indicator.classList.remove('wizard__steps--centered');
+        this.carouselPrev.hidden = this.carouselNext.hidden = true;
+        this.carouselActive = this.viewport.clientWidth > 0 && this.viewport.scrollWidth > this.viewport.clientWidth + 1;
+        this.stepsWrapper.classList.toggle('wizard__carousel--active', this.carouselActive);
+        this.viewport.tabIndex = this.carouselActive ? 0 : -1;
+        this.carouselPrev.hidden = this.carouselNext.hidden = !this.carouselActive || !this.options.stepCarousel.showArrows;
+        if (this.carouselActive && this.options.stepCarousel.autoScroll) {
+            const viewport = this.viewport.getBoundingClientRect();
+            let active = this.steps[this.current].item.getBoundingClientRect();
+            const estilo = getComputedStyle(this.viewport);
+            const anchoDisponible = this.viewport.clientWidth - parseFloat(estilo.paddingLeft) - parseFloat(estilo.paddingRight);
+            const separacion = parseFloat(getComputedStyle(this.indicator).columnGap) || 0;
+            const centrar = anchoDisponible + 1 >= active.width * 2 + separacion;
+            if (centrar) {
+                const visibles = this.steps.filter(step => step.enabled);
+                const inicio = Math.max(0, (anchoDisponible - visibles[0].item.getBoundingClientRect().width) / 2 - separacion);
+                const fin = Math.max(0, (anchoDisponible - visibles.at(-1).item.getBoundingClientRect().width) / 2 - separacion);
+                this.indicator.style.setProperty('--wizard-step-space-start', `${inicio}px`);
+                this.indicator.style.setProperty('--wizard-step-space-end', `${fin}px`);
+                this.indicator.classList.add('wizard__steps--centered');
+                // Ajustar con la extensión real: el padding final de un flex desbordado
+                // no se incluye igual en scrollWidth en todos los navegadores.
+                const ultimo = visibles.at(-1).item.getBoundingClientRect();
+                const maxNecesario = this.viewport.scrollLeft + (ultimo.left + ultimo.right - viewport.left - viewport.right) / 2;
+                const ajuste = maxNecesario - (this.viewport.scrollWidth - this.viewport.clientWidth);
+                if (Math.abs(ajuste) > 1) this.indicator.style.setProperty('--wizard-step-space-end', `${Math.max(0, fin + ajuste)}px`);
+                active = this.steps[this.current].item.getBoundingClientRect();
+            }
+            const delta = centrar ? (active.left + active.right - viewport.left - viewport.right) / 2 :
+                active.left < viewport.left ? active.left - viewport.left :
+                active.right > viewport.right ? active.right - viewport.right : 0;
+            const destino = Math.max(0, Math.min(this.viewport.scrollWidth - this.viewport.clientWidth, this.viewport.scrollLeft + delta));
+            if (ensureActive && Math.abs(destino - this.viewport.scrollLeft) > 1) this.scrollIndicatorTo(destino, smooth);
+        }
+        this.updateCarouselButtons();
+    }
+
+    updateCarouselButtons() {
+        if (!this.viewport || this.destroyed) return;
+        this.carouselPrev.disabled = !this.carouselActive || this.viewport.scrollLeft <= 1;
+        this.carouselNext.disabled = !this.carouselActive || this.viewport.scrollLeft >= this.viewport.scrollWidth - this.viewport.clientWidth - 1;
+    }
+
+    scrollIndicator(direction) {
+        if (!this.carouselActive) return;
+        this.scrollIndicatorTo(this.viewport.scrollLeft + direction * Math.max(1, this.viewport.clientWidth * .8));
+    }
+
+    scrollIndicatorTo(left, smooth = true) {
+        const animate = smooth && this.options.stepCarousel.smoothScroll && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+        this.viewport.scrollTo({ left, behavior: animate ? 'smooth' : 'instant' });
+        this.updateCarouselButtons();
     }
 
     enabled() { return this.steps.map((step, index) => step.enabled ? index : -1).filter(index => index !== -1); }
@@ -171,6 +288,11 @@ export default class Wizard {
         this.back.disabled = busy || done || !this.options.allowBackNavigation || this.current === this.enabled()[0];
         this.forward.disabled = busy || done;
         this.forward.textContent = this.current === this.enabled().at(-1) ? this.options.finishText : this.options.nextText;
+        if (this.carouselCurrent !== this.current) {
+            const initial = this.carouselCurrent === undefined;
+            this.carouselCurrent = this.current;
+            this.scheduleCarousel(true, !initial);
+        }
     }
 
     metadata(index) {
@@ -313,6 +435,13 @@ export default class Wizard {
     destroy() {
         if (this.destroyed) return;
         this.destroyed = true; this.token++;
+        this.carouselObserver?.disconnect();
+        if (this.carouselFrame) cancelAnimationFrame(this.carouselFrame);
+        if (this.viewport) {
+            this.viewport.removeEventListener('scroll', this.onIndicatorScroll);
+            this.viewport.removeEventListener('keydown', this.onIndicatorKey);
+            if (!this.carouselObserver) window.removeEventListener('resize', this.onCarouselResize);
+        }
         if (this.root) {
             this.root.removeEventListener('click', this.onClick);
             this.root.removeEventListener('input', this.onEdit);
@@ -329,5 +458,7 @@ export default class Wizard {
         this.options = {}; this.data = {}; this.initialData = {};
         this.root = this.container = this.header = this.indicator = this.progress = this.status = this.content = this.error = this.loading = this.footer = this.back = this.forward = null;
         this.onClick = this.onEdit = this.onSubmit = null;
+        this.stepsWrapper = this.viewport = this.carouselPrev = this.carouselNext = this.carouselObserver = this.carouselFrame = null;
+        this.onIndicatorScroll = this.onIndicatorKey = this.onCarouselResize = null;
     }
 }

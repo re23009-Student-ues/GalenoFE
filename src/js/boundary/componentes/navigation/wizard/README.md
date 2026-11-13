@@ -51,6 +51,7 @@ contactForm.addEventListener('input', () => {
 | `showProgress` | `true` | Barra de pasos completados, no porcentaje de campos |
 | `showStepNumbers` | `true` | Sin números usa puntos; completados/error conservan sus símbolos |
 | `allowBackNavigation` | `true` | Permite Anterior e indicador hacia pasos previos |
+| `stepCarousel` | Ver abajo | Carrusel responsivo del indicador; no cambia la navegación de pasos |
 | `previousText`, `nextText`, `finishText` | `Anterior`, `Siguiente`, `Finalizar` | Texto no vacío |
 | `loadingText` | `Procesando…` | Texto del indicador de procesamiento |
 | `data` | `{}` | Objeto de estado compartido inicial, clonado |
@@ -67,6 +68,46 @@ y la lista de pasos se configuran al construir; no se modifican mediante atribut
 Los textos se insertan con `textContent`, nunca como HTML. Configuraciones inválidas
 lanzan TypeError antes de mover contenido. No se admite reutilizar el mismo nodo,
 ni un nodo que contenga otro contenido de paso, entre pasos de una instancia.
+
+### Carrusel del indicador
+
+```js
+const wizard = new Wizard('#patientWizard', {
+    steps,
+    stepCarousel: {
+        enabled: true,
+        autoScroll: true,
+        showArrows: true,
+        smoothScroll: true
+    }
+}).render();
+```
+
+Las cuatro propiedades son booleanas, con valor predeterminado `true`; se pueden
+omitir individualmente o prescindir de `stepCarousel`. El desbordamiento real,
+no la cantidad de pasos ni un breakpoint, activa el carrusel y sus flechas.
+`enabled: false` conserva la lista original que envuelve y se apila en móvil.
+`autoScroll: false` permite controlar manualmente el desplazamiento sin seguir
+automáticamente al activo. `showArrows: false` oculta las flechas pero conserva
+desplazamiento nativo y teclado. `smoothScroll: false` aplica movimientos inmediatos.
+
+Las flechas solo desplazan el indicador; no validan ni cambian el paso. Se
+deshabilitan en los extremos. El área desplazable recibe foco con Tab cuando
+hay desbordamiento: Izquierda/Derecha desplazan, Inicio/Fin van a los extremos.
+Los botones de pasos mantienen su navegación existente y `aria-current="step"`.
+Se admite desplazamiento táctil y trackpad nativos sin interceptar gestos.
+
+`next()`, `previous()`, `goToStep()` y `reset()` mantienen visible el activo
+y lo centran cuando el área permite mostrar al menos dos pasos completos. Se agrega
+espacio lateral para centrar también el primero y el último; este espacio no se
+cuenta al detectar desbordamiento y desaparece cuando todos caben. Si solo
+cabe un paso, únicamente asegura su visibilidad.
+El carrusel no desplaza la página ni añade cambios de foco. El contenido
+de los formularios no se reconstruye. `ResizeObserver` ajusta el indicador al
+cambiar el contenedor, abrir un Modal o revelar un contenedor oculto. Las medidas
+se agrupan en un frame; `destroy()` cancela el frame, desconecta el observador y
+retira listeners. No se fuerza el activo durante desplazamientos manuales.
+`prefers-reduced-motion: reduce` desactiva el movimiento suave.
 
 ## API y navegación
 
@@ -109,7 +150,7 @@ La barra cuenta pasos validados: un opcional omitido no se marca completado.
 
 La presentación usa botones nativos (Tab, Shift+Tab, Enter/Espacio), lista ordenada,
 `aria-current="step"`, regiones de estado/error, títulos enfocables y paneles
-etiquetados. No es una pestañera y no implementa navegación con flechas. El foco
+etiquetados. Las flechas del área del carrusel desplazan, sin seleccionar pasos. El foco
 se mueve al título del nuevo paso o al mensaje de error. El envío de un formulario
 activo avanza sin envío nativo si la página no manejó ya su evento con preventDefault.
 
@@ -166,22 +207,29 @@ propios si necesitan cancelación.
 Variables en `.wizard`: `--wizard-primary`, `--wizard-success`, `--wizard-error`,
 `--wizard-text`, `--wizard-muted`, `--wizard-border`, `--wizard-background`,
 `--wizard-spacing`, `--wizard-radius`. Sobrescribir después del CSS. El indicador
-horizontal se apila en móvil para conservar títulos y evitar desbordamientos.
-Respeta movimiento reducido en el indicador de carga.
+horizontal conserva un ancho mínimo de 160px por paso (limitado por el viewport
+en espacios menores), envuelve títulos largos y desplaza solo su área. Sin carrusel
+habilitado conserva el apilado móvil original. Respeta movimiento reducido en el
+carrusel y el indicador de carga.
 
 Ejemplo local: `src/ejemplos/wizard.html`, con dos instancias, formularios,
 validación y finalización asíncronas simuladas y Modal. No usa backend.
 Suite: `test/wizard_test.html`, con Mocha, Chai y Sinon locales.
 
 Requiere un navegador moderno con ES Modules, custom elements y structuredClone;
+se recomienda ResizeObserver para detectar contenedores que cambian de tamaño o
+visibilidad. Sin él solo se recalcula al navegar o redimensionar la ventana.
 para el ejemplo modal se requiere dialog.showModal(). No almacena datos, no hace
 binding, no evalúa reglas de negocio ni cancela por sí mismo acciones externas ya
 iniciadas. Los datos compartidos deben ser objetos planos con valores clonables,
 sin funciones ni nodos DOM; setData no combina objetos anidados recursivamente.
 La lectura efectiva con tecnologías de asistencia debe verificarse manualmente.
 
-Validación en Brave: 31/31 casos en escritorio y 31/31 en móvil de 360 × 640 con
-movimiento reducido. También aprobaron 11/11 del service worker y 5/5 del catálogo
-y ejemplos existentes. Se verificaron Tab, Shift+Tab y Enter con teclas reales,
-un fallo/reintento de finalización en la demostración y el cierre de la instancia
-en Modal sin afectar a la principal. No se probó con lectores de pantalla.
+Validación del carrusel y centrado: 51/51 casos en escritorio y 51/51 en móvil
+emulado de 360 × 640 con movimiento reducido, incluyendo las 31 pruebas anteriores.
+Cubre 2, 3, 10 y 20 pasos, títulos largos, resize, contenedor oculto, Modal,
+opciones, extremos, teclado, navegación, independencia de instancias y limpieza.
+En la demostración se verificó Fin con una tecla real (desplaza sin navegar),
+seguimiento suave hasta el paso nueve en tableta de 768 × 1024 y ausencia de
+desbordamiento de página en móvil/tableta. El desplazamiento táctil/trackpad usa
+overflow nativo; no se probó con hardware táctil físico ni lectores de pantalla.

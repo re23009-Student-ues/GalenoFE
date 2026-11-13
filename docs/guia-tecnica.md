@@ -43,6 +43,13 @@ y ruta pendiente al iniciar sesión.
 
 ### Estado de la consulta en agenda y atención
 
+Agenda Médica conserva solo consultas de la clínica activa con algún paso definido
+para `usuario.idRol.idRol`. Cruza `consulta_procedimiento` con
+`procedimiento_paso/procedimiento/{id}`, paginando completamente y consultando cada
+procedimiento distinto una vez por carga. Incluye pasos sin ejecución y no exige
+asignación a la persona de la sesión. También aplica al acceso por `/consulta/:idConsulta`.
+Si falla el cruce, muestra el error sin presentar una lista parcial.
+
 La agenda carga los pasos con `ConsultaProcedimientoPasoService.listarParaConsultas`
 desde el recurso existente `consulta_procedimiento_paso` y los agrupa por
 `idConsultaProcedimiento.idConsulta.idConsulta`, incluyendo todos los procedimientos
@@ -62,12 +69,57 @@ pudo verificar» y permite reintentar. La agenda muestra error de carga antes de
 emitir conclusiones con datos incompletos. No se crean endpoints, pasos ni estados
 persistidos en el navegador para resolver esta regla.
 
-El detalle de atención muestra `consulta.observaciones` en TextArea de solo lectura,
-con autoResize y contador, usando la misma respuesta del listado de consultas. Si
-el valor es nulo o está ausente, el campo queda vacío con un placeholder descriptivo.
-No agrega peticiones ni operaciones de guardado. La instancia se destruye antes
-de reintentar la carga y al desconectar la vista; si falla solo la carga de pasos,
-las observaciones ya recibidas permanecen disponibles.
+El detalle de atención organiza siete apartados con el Wizard existente: información
+general, procedimientos, pasos de atención, exámenes disponibles, órdenes, resultados
+y observaciones/cierre. Los formularios mantienen sus nodos al navegar. Carga los
+recursos paginados mediante `atencion_service.js` y cruza los UUID por consulta;
+los procedimientos se muestran aunque todavía no tengan ejecuciones.
+Encima del Wizard permanece un encabezado con avatar circular (iniciales del
+primer nombre y primer apellido del paciente), y tres líneas: nombre completo,
+edad y documento, sin numeración. Un GET
+paginado de `documento` busca el primer documento con valor de esa persona y
+muestra tipo y número debajo; se detiene al encontrar uno, sin cargar el resto.
+Sin documento muestra «Sin documentos registrados»; ante errores ofrece reintentar
+solo esa búsqueda, conservando Wizard y borradores;
+sin idPersona no se consulta el recurso. Esta carga es independiente de los pasos
+y descarta respuestas de cargas anteriores o de una vista desconectada.
+
+Los TextArea de valor, indicaciones de órdenes existentes, resultado/interpretación
+y observaciones tienen guardado explícito por registro. Solo son editables para
+el rol participante del paso (o del catálogo para observaciones), manteniendo la
+clínica activa. Los otros roles se muestran en lectura. Antes de PUT se relee el
+registro, se verifica clínica/rol y se comparan los campos editados para detectar
+cambios previos de otra sesión; se conservan los demás valores. Esta comparación
+no sustituye control de concurrencia atómico del backend. También permite POST
+de resultados para órdenes existentes sin resultados. Tras un 201 sin UUID, intenta
+recuperarlo del listado; si falla, informa que fue registrado y evita repetir POST.
+Fechas, responsables y estados de pasos son información registrada, sin transiciones
+automáticas. La consulta no tiene responsable empleado directo: se muestran los
+responsables de sus pasos.
+
+Finalizar consulta exige carga completa y ausencia de ediciones o selecciones sin
+guardar. Relee todos los pasos, exige al menos uno y todos COMPLETADO/FINALIZADO,
+y guarda `consulta.fechaFin` por PUT, conservando la regla visual de estado basada
+en pasos. No completa pasos pendientes ni crea órdenes implícitas.
+
+`OrdenExamen` no relaciona un examen: los Checkbox generan borradores de indicaciones
+que se conservan al navegar, pero no se envían ni se atribuyen a órdenes existentes.
+El backend debe agregar `idProcedimientoPasoExamen` (o una relación explícita al
+examen) a la orden y validar su correspondencia con el paso para habilitar su creación.
+`ExamenResultado.rutaAtestado` se muestra como referencia; la entrada de archivo
+permanece deshabilitada hasta disponer de subida/descarga de adjuntos. No se envían
+archivos ni se inventan rutas REST. Para un responsable único de consulta se necesita
+una relación de empleado independiente del paciente `idPersonaRol`.
+
+Si falla la carga de pasos se informa estado no verificable. Si fallan complementos,
+se conservan los datos ya verificados y no se permite finalizar. Reintentar y salir
+destruyen Wizard, TextAreas y sus observadores; las respuestas tardías no modifican
+otra vista. Las observaciones nulas o ausentes se muestran vacías. Pruebas con REST
+simulado en `test/atencion_test.html`.
+Validación de esta integración: 39 pruebas de atención en escritorio y 39 en móvil
+emulado de 360 × 640 con movimiento reducido, 14 de personal, 22 de agenda y la
+suite del service worker, sin fallos. Los guardados se verificaron con REST simulado;
+no se realizaron escrituras sobre datos reales del backend.
 
 ## 3. Sesión del empleado y navegación protegida
 
@@ -118,6 +170,11 @@ página sincroniza sus controles con `setData()` y destruye la instancia al sali
 destruir restaura los nodos originales e ignora resultados tardíos. Documentación
 del contrato en `componentes/navigation/wizard/README.md`, ejemplo local en
 `ejemplos/wizard.html` y pruebas en `test/wizard_test.html`.
+El indicador usa carrusel por desbordamiento real y ResizeObserver, con opciones
+`stepCarousel: { enabled, autoScroll, showArrows, smoothScroll }` (todas `true`
+por defecto). Las flechas desplazan sin navegar pasos; los métodos existentes
+mantienen visible el activo. `enabled: false` conserva el indicador original.
+Los formularios no se reconstruyen; destroy limpia observador, frame y listeners.
 
 TextArea se importa desde `boundary/componentes/form/textarea/index.js` con
 `new TextArea(target, options).render()`. La vista `<galeno-textarea>` conserva un

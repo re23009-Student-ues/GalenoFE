@@ -3,6 +3,7 @@ const CACHE_API = 'galeno-api-v1';
 const ARCHIVOS = [
   './',
   'js/control/agenda_service.js',
+  'js/control/atencion_service.js',
   'js/boundary/vistas/citas_controller.js',
   'js/boundary/componentes/tarjeta_cita.js',
   'js/boundary/componentes/selector_contexto.js',

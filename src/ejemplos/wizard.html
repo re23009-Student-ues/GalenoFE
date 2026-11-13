@@ -26,8 +26,12 @@
     <div id="patientWizard"></div>
     <p id="wizard-demo-feedback" role="status">Completa los pasos con información ficticia.</p>
     <pre id="wizard-demo-data" aria-label="Datos compartidos del ejemplo"></pre>
+    <h2>Indicador con diez pasos</h2>
+    <p>Reduce el ancho de la ventana, desplaza el indicador o usa sus flechas. Los botones inferiores cambian de paso.</p>
+    <div id="carouselWizard"></div>
     <pre><code>import { Wizard } from '../js/boundary/componentes/navigation/wizard/index.js';
 const wizard = new Wizard('#patientWizard', {
+    stepCarousel: { enabled: true, autoScroll: true, showArrows: true, smoothScroll: true },
     steps: [
         { id: 'personal', title: 'Datos personales', content: personalForm,
           validate: () => personalForm.checkValidity() },

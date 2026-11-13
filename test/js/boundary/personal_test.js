@@ -6,6 +6,7 @@ import '../../../src/js/boundary/menu_lateral.js';
 import { crearRouter } from '../../../src/js/router.js';
 import { cargarResumen, listarConsultas } from '../../../src/js/control/resumen_service.js';
 import ConsultaService from '../../../src/js/control/consulta_service.js';
+import ConsultaProcedimientoPasoService from '../../../src/js/control/consultaProcedimientoPaso_service.js';
 
 // Cobertura del personal migrada de paciente_test.js antes de retirar el portal.
 const paciente = { idPersonaRol: 'paciente-1', idRol: { nombre: 'Paciente' }, idPersona: { idPersona: 'persona-1', nombres: 'Ana' }, idClinica: { idClinica: 'clinica-1', nombre: 'Central' } };
@@ -24,6 +25,7 @@ suite('Contexto, dashboard y consultas del personal', () => {
         contextoPrevio = sessionStorage.getItem('sesionPersonaRol');
         sandbox = sinon.createSandbox();
         sandbox.stub(ConsultaService.prototype, 'findAll').resolves(consultas);
+        sandbox.stub(ConsultaProcedimientoPasoService.prototype, 'listarParaConsultas').resolves([]);
         fixture = document.querySelector('#fixtures');
         fixture.innerHTML = '<galeno-menu></galeno-menu><h1 id="test-title"></h1><div id="test-root"></div>';
         router = crearRouter({ contenedor: fixture.querySelector('#test-root'), tituloEl: fixture.querySelector('#test-title'), obtenerUsuario: () => medico });

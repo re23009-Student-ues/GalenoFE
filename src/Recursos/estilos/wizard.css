@@ -1,0 +1,63 @@
+.wizard {
+    --wizard-primary: #1f3a5f;
+    --wizard-success: #15803d;
+    --wizard-error: #b91c1c;
+    --wizard-text: #334155;
+    --wizard-muted: #526173;
+    --wizard-border: #cbd5e1;
+    --wizard-background: #fff;
+    --wizard-spacing: 20px;
+    --wizard-radius: 12px;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    color: var(--wizard-text);
+    font-family: inherit;
+    background: var(--wizard-background);
+    border: 1px solid var(--wizard-border);
+    border-radius: var(--wizard-radius);
+}
+.wizard__header, .wizard__content, .wizard__footer { padding: var(--wizard-spacing); }
+.wizard__header { border-bottom: 1px solid var(--wizard-border); }
+.wizard__steps { display: flex; flex-wrap: wrap; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.wizard__step { flex: 1 1 140px; min-width: 0; border-bottom: 3px solid var(--wizard-border); padding-bottom: 8px; }
+.wizard__step-button { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px; border: 0; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.wizard__step-button:disabled { cursor: default; }
+.wizard__step-info { min-width: 0; overflow-wrap: anywhere; }
+.wizard__step-title, .wizard__step-description, .wizard__step-state { display: block; }
+.wizard__step-title { font-weight: 600; }
+.wizard__step-description, .wizard__step-state { margin-top: 4px; color: var(--wizard-muted); font-size: .8rem; }
+.wizard__step-number { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border: 1px solid var(--wizard-border); border-radius: 50%; }
+.wizard__step--active { border-color: var(--wizard-primary); }
+.wizard__step--active .wizard__step-number { background: var(--wizard-primary); color: #fff; }
+.wizard__step--completed:not(.wizard__step--active) { border-color: var(--wizard-success); }
+.wizard__step--error { border-color: var(--wizard-error); }
+.wizard__step--error .wizard__step-number { background: var(--wizard-error); color: #fff; }
+.wizard__progress { display: block; width: 100%; height: 8px; margin-top: 16px; accent-color: var(--wizard-primary); }
+.wizard__status { margin: 12px 0 0; color: var(--wizard-muted); font-size: .9rem; }
+.wizard__panel-title { margin: 0 0 16px; font-size: 1.1rem; }
+.wizard__panel { min-width: 0; overflow-wrap: anywhere; }
+.wizard__panel :is(input, select, textarea) { max-width: 100%; box-sizing: border-box; }
+.wizard__footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--wizard-border); }
+.wizard__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-left: auto; }
+.wizard__previous, .wizard__next { padding: 10px 16px; border: 1px solid var(--wizard-primary); border-radius: 6px; background: var(--wizard-background); color: var(--wizard-primary); font: inherit; cursor: pointer; }
+.wizard__next { background: var(--wizard-primary); color: #fff; }
+.wizard__actions button:disabled { opacity: .6; cursor: default; }
+.wizard :is(button, input, textarea, select, a):focus-visible, .wizard__error:focus, .wizard__panel-title:focus { outline: 3px solid var(--wizard-primary); outline-offset: 3px; }
+.wizard__error { margin: 0 var(--wizard-spacing) var(--wizard-spacing); padding: 12px; border: 1px solid currentColor; border-radius: 6px; color: var(--wizard-error); white-space: pre-line; overflow-wrap: anywhere; }
+.wizard__error:empty { display: none; }
+.wizard__loading { margin: 0; color: var(--wizard-muted); }
+.wizard__loading::before { content: ''; display: inline-block; width: .8em; height: .8em; margin-right: 8px; border: 2px solid var(--wizard-border); border-top-color: var(--wizard-primary); border-radius: 50%; animation: wizard-spin 800ms linear infinite; }
+.wizard [hidden] { display: none !important; }
+@keyframes wizard-spin { to { transform: rotate(360deg); } }
+@media (max-width: 600px) {
+    .wizard { --wizard-spacing: 16px; }
+    .wizard__step { flex: 1 1 100%; }
+    .wizard__step:not(.wizard__step--active) .wizard__step-description { display: none; }
+    .wizard__step-button { padding: 4px; }
+    .wizard__actions { width: 100%; }
+    .wizard__footer { position: sticky; bottom: 0; z-index: 1; background: var(--wizard-background); }
+    .wizard__actions button { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) { .wizard__loading::before { animation: none; } }

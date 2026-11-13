@@ -1,0 +1,64 @@
+.modal {
+    --modal-background: #fff;
+    --modal-text: #334155;
+    --modal-border: #e2e8f0;
+    --modal-radius: 12px;
+    --modal-padding: 20px;
+    --modal-shadow: 0 16px 60px #0f172a40;
+    --modal-overlay: #0f172a99;
+    --modal-primary: #1f3a5f;
+    --modal-danger: #b91c1c;
+    box-sizing: border-box;
+    width: min(600px, calc(100% - 32px));
+    max-width: calc(100% - 32px);
+    max-height: calc(100dvh - 32px);
+    padding: 0;
+    margin: auto;
+    border: 1px solid var(--modal-border);
+    border-radius: var(--modal-radius);
+    background: var(--modal-background);
+    color: var(--modal-text);
+    box-shadow: var(--modal-shadow);
+    font: inherit;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 160ms ease, transform 160ms ease, display 160ms allow-discrete, overlay 160ms allow-discrete;
+}
+.modal[open] { display: flex; flex-direction: column; opacity: 1; transform: translateY(0); }
+.modal::backdrop { background: var(--modal-overlay); opacity: 0; transition: opacity 160ms ease, display 160ms allow-discrete, overlay 160ms allow-discrete; }
+.modal[open]::backdrop { opacity: 1; }
+@starting-style { .modal[open] { opacity: 0; transform: translateY(8px); } .modal[open]::backdrop { opacity: 0; } }
+.modal--small { width: min(420px, calc(100% - 32px)); }
+.modal--large { width: min(960px, calc(100% - 32px)); }
+.modal--fullscreen { width: calc(100% - 32px); height: calc(100dvh - 32px); }
+.modal__header { display: flex; flex: 0 0 auto; align-items: center; gap: 16px; padding: var(--modal-padding); border-bottom: 1px solid var(--modal-border); }
+.modal__title { flex: 1; min-width: 0; margin: 0; font-size: 1.2rem; overflow-wrap: anywhere; }
+.modal__close { flex: 0 0 32px; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-size: 26px; cursor: pointer; }
+.modal__body { flex: 1 1 auto; padding: var(--modal-padding); overflow: auto; min-height: 0; min-width: 0; overflow-wrap: anywhere; overscroll-behavior: contain; }
+.modal__body > :first-child { margin-top: 0; }
+.modal__body > :last-child { margin-bottom: 0; }
+.modal__footer { display: flex; flex: 0 0 auto; justify-content: flex-end; flex-wrap: wrap; gap: 12px; padding: var(--modal-padding); border-top: 1px solid var(--modal-border); }
+.modal__footer[hidden], .modal__close[hidden] { display: none; }
+.modal__action { padding: 10px 16px; border: 1px solid var(--modal-border); border-radius: 6px; font: inherit; cursor: pointer; background: var(--modal-background); color: var(--modal-text); overflow-wrap: anywhere; }
+.modal__action--primary { background: var(--modal-primary); border-color: var(--modal-primary); color: #fff; }
+.modal__action--danger { background: var(--modal-danger); border-color: var(--modal-danger); color: #fff; }
+.modal :is(button, input, textarea, select, a):focus-visible { outline: 3px solid var(--modal-primary); outline-offset: 3px; }
+.modal button:disabled { opacity: .6; cursor: wait; }
+.modal--static, .modal--static::backdrop { transition: none; }
+.confirm-dialog { --confirm-accent: #1f3a5f; }
+.confirm-dialog--danger { --confirm-accent: #b91c1c; }
+.confirm-dialog--warning { --confirm-accent: #9a4e08; }
+.confirm-dialog--info { --confirm-accent: #1d4ed8; }
+.confirm-dialog__icon { width: 32px; height: 32px; fill: none; stroke: var(--confirm-accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.confirm-dialog__message { white-space: pre-line; }
+.confirm-dialog__confirm { background: var(--confirm-accent); border-color: var(--confirm-accent); color: #fff; }
+.confirm-dialog__error { color: var(--modal-danger); }
+.confirm-dialog__error:empty, .confirm-dialog__status:empty { display: none; }
+.confirm-dialog__status::before { content: ''; display: inline-block; width: .8em; height: .8em; margin-right: 8px; border: 2px solid var(--modal-border); border-top-color: var(--confirm-accent); border-radius: 50%; animation: modal-spin 800ms linear infinite; }
+@keyframes modal-spin { to { transform: rotate(360deg); } }
+@media (max-width: 480px) { .modal { --modal-padding: 16px; } .modal__footer > button { flex: 1; min-width: 0; } }
+@media (prefers-reduced-motion: reduce) {
+    .modal, .modal::backdrop { transition: none !important; }
+    .confirm-dialog__status::before { animation: none; }
+}

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Modal · Ejemplos Galeno</title>
+    <link rel="stylesheet" href="../Recursos/estilos/principal.css">
+    <link rel="stylesheet" href="../Recursos/estilos/modal.css">
+    <link rel="stylesheet" href="./ejemplos.css">
+</head>
+<body>
+<main class="ejemplo">
+    <a href="./index.html">Todos los ejemplos</a>
+    <h1>Modal nativo</h1>
+    <p>Demostración local de contenido, formularios y tamaños. No guarda datos ni realiza solicitudes al backend.</p>
+    <section class="ejemplo__panel">
+        <h2>Información dinámica</h2>
+        <div class="ejemplo__controles">
+            <label>Tamaño<select id="modal-size"><option value="small">Pequeño</option><option value="medium" selected>Mediano</option><option value="large">Grande</option><option value="fullscreen">Pantalla completa</option></select></label>
+            <label><input id="modal-long" type="checkbox">Contenido extenso</label>
+            <button id="open-info" type="button">Abrir información</button>
+        </div>
+    </section>
+    <section class="ejemplo__panel">
+        <h2>Formulario existente</h2>
+        <p>El mismo formulario se traslada al modal y conserva su estado. Al cerrarlo permanece en el diálogo; al destruirlo vuelve aquí.</p>
+        <div id="form-source">
+            <form id="example-form">
+                <label>Nombre ficticio<input name="name" value="Paciente de ejemplo" required></label>
+                <p id="form-feedback" role="status"></p>
+            </form>
+        </div>
+        <div class="ejemplo__controles">
+            <button id="open-form" type="button">Abrir formulario</button>
+            <button id="restore-form" type="button">Restaurar formulario (destruir modal)</button>
+        </div>
+    </section>
+    <p id="modal-feedback" role="status"></p>
+    <pre><code>import { Modal } from '../js/boundary/componentes/overlays/index.js';
+const modal = new Modal({ title: 'Información', size: 'medium' });
+modal.setContent('Contenido seguro, sin interpretar HTML.');
+modal.open();
+// modal.close(); modal.destroy();</code></pre>
+</main>
+<script type="module" src="./modal.js"></script>
+</body>
+</html>

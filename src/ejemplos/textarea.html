@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TextArea · Ejemplos Galeno</title>
+    <link rel="stylesheet" href="../Recursos/estilos/principal.css">
+    <link rel="stylesheet" href="../Recursos/estilos/textarea.css">
+    <link rel="stylesheet" href="../Recursos/estilos/textarea-ejemplo.css">
+    <link rel="stylesheet" href="../Recursos/estilos/modal.css">
+    <link rel="stylesheet" href="../Recursos/estilos/wizard.css">
+    <link rel="stylesheet" href="./ejemplos.css">
+</head>
+<body>
+<main class="ejemplo">
+    <a href="./index.html">Todos los ejemplos</a>
+    <h1>TextArea</h1>
+    <p>Campos de demostración con texto ficticio. La página solo muestra FormData localmente; no envía ni guarda información.</p>
+    <form id="textarea-example" class="ejemplo__panel">
+        <div class="textarea-demo__grid">
+            <section>
+                <h2>Textarea existente con autoResize</h2>
+                <label for="observations">Observaciones de ejemplo</label>
+                <textarea id="observations" name="observations">Texto inicial de ejemplo.</textarea>
+            </section>
+            <section>
+                <h2>Altura y redimensionado nativos</h2>
+                <div id="native-textarea"></div>
+            </section>
+        </div>
+        <div class="ejemplo__controles">
+            <button id="textarea-fill" type="button">Asignar texto multilínea</button>
+            <button id="textarea-clear" type="button">Limpiar</button>
+            <button id="textarea-validate" type="button">Validar</button>
+            <button id="textarea-error" type="button">Mostrar error de ejemplo</button>
+            <button id="textarea-clear-error" type="button">Limpiar error</button>
+            <button type="reset">Restablecer formulario nativo</button>
+            <button type="submit">Consultar FormData</button>
+        </div>
+        <div class="ejemplo__controles">
+            <label><input id="textarea-disabled" type="checkbox">Deshabilitado</label>
+            <label><input id="textarea-readonly" type="checkbox">Solo lectura</label>
+        </div>
+        <p id="textarea-events" role="status">Sin eventos de usuario.</p>
+        <pre id="textarea-data" aria-label="FormData de demostración"></pre>
+    </form>
+    <section class="ejemplo__panel">
+        <h2>Visibilidad y composición</h2>
+        <div class="ejemplo__controles">
+            <button id="textarea-toggle" type="button" aria-expanded="false" aria-controls="textarea-hidden">Mostrar campo inicialmente oculto</button>
+            <button id="textarea-modal" type="button">TextArea en Wizard dentro de Modal</button>
+        </div>
+        <div id="textarea-hidden" hidden></div>
+        <p id="textarea-feedback" role="status"></p>
+    </section>
+    <pre><code>import { TextArea } from '../js/boundary/componentes/form/textarea/index.js';
+const observations = new TextArea('#observations', {
+    name: 'observations', required: true, minLength: 10, maxLength: 500,
+    autoResize: true, minRows: 3, maxRows: 6, showCounter: true
+}).render();
+observations.setValue('Contenido de ejemplo.');
+const result = observations.validate(); // { valid, message }
+const data = new FormData(document.querySelector('#textarea-example'));</code></pre>
+</main>
+<script type="module" src="./textarea.js"></script>
+</body>
+</html>

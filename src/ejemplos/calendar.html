@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Calendarios de citas · Galeno</title>
+    <link rel="stylesheet" href="../Recursos/estilos/principal.css">
+    <link rel="stylesheet" href="../Recursos/estilos/calendar.css">
+    <link rel="stylesheet" href="./ejemplos.css">
+    <link rel="stylesheet" href="../Recursos/estilos/calendar-ejemplo.css">
+</head>
+<body>
+    <main class="calendar-demo">
+        <a href="./index.html">Todos los ejemplos</a>
+        <h1>Calendarios de citas</h1>
+        <p>Ejemplo local con datos ficticios. Selecciona el 12 de noviembre de 2026 para consultar sus eventos.</p>
+        <div class="calendar-demo__columns">
+            <section>
+                <h2>Con lista de eventos</h2>
+                <div id="appointmentsCalendar"></div>
+            </section>
+            <section>
+                <h2>Con panel externo</h2>
+                <div id="agendaCalendar"></div>
+                <p id="external-events" role="status">Selecciona una fecha para ver sus eventos aquí.</p>
+            </section>
+        </div>
+        <div class="calendar-demo__controls">
+            <button id="add-event" type="button">Agregar cita ficticia</button>
+            <button id="remove-event" type="button">Eliminar esa cita</button>
+            <button id="update-events" type="button">Actualizar eventos ficticios</button>
+            <button id="destroy-calendars" type="button">Destruir calendarios</button>
+        </div>
+        <p id="calendar-feedback" role="status"></p>
+    </main>
+    <script type="module" src="./calendar.js"></script>
+</body>
+</html>

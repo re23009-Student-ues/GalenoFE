@@ -2,6 +2,7 @@
 // Una ruta sin `tag` todavía no tiene pantalla y muestra "en construcción".
 import "./boundary/vistas/resumen_controller.js";
 import "./boundary/vistas/consulta_controller.js";
+import "./boundary/vistas/atencion_controller.js";
 
 const rutasPublicas = {
     '/login': { titulo: 'Iniciar sesión', publica: true },
@@ -11,7 +12,9 @@ const rutasPublicas = {
 const rutas = {
     '/dashboard': { publica: false, titulo: 'Resumen', tag: 'resumen-controller' },
     '/consulta/:idConsulta': { publica: false, titulo: 'Consulta', tag: 'consulta-controller' },
-    '/consultas': { publica: false, titulo: 'Agenda Médica', tag: 'consulta-controller' }
+    '/consultas': { publica: false, titulo: 'Agenda Médica', tag: 'consulta-controller' },
+    '/atencion': { publica: false, titulo: 'Atención y Procedimientos', tag: 'atencion-controller' },
+    '/atencion/:idConsulta': { publica: false, titulo: 'Atención y Procedimientos', tag: 'atencion-controller' }
 };
 
 /**
@@ -84,6 +87,14 @@ export function crearRouter({ contenedor, tituloEl, obtenerUsuario, alRequerirLo
         const pantalla = document.createElement(tag);
         pantalla.parametros = parametros;
         pantalla.usuario = usuario;   // el controller lo lee al conectarse
+        if (tag === 'atencion-controller') {
+            pantalla.idConsulta = parametros.idConsulta;
+            pantalla.addEventListener('volver-consultas', () => navegarA('/consultas'));
+        }
+        if (tag === 'consulta-controller') pantalla.addEventListener('abrir-atencion', evento => {
+            const id = evento.detail?.idConsulta;
+            if (id !== null && id !== undefined && String(id).trim()) navegarA(`/atencion/${encodeURIComponent(id)}`);
+        });
         contenedor.replaceChildren(pantalla);
     }
 

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TarjetaSimple · Ejemplos Galeno</title>
+    <link rel="stylesheet" href="../Recursos/estilos/principal.css">
+    <link rel="stylesheet" href="./ejemplos.css">
+</head>
+<body>
+<main class="ejemplo">
+    <a href="./index.html">Todos los ejemplos</a>
+    <h1>TarjetaSimple</h1>
+    <p>Contenido ficticio distribuido en los slots titulo, contenido y pie.</p>
+    <div class="ejemplo__grid">
+        <tarjeta-simple id="tarjeta-editable">
+            <p slot="titulo">Consulta general de ejemplo</p>
+            <p slot="contenido">Contenido descriptivo de la tarjeta.</p>
+            <span slot="pie">Clínica ficticia</span>
+            <span slot="pie">Ejemplo</span>
+        </tarjeta-simple>
+        <tarjeta-simple>
+            <p slot="titulo">Varios elementos de contenido</p>
+            <p slot="contenido">Primer párrafo de demostración.</p>
+            <p slot="contenido">Segundo párrafo en el mismo slot.</p>
+            <span slot="pie">Sin conexión al backend</span>
+        </tarjeta-simple>
+    </div>
+    <form id="tarjeta-form" class="ejemplo__panel">
+        <h2>Actualizar el contenido de los slots</h2>
+        <div class="ejemplo__controles">
+            <label>Título<input name="title" value="Título actualizado" required></label>
+            <label>Contenido<input name="content" value="Texto de ejemplo actualizado de forma segura." required></label>
+            <button type="submit">Actualizar primera tarjeta</button>
+        </div>
+        <p id="tarjeta-feedback" role="status"></p>
+    </form>
+    <pre><code>import '../js/boundary/componentes/tarjeta_simple.js';
+// En HTML:
+&lt;tarjeta-simple&gt;
+    &lt;p slot="titulo"&gt;Título&lt;/p&gt;
+    &lt;p slot="contenido"&gt;Contenido&lt;/p&gt;
+    &lt;span slot="pie"&gt;Pie&lt;/span&gt;
+&lt;/tarjeta-simple&gt;</code></pre>
+</main>
+<script type="module" src="./tarjeta-simple.js"></script>
+</body>
+</html>

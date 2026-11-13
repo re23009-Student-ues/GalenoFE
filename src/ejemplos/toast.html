@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Toast · Ejemplos Galeno</title>
+    <link rel="stylesheet" href="../Recursos/estilos/principal.css">
+    <link rel="stylesheet" href="../Recursos/estilos/toast.css">
+    <link rel="stylesheet" href="./ejemplos.css">
+</head>
+<body>
+<main class="ejemplo">
+    <a href="./index.html">Todos los ejemplos</a>
+    <h1>Toast</h1>
+    <p>Mensajes ficticios. El límite global de esta demostración es de tres notificaciones visibles.</p>
+    <section class="ejemplo__panel">
+        <h2>Tipos de notificación</h2>
+        <div class="ejemplo__controles">
+            <button type="button" data-type="success">Éxito</button>
+            <button type="button" data-type="error">Error</button>
+            <button type="button" data-type="warning">Advertencia</button>
+            <button type="button" data-type="info">Información</button>
+        </div>
+    </section>
+    <form id="toast-form" class="ejemplo__panel">
+        <h2>Notificación personalizada</h2>
+        <div class="ejemplo__controles">
+            <label>Tipo<select name="type"><option value="info">Información</option><option value="success">Éxito</option><option value="warning">Advertencia</option><option value="error">Error</option></select></label>
+            <label>Título opcional<input name="title" value="Ejemplo local"></label>
+            <label>Mensaje<input name="message" value="Esta es una notificación de prueba." required></label>
+            <label>Duración en ms (0 = persistente)<input name="duration" type="number" min="0" max="2147483647" step="1" value="4000" required></label>
+            <label>Posición<select name="position"><option>top-right</option><option>top-left</option><option>top-center</option><option>bottom-right</option><option>bottom-left</option><option>bottom-center</option></select></label>
+        </div>
+        <div class="ejemplo__controles">
+            <label><input type="checkbox" name="closable" checked>Botón de cierre</label>
+            <label><input type="checkbox" name="pauseOnHover" checked>Pausa al pasar el cursor</label>
+            <label><input type="checkbox" name="showProgress" checked>Progreso</label>
+            <label><input type="checkbox" name="animated" checked>Animaciones</label>
+            <button type="submit">Mostrar notificación</button>
+        </div>
+    </form>
+    <section class="ejemplo__panel">
+        <h2>Cola y cierre por identificador</h2>
+        <div class="ejemplo__controles">
+            <button id="toast-queue" type="button">Mostrar seis en cola</button>
+            <button id="toast-persistent" type="button">Crear persistente sin botón</button>
+            <button id="toast-dismiss" type="button">Cerrar última por ID</button>
+            <button id="toast-dismiss-all" type="button">Cerrar todas</button>
+        </div>
+        <p id="toast-feedback" role="status">Pasa el cursor sobre una notificación para pausar su tiempo. El foco en su botón también lo pausa.</p>
+        <p>Una notificación persistente ocupa un espacio hasta cerrarse. Usa una misma posición en pantallas estrechas para evitar que distintas pilas coincidan.</p>
+    </section>
+    <pre><code>import { Toast } from '../js/boundary/componentes/feedback/index.js';
+Toast.success('Operación de ejemplo completada.');
+const id = Toast.info('Proceso ficticio…', { duration: 0, closable: false });
+Toast.dismiss(id);</code></pre>
+</main>
+<script type="module" src="./toast.js"></script>
+</body>
+</html>

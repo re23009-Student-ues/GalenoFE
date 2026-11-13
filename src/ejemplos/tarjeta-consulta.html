@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>TarjetaConsulta · Ejemplos Galeno</title>
+    <link rel="stylesheet" href="../Recursos/estilos/principal.css">
+    <link rel="stylesheet" href="./ejemplos.css">
+</head>
+<body>
+<main class="ejemplo">
+    <a href="./index.html">Todos los ejemplos</a>
+    <h1>TarjetaConsulta</h1>
+    <p>Consultas ficticias con distintas fechas. Una fecha de fin pasada no basta para mostrar «Finalizada»: se necesitan pasos completados del REST. Este ejemplo local no carga pasos.</p>
+    <div id="consultas-demo" class="ejemplo__grid"></div>
+    <pre><code>import TarjetaConsulta from '../js/boundary/componentes/tarjeta_consulta.js';
+const tarjeta = new TarjetaConsulta();
+tarjeta.consulta = consulta; // Asignar antes de insertarla.
+tarjeta.pasos = pasosDeEstaConsulta; // Pasos reales cargados por la página.
+document.querySelector('#consultas-demo').append(tarjeta);</code></pre>
+    <p>El componente presenta fecha, paciente, observaciones, clínica y estado. La navegación hacia Atención pertenece al controller de Consultas, no a la tarjeta.</p>
+</main>
+<script type="module" src="./tarjeta-consulta.js"></script>
+</body>
+</html>

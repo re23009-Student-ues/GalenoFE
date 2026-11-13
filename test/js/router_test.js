@@ -229,5 +229,27 @@ suite('Router por hash', () => {
         router.iniciar();
         assert.equal(tituloEl.textContent, 'Agenda Médica');
     });
+    test('atención recibe el id decodificado y requiere sesión', async () => {
+        router.manejarRuta('/atencion/abc%20def');
+        assert.equal(contenedor.firstChild.localName, 'atencion-controller');
+        assert.equal(contenedor.firstChild.idConsulta, 'abc def');
+        assert.deepEqual(contenedor.firstChild.parametros, { idConsulta: 'abc def' });
+        obtenerUsuario.returns(null);
+        router.manejarRuta('/atencion/42');
+        await cambio();
+        assert.equal(window.location.hash, '#/login');
+        assert.equal(router.tomarPendiente(), '/atencion/42');
+    });
+    test('seleccionar consulta navega a atención y permite volver a consultas', async () => {
+        window.history.replaceState({}, '', '#/consultas');
+        router.iniciar();
+        contenedor.firstChild.dispatchEvent(new CustomEvent('abrir-atencion', { detail: { idConsulta: 'id/42' } }));
+        await cambio();
+        assert.equal(window.location.hash, '#/atencion/id%2F42');
+        assert.equal(contenedor.firstChild.idConsulta, 'id/42');
+        contenedor.firstChild.dispatchEvent(new CustomEvent('volver-consultas'));
+        await cambio();
+        assert.equal(window.location.hash, '#/consultas');
+    });
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

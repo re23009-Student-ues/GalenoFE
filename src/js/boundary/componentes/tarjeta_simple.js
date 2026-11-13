@@ -30,7 +30,7 @@ class TarjetaSimple  extends HTMLElement {
         //<link rel="stylesheet" href="./Recursos/estilos/tarjeta.css" />
         let estilo = document.createElement("link");
         estilo.setAttribute("rel","stylesheet");
-        estilo.setAttribute("href","./Recursos/estilos/tarjeta.css")
+        estilo.setAttribute("href", new URL('../../../Recursos/estilos/tarjeta.css', import.meta.url).href);
 
         this.root.appendChild(titulo);
         this.root.appendChild(cuerpo);

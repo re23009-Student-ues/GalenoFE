@@ -1,0 +1,15 @@
+.ejemplo { max-width: 1100px; margin: auto; padding: 24px; }
+.ejemplo h1, .ejemplo h2, .ejemplo p { margin-bottom: 16px; }
+.ejemplo a { color: #1d4ed8; }
+.ejemplo__panel { margin: 20px 0; padding: 20px; border: 1px solid #cbd5e1; border-radius: 12px; background: #fff; }
+.ejemplo__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; }
+.ejemplo__controles { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 16px 0; }
+.ejemplo label { display: flex; flex-direction: column; gap: 6px; }
+.ejemplo label:has(input[type=checkbox]) { flex-direction: row; align-items: center; }
+.ejemplo input:not([type=checkbox]), .ejemplo select, .ejemplo button { padding: 8px 12px; border: 1px solid #64748b; border-radius: 6px; background: #fff; color: #26313f; font: inherit; max-width: 100%; box-sizing: border-box; }
+.ejemplo button { cursor: pointer; }
+.ejemplo :is(button, input, select, a):focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
+.ejemplo pre { overflow-x: auto; padding: 16px; border-radius: 8px; background: #eef5fc; }
+.ejemplo__tabla { width: 100%; border-collapse: collapse; }
+.ejemplo__tabla th, .ejemplo__tabla td { padding: 12px; border-bottom: 1px solid #cbd5e1; text-align: left; }
+@media (max-width: 480px) { .ejemplo { padding: 16px; } .ejemplo__tabla th, .ejemplo__tabla td { padding: 8px 4px; } }

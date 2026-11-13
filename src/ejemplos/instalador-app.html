@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>InstaladorApp · Ejemplos Galeno</title>
+    <link rel="stylesheet" href="../Recursos/estilos/principal.css">
+    <link rel="stylesheet" href="./ejemplos.css">
+</head>
+<body>
+<main class="ejemplo">
+    <a href="./index.html">Todos los ejemplos</a>
+    <h1>InstaladorApp</h1>
+    <p>Simulación local del ciclo de instalación PWA. No instala la aplicación, no abre un diálogo nativo y no registra un service worker.</p>
+    <section class="ejemplo__panel">
+        <h2>Eventos de instalación simulados</h2>
+        <p>Inicialmente el botón del componente está oculto. Ofrece una instalación simulada y después pulsa «Instalar app».</p>
+        <div class="ejemplo__controles">
+            <label>Respuesta simulada<select id="install-outcome"><option value="accepted">Aceptada</option><option value="dismissed">Rechazada</option></select></label>
+            <button id="offer-install" type="button">Ofrecer instalación simulada</button>
+            <button id="installed" type="button">Simular appinstalled</button>
+        </div>
+        <instalador-app></instalador-app>
+        <p id="install-feedback" role="status">Sin oferta de instalación; el botón está oculto.</p>
+    </section>
+    <pre><code>import '../js/boundary/componentes/instalador_app.js';
+// En HTML:
+&lt;instalador-app&gt;&lt;/instalador-app&gt;</code></pre>
+    <p>En producción, beforeinstallprompt lo emite un navegador compatible cuando la aplicación cumple sus requisitos de instalación. El componente espera userChoice y oculta el botón cuando el evento se consume o llega appinstalled.</p>
+</main>
+<script type="module" src="./instalador-app.js"></script>
+</body>
+</html>

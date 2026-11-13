@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ConfirmDialog · Ejemplos Galeno</title>
+    <link rel="stylesheet" href="../Recursos/estilos/principal.css">
+    <link rel="stylesheet" href="../Recursos/estilos/modal.css">
+    <link rel="stylesheet" href="../Recursos/estilos/toast.css">
+    <link rel="stylesheet" href="./ejemplos.css">
+</head>
+<body>
+<main class="ejemplo">
+    <a href="./index.html">Todos los ejemplos</a>
+    <h1>ConfirmDialog</h1>
+    <p>Confirmaciones ficticias. No eliminan registros ni realizan peticiones HTTP. Cancelar recibe el foco inicial.</p>
+    <section class="ejemplo__panel">
+        <h2>Tipos de confirmación</h2>
+        <div class="ejemplo__controles">
+            <button type="button" data-confirm-type="default">Genérica</button>
+            <button type="button" data-confirm-type="danger">Peligro</button>
+            <button type="button" data-confirm-type="warning">Precaución</button>
+            <button type="button" data-confirm-type="info">Información</button>
+        </div>
+    </section>
+    <section class="ejemplo__panel">
+        <h2>Acción asíncrona y cola</h2>
+        <div class="ejemplo__controles">
+            <label><input id="fail-first" type="checkbox" checked>Fallar el primer intento</label>
+            <button id="confirm-async" type="button">Probar operación asíncrona ficticia</button>
+            <button id="confirm-queue" type="button">Abrir tres confirmaciones en cola</button>
+        </div>
+        <p>Durante el procesamiento no se puede cerrar. Ante un fallo, puedes reintentar o cancelar. El Toast posterior lo muestra esta página, no ConfirmDialog.</p>
+    </section>
+    <p id="confirm-feedback" role="status">Selecciona una demostración.</p>
+    <pre><code>import { ConfirmDialog } from '../js/boundary/componentes/overlays/index.js';
+const confirmed = await ConfirmDialog.show({
+    title: 'Confirmar acción', message: '¿Deseas continuar?', type: 'warning'
+});
+if (confirmed) { /* Acción proporcionada por la página */ }</code></pre>
+</main>
+<script type="module" src="./confirm-dialog.js"></script>
+</body>
+</html>

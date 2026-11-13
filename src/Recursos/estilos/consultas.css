@@ -9,3 +9,21 @@ consulta-controller {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 16px;
 }
+
+.consulta__seleccionar { display: block; min-width: 0; width: 100%; padding: 0; border: 0; border-radius: 14px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.consulta__seleccionar:hover { box-shadow: 0 4px 16px #1f3a5f26; }
+.consulta__seleccionar:focus-visible { outline: 3px solid var(--marino, #1f3a5f); outline-offset: 3px; }
+atencion-controller { display: block; color: var(--texto, #26313f); }
+.atencion__boton { padding: 10px 16px; border: 1px solid var(--marino, #1f3a5f); border-radius: 8px; background: #fff; color: var(--marino, #1f3a5f); font: inherit; cursor: pointer; }
+.atencion__boton:focus-visible { outline: 3px solid var(--marino, #1f3a5f); outline-offset: 3px; }
+.atencion__registro, .atencion__pasos { margin-top: 20px; padding: 20px; background: #fff; border-radius: 14px; }
+.atencion__registro h2, .atencion__pasos h3 { margin: 0 0 16px; }
+.atencion__datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 16px; margin: 0; }
+.atencion__datos dt { color: var(--texto-suave, #6f7b8a); font-size: 14px; }
+.atencion__datos dd { margin: 4px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.atencion__observaciones { margin-top: 20px; }
+.atencion__tabla { overflow-x: auto; }
+.atencion__tabla table { width: 100%; border-collapse: collapse; }
+.atencion__tabla caption { text-align: left; padding: 8px 0; }
+.atencion__tabla th, .atencion__tabla td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; overflow-wrap: anywhere; }
+.atencion__paso-actual { background: var(--cielo, #d6e9f8); }

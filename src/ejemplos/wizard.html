@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Wizard · Ejemplos Galeno</title>
+    <link rel="stylesheet" href="../Recursos/estilos/principal.css">
+    <link rel="stylesheet" href="../Recursos/estilos/wizard.css">
+    <link rel="stylesheet" href="../Recursos/estilos/wizard-ejemplo.css">
+    <link rel="stylesheet" href="../Recursos/estilos/modal.css">
+    <link rel="stylesheet" href="../Recursos/estilos/toast.css">
+    <link rel="stylesheet" href="./ejemplos.css">
+</head>
+<body>
+<main class="ejemplo">
+    <a href="./index.html">Todos los ejemplos</a>
+    <h1>Wizard: formularios multipaso</h1>
+    <p>Demostración con datos ficticios. No guarda registros, no usa almacenamiento persistente y no realiza solicitudes HTTP.</p>
+    <div class="ejemplo__controles">
+        <label><input id="reject-contact" type="checkbox">Rechazar la validación asíncrona</label>
+        <label><input id="fail-completion" type="checkbox" checked>Fallar el primer intento de finalización</label>
+        <button id="reset-wizard" type="button">Reiniciar proceso sin borrar campos</button>
+        <button id="show-wizard-data" type="button">Ver datos compartidos</button>
+        <button id="open-wizard-modal" type="button">Abrir otro Wizard en Modal</button>
+    </div>
+    <div id="patientWizard"></div>
+    <p id="wizard-demo-feedback" role="status">Completa los pasos con información ficticia.</p>
+    <pre id="wizard-demo-data" aria-label="Datos compartidos del ejemplo"></pre>
+    <pre><code>import { Wizard } from '../js/boundary/componentes/navigation/wizard/index.js';
+const wizard = new Wizard('#patientWizard', {
+    steps: [
+        { id: 'personal', title: 'Datos personales', content: personalForm,
+          validate: () => personalForm.checkValidity() },
+        { id: 'contact', title: 'Contacto', content: contactForm,
+          validate: async () => await validateContactData() },
+        { id: 'review', title: 'Revisar', content: confirmationElement }
+    ],
+    onComplete: async data => { /* Acción proporcionada por la página */ }
+});
+wizard.render();</code></pre>
+</main>
+<script type="module" src="./wizard.js"></script>
+</body>
+</html>

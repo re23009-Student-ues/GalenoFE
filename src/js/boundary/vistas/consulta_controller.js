@@ -1,5 +1,6 @@
 import TarjetaConsulta from "../componentes/tarjeta_consulta.js";
 import { listarConsultas } from "../../control/resumen_service.js";
+import ConsultaProcedimientoPasoService from '../../control/consultaProcedimientoPaso_service.js';
 import { esc } from "../util_html.js";
 
 /**
@@ -21,8 +22,11 @@ class ConsultaController extends HTMLElement {
         this.innerHTML = `<p class="aviso">Cargando consultas…</p>`;
 
         let lista;
+        let pasos;
         try {
             lista = await listarConsultas(this.usuario);
+            if (!this.isConnected) return;
+            pasos = await new ConsultaProcedimientoPasoService().listarParaConsultas(lista.map(consulta => consulta.idConsulta));
         } catch (err) {
             console.error(err);
             if (!this.isConnected) return;
@@ -38,10 +42,26 @@ class ConsultaController extends HTMLElement {
 
         const tarjetas = document.createElement("div");
         tarjetas.className = "lista-consultas";
+        const porConsulta = new Map(lista.map(consulta => [consulta.idConsulta, []]));
+        for (const paso of pasos) {
+            porConsulta.get(paso.idConsultaProcedimiento?.idConsulta?.idConsulta)?.push(paso);
+        }
         lista.forEach(consulta => {
             const tarjeta = new TarjetaConsulta();
             tarjeta.consulta = consulta;
-            tarjetas.appendChild(tarjeta);
+            tarjeta.pasos = porConsulta.get(consulta.idConsulta);
+            const registro = document.createElement('button');
+            registro.type = 'button';
+            registro.className = 'consulta__seleccionar';
+            registro.setAttribute('aria-label', `Abrir atención de ${[
+                consulta.idPersonaRol?.idPersona?.nombres,
+                consulta.idPersonaRol?.idPersona?.apellidos
+            ].filter(Boolean).join(' ') || 'paciente'}: ${consulta.idConsulta}`);
+            registro.append(tarjeta);
+            registro.addEventListener('click', () => this.dispatchEvent(new CustomEvent('abrir-atencion', {
+                bubbles: true, detail: { idConsulta: consulta.idConsulta }
+            })));
+            tarjetas.appendChild(registro);
         });
         this.replaceChildren(tarjetas);
     }

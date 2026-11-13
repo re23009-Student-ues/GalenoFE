@@ -1,11 +1,14 @@
 import { obtenerSesion, rolesDePersona, establecerContexto, obtenerContexto, cerrarSesion } from "./control/sesion_service.js";
 import { esPaciente } from "./control/roles.js";
 import { crearRouter } from "./router.js";
+import { ConfirmDialog } from "./boundary/componentes/overlays/index.js";
 import "./boundary/galeno_app.js";
 
 export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     let usuario = null;   // persona_rol de la sesión actual
     let detenido = false;
+    let saliendo = false;
+    let confirmacionSalida = null;
 
     const router = crearRouter({
         contenedor: app.outlet,
@@ -30,9 +33,30 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
 
     // Cerrar sesión: vuelve al acceso público
     const alCerrarSesion = async () => {
-        await cerrarSesion();
-        router.navegarA('/citas');
-        entrar();
+        if (detenido || saliendo || !usuario) return;
+        saliendo = true;
+        try {
+            confirmacionSalida = new ConfirmDialog({
+                title: 'Cerrar sesión',
+                message: '¿Deseas cerrar tu sesión y volver al acceso público?',
+                type: 'warning',
+                confirmText: 'Cerrar sesión',
+                cancelText: 'Permanecer',
+                errorMessage: 'No fue posible cerrar la sesión. Intenta nuevamente.',
+                onConfirm: () => cerrarSesion()
+            });
+            confirmacionSalida.open();
+            const confirmado = await confirmacionSalida.result;
+            if (!confirmado || detenido) return;
+            usuario = null;
+            app.usuario = null;
+            router.navegarA('/citas');
+            await entrar();
+        } finally {
+            confirmacionSalida?.destroy();
+            confirmacionSalida = null;
+            saliendo = false;
+        }
     };
     app.addEventListener('galeno-cerrar-sesion', alCerrarSesion);
 
@@ -72,6 +96,7 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
 
     function detener() {
         detenido = true;
+        confirmacionSalida?.destroy();
         router.detener();
         app.removeEventListener('galeno-navegar', alNavegar);
         app.removeEventListener('galeno-cerrar-sesion', alCerrarSesion);

@@ -1,3 +1,5 @@
+import "../componentes/selector_contexto.js";
+import "../componentes/agenda.js";
 import { BarChart } from "../componentes/charts/index.js";
 import { cargarResumen } from "../../control/resumen_service.js";
 import { formatoCorto } from "../../control/fechas.js";
@@ -16,6 +18,7 @@ class ResumenController extends HTMLElement {
         super();
         this.usuario = null;   // persona_rol de la sesión
         this.grafica = null;
+        this.version = 0;
     }
 
     connectedCallback() {
@@ -24,11 +27,13 @@ class ResumenController extends HTMLElement {
 
     // Al salir de la pantalla se libera la gráfica
     disconnectedCallback() {
+        this.version++;
         this.grafica?.destroy();
         this.grafica = null;
     }
 
     async cargar() {
+        const version = ++this.version;
         this.grafica?.destroy();
         this.grafica = null;
         this.innerHTML = `<p class="aviso">Cargando resumen…</p>`;
@@ -38,11 +43,12 @@ class ResumenController extends HTMLElement {
             d = await cargarResumen(this.usuario);
         } catch (err) {
             console.error(err);
-            if (!this.isConnected) return;
+            if (!this.isConnected || version !== this.version) return;
             this.innerHTML = `<p class="aviso aviso--error">${esc(err.mensaje ?? 'No se pudo cargar el resumen')}. Revisa que el servidor esté en marcha (puerto 9080).</p>`;
+            this.montarAgenda();
             return;
         }
-        if (!this.isConnected) return;   // el usuario ya cambió de pantalla
+        if (!this.isConnected || version !== this.version) return;   // el usuario ya cambió de pantalla
 
         const hoy = new Date();
         const mesCorto = hoy.toLocaleDateString('es', { month: 'short' });
@@ -121,7 +127,16 @@ class ResumenController extends HTMLElement {
                 </div>
             </section>`;
 
+        this.montarAgenda();
         this.grafica = dibujarGraficaMes(this.querySelector('#grafica-mes'), d.porMes);
+    }
+    montarAgenda() {
+        const selector = document.createElement('galeno-selector-contexto');
+        selector.usuario = this.usuario;
+        this.prepend(selector);
+        const agenda = document.createElement('galeno-agenda');
+        agenda.usuario = this.usuario;
+        this.append(agenda);
     }
 }
 

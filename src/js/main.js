@@ -7,6 +7,7 @@ import "./boundary/galeno_app.js";
 export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     let usuario = null;   // persona_rol de la sesión actual
     let detenido = false;
+    let versionContexto = 0;
     let saliendo = false;
     let confirmacionSalida = null;
 
@@ -22,6 +23,7 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     window.addEventListener('hashchange', marcarActiva);
 
     function alLoginExitoso(evento) {
+        versionContexto++;
         const { personaRoles } = evento.detail;
         usuario = personaRoles[0];
         establecerContexto(usuario);
@@ -31,10 +33,47 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     }
     app.addEventListener('galeno-login-exitoso', alLoginExitoso);
 
+    // La selección es una propuesta: la inscripción se vuelve a verificar en REST.
+    const alContexto = async evento => {
+        if (detenido || saliendo || !usuario) return;
+        const version = ++versionContexto;
+        const rutaOrigen = window.location.hash;
+        const persona = obtenerSesion();
+        const id = evento.detail?.personaRol?.idPersonaRol;
+        if (!persona || !id) return;
+        try {
+            const roles = await rolesDePersona(persona.idPersona);
+            if (detenido || saliendo || version !== versionContexto || window.location.hash !== rutaOrigen || obtenerSesion()?.idPersona !== persona.idPersona) return;
+            const contexto = roles.find(r => r.idPersonaRol === id && r.idPersona?.idPersona === persona.idPersona && !esPaciente(r) && r.idClinica?.idClinica && r.idRol?.idRol);
+            if (!contexto) throw new Error('El contexto no pertenece al empleado');
+            establecerContexto(contexto);
+            usuario = contexto;
+            app.usuario = contexto;
+            router.navegarA('/dashboard');
+            marcarActiva();
+        } catch (error) {
+            if (detenido || saliendo || version !== versionContexto || window.location.hash !== rutaOrigen) return;
+            const selector = app.querySelector('galeno-selector-contexto');
+            if (selector && usuario) {
+                selector.querySelector('[name="clinica"]').value = usuario.idClinica.idClinica;
+                if (selector.contextos) selector.roles();
+            }
+            const aviso = selector?.querySelector('[role="status"]');
+            if (aviso) aviso.textContent = error.message || error.mensaje || 'No se pudo cambiar de contexto';
+        }
+    };
+    app.addEventListener('galeno-contexto-seleccionado', alContexto);
+
     // Cerrar sesión: vuelve al acceso público
     const alCerrarSesion = async () => {
         if (detenido || saliendo || !usuario) return;
         saliendo = true;
+        versionContexto++;
+        const selector = app.querySelector('galeno-selector-contexto');
+        if (selector?.contextos) {
+            selector.querySelector('[name="clinica"]').value = usuario.idClinica.idClinica;
+            selector.roles();
+        }
         try {
             confirmacionSalida = new ConfirmDialog({
                 title: 'Cerrar sesión',
@@ -96,6 +135,8 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
 
     function detener() {
         detenido = true;
+        versionContexto++;
+        app.removeEventListener('galeno-contexto-seleccionado', alContexto);
         confirmacionSalida?.destroy();
         router.detener();
         app.removeEventListener('galeno-navegar', alNavegar);
@@ -108,4 +149,7 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     return { router, listo: entrar(), detener };
 }
 
-document.addEventListener("DOMContentLoaded", () => iniciarAplicacion());
+document.addEventListener("DOMContentLoaded", () => {
+    const app = document.querySelector('galeno-app');
+    if (app) iniciarAplicacion(app);
+});

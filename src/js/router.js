@@ -1,12 +1,13 @@
 // Cada ruta apunta al controller (custom element) que dibuja esa pantalla.
 // Una ruta sin `tag` todavía no tiene pantalla y muestra "en construcción".
 import "./boundary/vistas/resumen_controller.js";
+import "./boundary/vistas/citas_controller.js";
 import "./boundary/vistas/consulta_controller.js";
 import "./boundary/vistas/atencion_controller.js";
 
 const rutasPublicas = {
     '/login': { titulo: 'Iniciar sesión', publica: true },
-    '/citas': { titulo: 'Búsqueda de citas', publica: true }
+    '/citas': { titulo: 'Búsqueda de citas', publica: true, tag: 'galeno-citas' }
 };
 
 const rutas = {

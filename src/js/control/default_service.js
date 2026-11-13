@@ -47,18 +47,29 @@ class DefaultService {
 
     /**
      * Recorre findRange hasta traer todos los registros.
-     * @param {number} [tope=1000] limite de seguridad de registros a traer
+     * @param {number} [tope=1000] límite explícito; rechaza resultados parciales
      * @returns {Promise.<Array>} una promesa que se resuelve con todos los registros
      */
-    async findAll(tope = 1000) {
-        const PAGINA = 50;   // el REST rechaza max > 50
-        let todos = [];
-        while (todos.length < tope) {
-            const resp = await this.findRange(todos.length, PAGINA);
-            todos = todos.concat(resp.datos);
-            if (resp.datos.length < PAGINA) break;
+    async findAll(tope = Infinity) {
+        const PAGINA = 50;
+        const todos = [];
+        const paginas = new Set();
+        let first = 0;
+        while (true) {
+            const resp = await this.findRange(first, PAGINA);
+            if (!Array.isArray(resp.datos)) throw new Error('El repositorio no devolvió una lista');
+            const firma = JSON.stringify(resp.datos);
+            if (resp.datos.length && paginas.has(firma)) throw new Error('El repositorio repitió una página');
+            paginas.add(firma);
+            todos.push(...resp.datos);
+            first += resp.datos.length;
+            const raw = resp.totalDatos;
+            const total = raw != null && String(raw).trim() !== '' && Number.isSafeInteger(Number(raw)) && Number(raw) >= 0 ? Number(raw) : null;
+            if (total !== null && first >= total) return todos;
+            if (total === null && resp.datos.length < PAGINA) return todos;
+            if (!resp.datos.length) throw new Error('El repositorio devolvió una lista incompleta');
+            if (todos.length >= tope) throw new Error('La búsqueda supera el límite solicitado; no se mostrarán resultados parciales');
         }
-        return todos;
     }
 
 }

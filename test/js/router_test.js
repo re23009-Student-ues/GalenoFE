@@ -159,15 +159,15 @@ suite('Router por hash', () => {
         assert.equal(window.location.hash, '#/login');
     });
 
-    test('citas se abre sin sesión y muestra el placeholder', async () => {
+    test('citas se abre sin sesión y monta la búsqueda pública', async () => {
         obtenerUsuario.returns(null);
         window.location.hash = '/citas';
         router.iniciar();
         await cambio();
         assert.equal(window.location.hash, '#/citas');
         assert.equal(tituloEl.textContent, 'Búsqueda de citas');
-        assert.equal(contenedor.firstChild.className, 'aviso');
-        assert.equal(contenedor.textContent, 'Esta pantalla está en construcción.');
+        assert.equal(contenedor.firstChild.tagName, 'GALENO-CITAS');
+        assert.isNotNull(contenedor.querySelector('galeno-citas'));
         sinon.assert.notCalled(alRequerirLogin);
         assert.equal(router.tomarPendiente('/dashboard'), '/dashboard');
     });

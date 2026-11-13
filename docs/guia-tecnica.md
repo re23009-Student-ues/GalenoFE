@@ -23,7 +23,7 @@ Navegación: `#/ruta`, `navegarA(ruta)` y `hashchange`. Hash vacío: sin sesión
 | Ruta | Acceso | `tag` actual |
 |---|---|---|
 | `/login` | Pública | Sin tag en el router; callback pide a `galeno-app` montar `galeno-login`. |
-| `/citas` | Pública | Sin tag: placeholder. |
+| `/citas` | Pública | `galeno-citas`: búsqueda por documento, clínica y fechas. |
 | `/dashboard` | Protegida | `resumen-controller` |
 | `/consulta/:idConsulta` | Protegida | `consulta-controller` |
 | `/consultas` | Protegida | `consulta-controller` |
@@ -34,7 +34,7 @@ No existe portal ni mapa de rutas del paciente. El menú lateral del personal co
 
 Agregar ruta: añadir `{ publica, titulo, tag }` al mapa en `router.js`. Reemplazar placeholder: asignar `tag` e importar su módulo registrado. Sin tag: «Esta pantalla está en construcción.», salvo `/login`. Enlaces: `data-route` en `menu_lateral.js`, dentro de `<galeno-menu>`. El router monta las vistas en `<galeno-outlet>`; no reemplazar este elemento al cambiar de modo.
 
-Antes de conectar, el router asigna **propiedades JavaScript**: `usuario` (persona_rol del contexto), `parametros` (parámetros decodificados, como `{ idConsulta: '42' }`). `/consulta/:idConsulta` reutiliza el controlador de consultas; no implementa un detalle específico.
+Antes de conectar, el router asigna **propiedades JavaScript**: `usuario` (persona_rol del contexto), `parametros` (parámetros decodificados, como `{ idConsulta: '42' }`). `/consulta/:idConsulta` conserva el controlador de consultas, obtiene por GET la consulta indicada y verifica su clínica; mantiene tarjetas con pasos reales y el evento `abrir-atencion`. El detalle está en `/atencion/:idConsulta`.
 
 Seleccionar una tarjeta emite `abrir-atencion` con `detail: { idConsulta }`. El
 router abre `#/atencion/:idConsulta`, asigna `idConsulta` al detalle y escucha
@@ -71,7 +71,7 @@ las observaciones ya recibidas permanecen disponibles.
 
 ## 3. Sesión del empleado y navegación protegida
 
-Login carga tipos activos e indicaciones → `autenticarEmpleado` valida formato, busca documento y roles excluyendo Paciente → guarda persona y emite `galeno-login-exitoso` con `detail: { persona, personaRoles }` → main establece el primer rol como contexto y `usuario`. La selección de clínica/rol de HU3 aún no existe; podrá usar `establecerContexto`.
+Login carga tipos activos e indicaciones → `autenticarEmpleado` valida formato, busca documento y roles excluyendo Paciente → guarda persona y emite `galeno-login-exitoso` con `detail: { persona, personaRoles }` → main establece el primer rol como contexto y `usuario`. HU3 agrega `galeno-selector-contexto`. Main revalida la pertenencia y actualiza usuario en memoria, app y `establecerContexto`; conserva ConfirmDialog para cerrar sesión.
 
 Ruta protegida sin sesión → guarda `pendiente` en memoria → `/login` → callback `alRequerirLogin` sin duplicarse en la redirección → ingreso → `tomarPendiente('/dashboard')`. Consumirla o llamar a `detener()` la borra.
 
@@ -90,7 +90,7 @@ Recarga: `obtenerSesion()` → `rolesDePersona(idPersona)` → excluir Paciente 
 
 Errores REST: `DefaultError` (`mensaje`, `error`), salvo 404 de documento. `sessionStorage`: `sesionPersona` (JSON: **solo** `idPersona`, `nombres`, `apellidos`) y `sesionPersonaRol` (id del contexto, texto). No persiste clínica/rol completos ni pendiente.
 
-El paciente no inicia sesión; HU1 es pública y de solo lectura. `/citas` todavía es un placeholder, sin búsqueda implementada.
+El paciente no inicia sesión; HU1 es pública y de solo lectura. `/citas` ofrece búsqueda pública con invalidación de filtros y respuestas tardías. El ticket PDF permanece deshabilitado porque no existe el endpoint backend. Ver `docs/hu1-hu3.md`.
 
 `galeno-cerrar-sesion` solicita confirmación con ConfirmDialog. Permanecer, Escape,
 X u overlay conservan la sesión. Confirmar ejecuta `cerrarSesion()` y regresa a
@@ -132,3 +132,9 @@ síncronos y setValue no emite eventos artificiales. Estilos en
 - Archivo nuevo en `src`: añadir su ruta relativa a `ARCHIVOS` de `src/serviceWorker.js` (estáticos). El worker intercepta GET a `/resources/v1/` en cualquier origen; guarda solo 200 `cors`/`basic` con headers, nunca opacas ni escrituras. `activate` elimina versiones anteriores de sus cachés.
 - Comportamiento nuevo: pruebas Mocha/Chai/Sinon en `test/js/`, página HTML en `test/` y ejecución en navegador; simular `fetch` cuando corresponda.
 - Registrar/importar componentes, documentar entradas/salidas y verificar limpieza. Cambios pequeños y enfocados.
+
+## 6. Integración HU1/HU3 sobre e806073
+
+El dashboard conserva sus estadísticas y gráficas y agrega contexto laboral y agenda por rol. `galeno-agenda` emite `galeno-navegar` hacia `/atencion/{idConsulta}` para usar el detalle nuevo; no reemplaza su regla de finalización ni sus controles. La selección de contexto se invalida al navegar, iniciar/cerrar sesión o desconectar la app. Durante ConfirmDialog no se aceptan cambios de contexto.
+
+Los seis archivos nuevos de src están incluidos en ARCHIVOS; caché estática `galenosv-v10`. Solo ECMAScript, componentes y CSS propios. La cobertura de HU1/HU3 se encuentra en `test/agenda_test.html`; no se ejecutaron pruebas durante este traslado. Ver `docs/integracion-nueva-version.md`.

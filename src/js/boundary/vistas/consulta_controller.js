@@ -1,6 +1,7 @@
 import TarjetaConsulta from "../componentes/tarjeta_consulta.js";
 import { listarConsultas } from "../../control/resumen_service.js";
 import ConsultaProcedimientoPasoService from '../../control/consultaProcedimientoPaso_service.js';
+import { leer } from "../../control/agenda_service.js";
 import { esc } from "../util_html.js";
 
 /**
@@ -24,13 +25,18 @@ class ConsultaController extends HTMLElement {
         let lista;
         let pasos;
         try {
-            lista = await listarConsultas(this.usuario);
+            const id = this.parametros?.idConsulta;
+            if (id) {
+                const consulta = await (await leer(`consulta/${encodeURIComponent(id)}`)).json();
+                if (!this.usuario?.idClinica?.idClinica || consulta.idPersonaRol?.idClinica?.idClinica !== this.usuario.idClinica.idClinica) throw new Error('La consulta no pertenece a la clínica del contexto actual');
+                lista = [consulta];
+            } else lista = await listarConsultas(this.usuario);
             if (!this.isConnected) return;
             pasos = await new ConsultaProcedimientoPasoService().listarParaConsultas(lista.map(consulta => consulta.idConsulta));
         } catch (err) {
             console.error(err);
             if (!this.isConnected) return;
-            this.innerHTML = `<p class="aviso aviso--error">${esc(err.mensaje ?? 'No se pudieron cargar las consultas')}.</p>`;
+            this.innerHTML = `<p class="aviso aviso--error">${esc(err.mensaje ?? err.message ?? 'No se pudieron cargar las consultas')}.</p>`;
             return;
         }
         if (!this.isConnected) return;   // el usuario ya cambió de pantalla

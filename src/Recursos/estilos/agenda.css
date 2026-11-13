@@ -1,0 +1,15 @@
+galeno-citas, galeno-agenda, galeno-tarjeta-cita, galeno-selector-contexto { display: block; }
+.agenda-panel { background: white; border-radius: 16px; padding: 24px; margin: 20px 0; color: var(--texto, #26313f); }
+.agenda-panel h2, .agenda-panel h3, .agenda-panel p { margin-bottom: 12px; }
+.agenda-form { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; margin: 16px 0; }
+.agenda-form label { display: flex; flex-direction: column; gap: 8px; flex: 1 1 200px; }
+.agenda-form input, .agenda-form select { min-width: 0; width: 100%; padding: 12px; border: 1px solid #bacddd; border-radius: 8px; font: inherit; }
+.agenda-panel button { background: #1a73e8; border: 0; border-radius: 8px; color: white; padding: 12px 18px; font: inherit; cursor: pointer; }
+.agenda-panel button:disabled, .agenda-panel input:disabled, .agenda-panel select:disabled { opacity: .55; cursor: default; }
+.agenda-panel :focus-visible { outline: 3px solid #1f3a5f; outline-offset: 3px; }
+.agenda-panel [hidden] { display: none; }
+.agenda-panel article { padding: 16px; margin: 16px 0; border: 1px solid #d6e9f8; border-radius: 12px; }
+.agenda-panel details { padding: 10px; margin: 8px 0; background: #eef5fc; border-radius: 8px; }
+.agenda-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.agenda-panel ul { padding-left: 22px; }
+@media(max-width: 600px) { .agenda-panel { padding: 16px; } .agenda-form { flex-direction: column; align-items: stretch; } .agenda-form label { flex: auto; } }

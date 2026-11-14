@@ -4,6 +4,7 @@ const ARCHIVOS = [
   './',
   'js/control/agenda_service.js',
   'js/control/documento_formato.js',
+  'js/control/atencion_service.js',
   'js/boundary/vistas/citas_controller.js',
   'js/boundary/componentes/tarjeta_cita.js',
   'js/boundary/componentes/selector_contexto.js',

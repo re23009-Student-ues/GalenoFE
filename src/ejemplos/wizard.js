@@ -64,6 +64,14 @@ function demo(host, modal = null) {
 }
 
 const main = demo(document.querySelector('#patientWizard'));
+const carousel = new Wizard('#carouselWizard', {
+    linear: false,
+    steps: Array.from({ length: 10 }, (_, index) => {
+        const content = document.createElement('p');
+        content.textContent = `Contenido del paso ${index + 1}. El desplazamiento del indicador conserva este panel.`;
+        return { id: `carousel-${index}`, title: index === 6 ? 'Historial y antecedentes personales' : `Paso ${index + 1}`, content };
+    })
+}).render();
 document.querySelector('#reset-wizard').addEventListener('click', () => {
     feedback.textContent = main.reset() ? 'Proceso reiniciado; los valores de los controles se conservan.' : 'Espera a que termine el procesamiento.';
 });
@@ -78,5 +86,5 @@ document.querySelector('#open-wizard-modal').addEventListener('click', () => {
     modalDemo = demo(modalHost, modal); modal.open();
 });
 window.addEventListener('pagehide', event => {
-    if (!event.persisted) { main.destroy(); modal.destroy(); Toast.dismissAll(); }
+    if (!event.persisted) { main.destroy(); carousel.destroy(); modal.destroy(); Toast.dismissAll(); }
 });

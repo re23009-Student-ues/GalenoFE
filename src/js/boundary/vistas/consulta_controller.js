@@ -1,12 +1,12 @@
 import TarjetaConsulta from "../componentes/tarjeta_consulta.js";
 import { listarConsultas } from "../../control/resumen_service.js";
 import ConsultaProcedimientoPasoService from '../../control/consultaProcedimientoPaso_service.js';
-import { leer } from "../../control/agenda_service.js";
+import { leer, filtrarConsultasPorRol } from "../../control/agenda_service.js";
 import { esc } from "../util_html.js";
 
 /**
  * Pantalla "Agenda Médica": una <tarjeta-consulta> por cada consulta visible
- * para el usuario (las de su clínica; si es paciente, solo las suyas).
+ * para el rol activo dentro de su clínica.
  * Uso: <consulta-controller>, con la propiedad `usuario` asignada antes de conectarlo.
  */
 class ConsultaController extends HTMLElement {
@@ -32,6 +32,8 @@ class ConsultaController extends HTMLElement {
                 lista = [consulta];
             } else lista = await listarConsultas(this.usuario);
             if (!this.isConnected) return;
+            lista = await filtrarConsultasPorRol(lista, this.usuario);
+            if (!this.isConnected) return;
             pasos = await new ConsultaProcedimientoPasoService().listarParaConsultas(lista.map(consulta => consulta.idConsulta));
         } catch (err) {
             console.error(err);
@@ -42,7 +44,7 @@ class ConsultaController extends HTMLElement {
         if (!this.isConnected) return;   // el usuario ya cambió de pantalla
 
         if (!lista.length) {
-            this.innerHTML = `<p class="aviso">Aún no hay consultas registradas</p>`;
+            this.innerHTML = `<p class="aviso">No hay consultas con pasos para tu rol en esta clínica</p>`;
             return;
         }
 

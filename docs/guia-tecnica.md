@@ -23,7 +23,7 @@ Navegación: `#/ruta`, `navegarA(ruta)` y `hashchange`. Hash vacío: sin sesión
 | Ruta | Acceso | `tag` actual |
 |---|---|---|
 | `/login` | Pública | Sin tag en el router; callback pide a `galeno-app` montar `galeno-login`. |
-| `/citas` | Pública | `galeno-citas`: búsqueda por documento, clínica y fechas. |
+| `/citas` | Pública | `galeno-citas`: validación de documento y búsqueda; fechas opcionales en los resultados. |
 | `/dashboard` | Protegida | `resumen-controller` |
 | `/consulta/:idConsulta` | Protegida | `consulta-controller` |
 | `/consultas` | Protegida | `consulta-controller` |
@@ -138,3 +138,23 @@ síncronos y setValue no emite eventos artificiales. Estilos en
 El dashboard conserva sus estadísticas y gráficas y agrega contexto laboral y agenda por rol. `galeno-agenda` emite `galeno-navegar` hacia `/atencion/{idConsulta}` para usar el detalle nuevo; no reemplaza su regla de finalización ni sus controles. La selección de contexto se invalida al navegar, iniciar/cerrar sesión o desconectar la app. Durante ConfirmDialog no se aceptan cambios de contexto.
 
 Los seis archivos nuevos de src están incluidos en ARCHIVOS; caché estática `galenosv-v10`. Solo ECMAScript, componentes y CSS propios. La cobertura de HU1/HU3 se encuentra en `test/agenda_test.html`; no se ejecutaron pruebas durante este traslado. Ver `docs/integracion-nueva-version.md`.
+
+## 7. Búsqueda pública simplificada
+
+El inicio de HU1 contiene tipo y número de documento y un único botón Buscar citas, que valida el documento y consulta sus citas. La validación de formato se comparte entre la entrada y validarPaciente mediante validarFormatoDocumento, usando la expresión regular del tipo; los errores aparecen junto al campo antes de consultar REST.
+
+buscarCitas(contextos) trae las consultas de todas las inscripciones válidas del paciente, conserva el cruce por UUID y no recibe clínica ni fechas. La clínica se muestra como información dentro de galeno-tarjeta-cita, que reutiliza tarjeta-simple. Las citas sin fecha también pueden verse en el listado general.
+
+Después de buscar se muestra un filtro con Desde y Hasta opcionales, inicialmente vacíos. filtrarCitas trabaja en memoria, con días inclusivos en America/El_Salvador; no modifica validarRango ni la agenda laboral. Mostrar todas limpia el filtro. Cambiar tipo o documento elimina la validación, los resultados y los filtros e invalida cargas previas.
+
+La cuadrícula pública muestra hasta cuatro tarjetas por fila, tres o dos en anchos intermedios y una en móvil. Los estilos se limitan a galeno-citas. La caché estática pasa a galenosv-v12 e incluye documento_formato.js. Cobertura actualizada en test/js/agenda_test.js; se conserva la indicación previa de no ejecutar pruebas por ahora.
+
+### Resultados y ejemplos de documento
+
+Las tarjetas se montan en una cuadrícula propia, hermana del panel de acciones, debajo de Buscar mis citas y Mis citas. El panel mantiene únicamente formulario, filtros y mensajes; no contiene las tarjetas.
+
+Buscar valida formato, consulta el documento y sus inscripciones y obtiene las citas en una sola acción. Las respuestas previas se descartan al cambiar el documento o salir. Los mensajes indican si se encontraron citas asociadas al documento y distinguen los errores del servidor.
+
+El helper propio `ejemploDocumento` en `control/documento_formato.js` se comparte entre HU1 y login. Sugiere un placeholder como `Ej.: 00000000-0` a partir de formatos habituales y solo lo muestra si satisface la expresión regular. Para expresiones no reconocidas sin ejemplo compatible se conservan las indicaciones del catálogo. No modifica lo escrito ni cambia la autenticación.
+
+Login agrega Volver a mis citas, disponible incluso durante la carga del catálogo o un ingreso pendiente. Emite `galeno-login-cancelado`, cancela sus listeners y descarta respuestas pendientes. Main cierra el overlay mediante `app.ocultarLogin()`, consume la ruta protegida pendiente y navega a `/citas` sin guardar sesión. El cierre exitoso de login reutiliza ocultarLogin. No se ejecutaron pruebas durante este ajuste.

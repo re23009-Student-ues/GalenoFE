@@ -56,13 +56,16 @@ export async function listarCompleto(recurso, clave) {
     }
     return [...datos.values()];
 }
-export async function validarPaciente(tipo, numero) {
+export function validarFormatoDocumento(tipo, numero) {
     let expresion;
     try {
         if (!tipo?.expresionRegular) throw new Error();
         expresion = new RegExp(`^(?:${tipo.expresionRegular})$`);
     } catch { throw new Error('El tipo de documento no tiene un formato válido configurado'); }
     if (!numero || !expresion.test(numero)) throw new Error(tipo.indicaciones || 'El formato del documento no es válido');
+}
+export async function validarPaciente(tipo, numero) {
+    validarFormatoDocumento(tipo, numero);
     const documento = await buscarDocumento(tipo.idTipoDocumento, numero);
     if (!documento) throw new Error('Documento no registrado');
     const persona = documento.idPersona;
@@ -71,14 +74,32 @@ export async function validarPaciente(tipo, numero) {
     if (!contextos.length) throw new Error('Esta persona no tiene inscripciones como paciente');
     return { persona, contextos };
 }
-export async function buscarCitas(contextos, idClinica, desde, hasta) {
-    validarRango(desde, hasta);
-    const permitidos = new Set(contextos.filter(c => esPaciente(c) && c.idClinica?.idClinica === idClinica).map(c => c.idPersonaRol));
-    if (!permitidos.size) throw new Error('Selecciona una clínica donde estés inscrito como paciente');
-    const consultas = (await listarCompleto('consulta', 'idConsulta')).filter(c => permitidos.has(c.idPersonaRol?.idPersonaRol) && c.idPersonaRol?.idClinica?.idClinica === idClinica).filter(c => c.fechaInicio != null).filter(c => { const dia = diaAgenda(c.fechaInicio); return dia >= desde && dia <= hasta; });
+/** Citas de todas las inscripciones del paciente; los filtros se aplican después, en memoria. */
+export async function buscarCitas(contextos) {
+    const inscripciones = new Map(contextos
+        .filter(c => esPaciente(c) && c.idPersonaRol && c.idClinica?.idClinica)
+        .map(c => [c.idPersonaRol, c]));
+    if (!inscripciones.size) throw new Error('No hay inscripciones de paciente con clínica disponible');
+    const consultas = (await listarCompleto('consulta', 'idConsulta')).filter(c => {
+        const paciente = c.idPersonaRol;
+        return inscripciones.has(paciente?.idPersonaRol)
+            && inscripciones.get(paciente.idPersonaRol).idClinica.idClinica === paciente.idClinica?.idClinica;
+    });
     if (!consultas.length) return [];
     const procedimientos = await listarCompleto('consulta_procedimiento', 'idConsultaProcedimiento');
-    return consultas.sort((a,b) => new Date(a.fechaInicio.replace(/\[.*\]$/, '')) - new Date(b.fechaInicio.replace(/\[.*\]$/, ''))).map(c => ({ ...c, procedimientos: procedimientos.filter(p => p.idConsulta?.idConsulta === c.idConsulta) }));
+    const inicio = c => c.fechaInicio ? new Date(c.fechaInicio.replace(/\[.*\]$/, '')).getTime() : Infinity;
+    return consultas.sort((a, b) => inicio(a) - inicio(b)).map(c => ({
+        ...c, procedimientos: procedimientos.filter(p => p.idConsulta?.idConsulta === c.idConsulta)
+    }));
+}
+export function filtrarCitas(citas, desde = '', hasta = '') {
+    if (!desde && !hasta) return citas;
+    validarRango(desde || hasta, hasta || desde);
+    return citas.filter(c => {
+        if (!c.fechaInicio) return false;
+        const dia = diaAgenda(c.fechaInicio);
+        return (!desde || dia >= desde) && (!hasta || dia <= hasta);
+    });
 }
 export async function ticketPDF(idConsulta) {
     const respuesta = await leer(`consulta/${encodeURIComponent(idConsulta)}/ticket`, { headers: { Accept: 'application/pdf' } });

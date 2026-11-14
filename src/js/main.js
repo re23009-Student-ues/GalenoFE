@@ -20,6 +20,12 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     const alNavegar = evento => router.navegarA(evento.detail.ruta);
     const marcarActiva = () => app.marcarActiva(window.location.hash.slice(1));
     app.addEventListener('galeno-navegar', alNavegar);
+    const alCancelarLogin = () => {
+        app.ocultarLogin();
+        router.tomarPendiente('/dashboard');
+        router.navegarA('/citas');
+    };
+    app.addEventListener('galeno-login-cancelado', alCancelarLogin);
     window.addEventListener('hashchange', marcarActiva);
 
     function alLoginExitoso(evento) {
@@ -140,6 +146,7 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
         confirmacionSalida?.destroy();
         router.detener();
         app.removeEventListener('galeno-navegar', alNavegar);
+        app.removeEventListener('galeno-login-cancelado', alCancelarLogin);
         app.removeEventListener('galeno-cerrar-sesion', alCerrarSesion);
         app.removeEventListener('galeno-login-exitoso', alLoginExitoso);
         window.removeEventListener('hashchange', marcarActiva);

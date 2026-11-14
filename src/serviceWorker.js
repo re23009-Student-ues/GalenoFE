@@ -1,8 +1,9 @@
-const CACHE = 'galenosv-v10';
+const CACHE = 'galenosv-v12';
 const CACHE_API = 'galeno-api-v1';
 const ARCHIVOS = [
   './',
   'js/control/agenda_service.js',
+  'js/control/documento_formato.js',
   'js/boundary/vistas/citas_controller.js',
   'js/boundary/componentes/tarjeta_cita.js',
   'js/boundary/componentes/selector_contexto.js',

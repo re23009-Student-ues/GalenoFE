@@ -8,8 +8,8 @@ Cambios aplicados en el repositorio GalenoFE indicado por el usuario. Se conserv
 
 - La ruta `#/citas` monta `galeno-citas` y carga los tipos activos de documento.
 - Valida el formato antes de pedir datos. Reutiliza `buscarDocumento` y `rolesDePersona` sin iniciar sesión; solo admite inscripciones de la persona encontrada cuyo rol es Paciente.
-- Habilita progresivamente documento, clínicas inscritas y fechas. Cambiar documento elimina clínicas y resultados; cambiar filtros invalida los resultados anteriores.
-- Composición por UUID entre consulta y consulta_procedimiento, con rango de días inclusivo y paginación completa.
+- El inicio contiene tipo y número de documento y un único botón Buscar, que valida y consulta. La expresión regular se valida mientras se escribe y antes de consultar. Cambiar documento elimina validación, resultados y filtros.
+- Composición por UUID entre consulta y consulta_procedimiento para todas las inscripciones del paciente, con paginación completa. Clínica dentro de cada tarjeta; fechas opcionales después de buscar, aplicadas localmente con días inclusivos. Cuadrícula independiente del panel de acciones, de hasta cuatro tarjetas por fila.
 - Distingue documento inexistente, ausencia de inscripción, cero citas y fallo REST. Ignora respuestas tardías tras cambios o desmontaje.
 - La comparación con ConsultaResource confirma que no existe `GET consulta/{id}/ticket`. El botón PDF queda deshabilitado con un mensaje de disponibilidad. Se conserva el adaptador Blob para integración posterior, con `TICKET_PDF_DISPONIBLE=false`.
 
@@ -26,7 +26,7 @@ Cambios aplicados en el repositorio GalenoFE indicado por el usuario. Se conserv
 
 Se agrega agenda_service para composición de lecturas, fechas de negocio y ticket. Se elimina el corte silencioso de 1000 registros de findAll, que afectaba las estadísticas. Se detectan páginas repetidas y resultados incompletos.
 
-Los seis archivos nuevos de src están incluidos en ARCHIVOS. Se incrementa la caché estática a galenosv-v10. Se mantiene el mecanismo existente de respaldo de GET REST sin conexión; solo estarán disponibles las respuestas previamente guardadas. La política específica de caché para datos públicos y PDF sigue requiriendo coordinación con integrante 1.
+Los seis archivos nuevos de src están incluidos en ARCHIVOS. Se incrementa la caché estática a galenosv-v11. Se mantiene el mecanismo existente de respaldo de GET REST sin conexión; solo estarán disponibles las respuestas previamente guardadas. La política específica de caché para datos públicos y PDF sigue requiriendo coordinación con integrante 1.
 
 ## Verificación histórica, anterior al traslado de versión
 
@@ -55,3 +55,9 @@ Ver `docs/comparacion-backend-hu1-hu3.md`. Los registros sin fechaInicio se excl
 ## Traslado de versión
 
 Cambios adaptados a `e806073` sin reemplazar el detalle de atención, las reglas de finalización por pasos, ConfirmDialog ni Wizard/TextArea/Toast/Modal. Ver `docs/integracion-nueva-version.md`.
+
+## Refactorización de búsqueda pública — 14 de noviembre de 2026
+
+Se simplificó solo HU1 y sus servicios propios. HU3, login, sesión y atención mantienen su lógica. Las pruebas de HU1 fueron actualizadas, sin ejecutarse; la revisión de este cambio fue estática.
+
+El acceso del personal y la búsqueda pública comparten ejemplos visuales compatibles con el tipo de documento. El acceso agrega Volver a mis citas sin autenticación, con descarte de ingresos pendientes.

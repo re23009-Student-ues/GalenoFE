@@ -16,11 +16,7 @@ class GalenoApp extends HTMLElement {
                 <footer class="pie">Galenos · Gestión clínica</footer>
                 </main></div><div id="pantalla-login" class="pantalla-login" hidden></div>`;
             this.addEventListener('galeno-alternar-menu', () => this.menu?.alternar());
-            this.addEventListener('galeno-login-exitoso', () => {
-                const pantalla = this.querySelector('#pantalla-login');
-                pantalla.hidden = true;
-                pantalla.replaceChildren();
-            });
+            this.addEventListener('galeno-login-exitoso', () => this.ocultarLogin());
         }
         this.usuario = this._usuario ?? null;
     }
@@ -48,6 +44,12 @@ class GalenoApp extends HTMLElement {
 
     marcarActiva(ruta) { this.menu?.setAttribute('ruta', ruta); }
     cerrarMenu() { this.menu?.cerrar(); }
+
+    ocultarLogin() {
+        const pantalla = this.querySelector('#pantalla-login');
+        pantalla.hidden = true;
+        pantalla.replaceChildren();
+    }
 
     mostrarLogin() {
         const pantalla = this.querySelector('#pantalla-login');

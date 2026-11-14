@@ -1,59 +1,105 @@
-import { listarCompleto, validarPaciente, buscarCitas, diaAgenda } from '../../control/agenda_service.js';
+import { listarCompleto, validarPaciente, buscarCitas, filtrarCitas, validarFormatoDocumento } from '../../control/agenda_service.js';
+import { ejemploDocumento } from '../../control/documento_formato.js';
 import { esc } from '../util_html.js';
 import '../componentes/tarjeta_cita.js';
 
 class GalenoCitas extends HTMLElement {
     connectedCallback() {
         this.version = (this.version || 0) + 1;
-        this.contextos = [];
-        const hoy = diaAgenda();
-        this.innerHTML = `<section class="agenda-panel"><h2>Buscar mis citas</h2><p>1. Tipo → 2. Documento → 3. Clínica → 4. Fechas</p>
-        <form novalidate class="agenda-form"><label>Tipo de documento<select name="tipo" disabled><option value="">Cargando…</option></select></label>
-        <label>Número de documento<input name="numero" autocomplete="off" disabled aria-describedby="indicaciones"></label>
-        <p id="indicaciones"></p><button type="button" data-validar disabled>Validar documento</button>
-        <label>Clínica<select name="clinica" disabled><option value="">Valida tu documento</option></select></label>
-        <label>Desde<input name="desde" type="date" value="${hoy}" disabled></label><label>Hasta<input name="hasta" type="date" value="${hoy}" disabled></label>
-        <button type="submit" disabled>Buscar citas</button></form><p role="status" aria-live="polite" data-estado></p>
-        <button type="button" data-reintentar hidden>Reintentar catálogo</button><section data-resultados aria-label="Resultados de citas"></section></section>`;
+        this.citas = [];
+        this.ocupado = false;
+        this.innerHTML = `<section class="agenda-panel">
+            <h2>Buscar mis citas</h2>
+            <form class="agenda-form" data-busqueda novalidate>
+                <label>Tipo de documento
+                    <select name="tipo" disabled><option value="">Cargando…</option></select>
+                </label>
+                <div class="citas-documento">
+                    <label>Número de documento
+                        <input name="numero" autocomplete="off" disabled aria-describedby="indicaciones error-documento">
+                    </label>
+                    <p id="indicaciones"></p>
+                    <p id="error-documento" class="citas-error" aria-live="polite"></p>
+                </div>
+                <button type="submit" data-buscar disabled>Buscar citas</button>
+            </form>
+            <p role="status" aria-live="polite" data-estado></p>
+            <button type="button" data-reintentar hidden>Reintentar catálogo</button>
+            <section data-resultados hidden aria-label="Resultados de citas">
+                <h3>Mis citas</h3>
+                <form class="agenda-form" data-filtros>
+                    <label>Desde<input name="desde" type="date"></label>
+                    <label>Hasta<input name="hasta" type="date"></label>
+                    <button type="submit">Filtrar</button>
+                    <button type="button" data-limpiar>Mostrar todas</button>
+                </form>
+                <p role="status" aria-live="polite" data-resumen></p>
+            </section>
+        </section>
+        <section class="citas-grid" data-lista hidden aria-label="Citas encontradas"></section>`;
         this.alCambio = e => this.cambiar(e);
-        this.alClick = e => { if (e.target.closest('[data-validar]')) this.validar(); if (e.target.closest('[data-reintentar]')) this.catalogo(); };
-        this.alSubmit = e => { e.preventDefault(); this.buscar(); };
+        this.alClick = e => {
+            if (e.target.closest('[data-reintentar]')) this.catalogo();
+            if (e.target.closest('[data-limpiar]')) {
+                this.querySelector('[data-filtros]').reset();
+                this.filtrar();
+            }
+        };
+        this.alSubmit = e => {
+            e.preventDefault();
+            if (e.target.matches('[data-filtros]')) this.filtrar();
+            else this.buscar();
+        };
         this.addEventListener('input', this.alCambio);
         this.addEventListener('click', this.alClick);
-        this.querySelector('form').addEventListener('submit', this.alSubmit);
+        this.addEventListener('submit', this.alSubmit);
         this.catalogo();
     }
     disconnectedCallback() {
         this.version++;
         this.removeEventListener('input', this.alCambio);
         this.removeEventListener('click', this.alClick);
-        this.querySelector('form')?.removeEventListener('submit', this.alSubmit);
+        this.removeEventListener('submit', this.alSubmit);
     }
     campo(nombre) { return this.querySelector(`[name="${nombre}"]`); }
     estado(texto) { this.querySelector('[data-estado]').textContent = texto; }
     vigente(version) { return this.isConnected && this.version === version; }
+    tipoSeleccionado() { return this.tipos?.find(t => t.idTipoDocumento === this.campo('tipo').value); }
     cambiar(e) {
-        const nombre = e.target.name;
-        if (!['tipo','numero','clinica','desde','hasta'].includes(nombre)) return;
+        if (!['tipo', 'numero'].includes(e.target.name)) return;
         this.version++;
-        this.querySelector('[data-resultados]').replaceChildren();
+        this.ocupado = false;
+        this.limpiarResultados();
         this.estado('');
-        if (nombre === 'tipo' || nombre === 'numero') {
-            this.contextos = [];
-            this.campo('clinica').innerHTML = '<option value="">Valida tu documento</option>';
-            this.campo('clinica').disabled = true;
-            this.campo('numero').disabled = !this.campo('tipo').value;
-            const tipo = this.tipos?.find(t => t.idTipoDocumento === this.campo('tipo').value);
-            this.querySelector('#indicaciones').textContent = tipo?.indicaciones || '';
-            this.querySelector('[data-validar]').disabled = !tipo || !this.campo('numero').value;
-        }
+        this.campo('numero').disabled = !this.tipoSeleccionado();
+        const ejemplo = ejemploDocumento(this.tipoSeleccionado());
+        this.campo('numero').placeholder = ejemplo ? `Ej.: ${ejemplo}` : '';
+        this.querySelector('#indicaciones').textContent = this.tipoSeleccionado()?.indicaciones || '';
+        this.validarEntrada();
         this.sincronizar();
     }
+    validarEntrada() {
+        const campo = this.campo('numero');
+        let error = '';
+        try { validarFormatoDocumento(this.tipoSeleccionado(), campo.value.trim()); }
+        catch (e) { error = e.message; }
+        campo.setCustomValidity(error);
+        const mostrarError = Boolean(campo.value && error);
+        campo.setAttribute('aria-invalid', String(mostrarError));
+        this.querySelector('#error-documento').textContent = mostrarError ? error : '';
+    }
     sincronizar() {
-        const lista = this.contextos.length && this.campo('clinica').value;
-        this.campo('desde').disabled = !lista;
-        this.campo('hasta').disabled = !lista;
-        this.querySelector('[type="submit"]').disabled = !lista;
+        this.querySelector('[data-buscar]').disabled = this.ocupado
+            || !this.tipoSeleccionado() || !this.campo('numero').value.trim()
+            || !this.campo('numero').validity.valid;
+    }
+    limpiarResultados() {
+        this.citas = [];
+        this.querySelector('[data-resultados]').hidden = true;
+        this.querySelector('[data-filtros]').reset();
+        this.querySelector('[data-lista]').replaceChildren();
+        this.querySelector('[data-lista]').hidden = true;
+        this.querySelector('[data-resumen]').textContent = '';
     }
     async catalogo() {
         const version = ++this.version;
@@ -68,45 +114,42 @@ class GalenoCitas extends HTMLElement {
             this.estado(tipos.length ? '' : 'No hay tipos de documento activos');
         } catch (e) { if (this.vigente(version)) { this.estado(e.message || e.mensaje); this.querySelector('[data-reintentar]').hidden = false; } }
     }
-    async validar() {
-        if (this.querySelector('[data-validar]').disabled) return;
-        const version = ++this.version;
-        this.contextos = [];
-        this.campo('clinica').disabled = true;
-        this.sincronizar();
-        this.querySelector('[data-resultados]').replaceChildren();
-        this.querySelector('[data-validar]').disabled = true;
-        this.estado('Validando documento…');
-        try {
-            const tipo = this.tipos.find(t => t.idTipoDocumento === this.campo('tipo').value);
-            const resultado = await validarPaciente(tipo, this.campo('numero').value.trim());
-            if (!this.vigente(version)) return;
-            this.contextos = resultado.contextos;
-            const clinicas = [...new Map(this.contextos.filter(c => c.idClinica?.idClinica).map(c => [c.idClinica.idClinica, c.idClinica])).values()];
-            this.campo('clinica').innerHTML = '<option value="">Selecciona una clínica</option>' + clinicas.map(c => `<option value="${esc(c.idClinica)}">${esc(c.nombre)}</option>`).join('');
-            this.campo('clinica').disabled = !clinicas.length;
-            this.estado(clinicas.length ? 'Documento validado. Selecciona tu clínica.' : 'No hay clínicas disponibles para esta inscripción');
-            this.campo('clinica').focus();
-        } catch (e) { if (this.vigente(version)) { this.estado(e.message || e.mensaje); this.campo('numero').focus(); } }
-        finally { if (this.vigente(version)) this.querySelector('[data-validar]').disabled = false; }
-    }
     async buscar() {
-        if (this.querySelector('[type="submit"]').disabled) return;
+        this.validarEntrada();
+        this.sincronizar();
+        if (this.querySelector('[data-buscar]').disabled) return;
         const version = ++this.version;
-        this.querySelector('[type="submit"]').disabled = true;
-        this.querySelector('[data-resultados]').replaceChildren();
+        this.limpiarResultados();
+        this.ocupado = true;
+        this.sincronizar();
         this.estado('Buscando citas…');
         try {
-            const citas = await buscarCitas(this.contextos, this.campo('clinica').value, this.campo('desde').value, this.campo('hasta').value);
+            const paciente = await validarPaciente(this.tipoSeleccionado(), this.campo('numero').value.trim());
             if (!this.vigente(version)) return;
-            this.estado(citas.length ? `${citas.length} ${citas.length === 1 ? 'cita encontrada' : 'citas encontradas'}` : 'No hay citas en el rango seleccionado');
-            for (const cita of citas) {
+            const citas = await buscarCitas(paciente.contextos);
+            if (!this.vigente(version)) return;
+            this.citas = citas;
+            this.querySelector('[data-resultados]').hidden = false;
+            this.estado('');
+            this.filtrar();
+        } catch (e) { if (this.vigente(version)) { this.estado(e.message || e.mensaje); this.campo('numero').focus(); } }
+        finally { if (this.vigente(version)) { this.ocupado = false; this.sincronizar(); } }
+    }
+    filtrar() {
+        const resumen = this.querySelector('[data-resumen]');
+        try {
+            const citas = filtrarCitas(this.citas, this.campo('desde').value, this.campo('hasta').value);
+            const tarjetas = citas.map(cita => {
                 const tarjeta = document.createElement('galeno-tarjeta-cita');
                 tarjeta.cita = cita;
-                this.querySelector('[data-resultados]').append(tarjeta);
-            }
-        } catch (e) { if (this.vigente(version)) this.estado(e.message || e.mensaje); }
-        finally { if (this.vigente(version)) this.sincronizar(); }
+                return tarjeta;
+            });
+            this.querySelector('[data-lista]').replaceChildren(...tarjetas);
+            this.querySelector('[data-lista]').hidden = !tarjetas.length;
+            resumen.textContent = citas.length
+                ? `${citas.length} ${citas.length === 1 ? 'cita encontrada asociada' : 'citas encontradas asociadas'} al documento`
+                : this.citas.length ? 'No hay citas en el rango seleccionado' : 'No se encontraron citas asociadas al documento';
+        } catch (e) { resumen.textContent = e.message; }
     }
 }
 customElements.define('galeno-citas', GalenoCitas);

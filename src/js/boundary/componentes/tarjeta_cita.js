@@ -6,7 +6,7 @@ class TarjetaCita extends HTMLElement {
     connectedCallback() {
         this.version = (this.version || 0) + 1;
         const c = this.cita;
-        this.innerHTML = `<tarjeta-simple><span slot="titulo">${esc(fechaAgenda(c.fechaInicio))}</span><div slot="contenido"><p>${esc(c.idPersonaRol?.idClinica?.nombre || 'Clínica sin nombre')}</p><p>Procedimientos: ${esc(c.procedimientos.map(p => p.idProcedimiento?.nombre || 'Procedimiento sin nombre').join(', ') || 'Sin procedimientos registrados')}</p></div><div slot="pie"><button type="button" ${TICKET_PDF_DISPONIBLE ? '' : 'disabled'}>Descargar ticket PDF</button><p role="status" aria-live="polite">${TICKET_PDF_DISPONIBLE ? '' : 'El ticket PDF todavía no está disponible.'}</p></div></tarjeta-simple>`;
+        this.innerHTML = `<tarjeta-simple><span slot="titulo">${esc(fechaAgenda(c.fechaInicio))}</span><div slot="contenido"><p><strong>Clínica:</strong> ${esc(c.idPersonaRol?.idClinica?.nombre || 'Clínica sin nombre')}</p><p>Procedimientos: ${esc(c.procedimientos.map(p => p.idProcedimiento?.nombre || 'Procedimiento sin nombre').join(', ') || 'Sin procedimientos registrados')}</p></div><div slot="pie"><button type="button" ${TICKET_PDF_DISPONIBLE ? '' : 'disabled'}>Descargar ticket PDF</button><p role="status" aria-live="polite">${TICKET_PDF_DISPONIBLE ? '' : 'El ticket PDF todavía no está disponible.'}</p></div></tarjeta-simple>`;
         this.alDescargar = () => this.descargar();
         this.querySelector('button').addEventListener('click', this.alDescargar);
     }

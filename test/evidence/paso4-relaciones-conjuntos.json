@@ -1,0 +1,723 @@
+{
+  "step": 4,
+  "backendUnit": {
+    "tests": 233,
+    "passed": 233,
+    "failed": 0,
+    "offline": true,
+    "temporaryBuild": true
+  },
+  "frontend": {
+    "tests": 189,
+    "passed": 189,
+    "failed": 0,
+    "realRestBlocked": true,
+    "suites": [
+      {
+        "passes": "13",
+        "failures": "0",
+        "errors": [],
+        "page": "relaciones_conjuntos_test"
+      },
+      {
+        "passes": "10",
+        "failures": "0",
+        "errors": [],
+        "page": "citas_agenda_por_rol_test"
+      },
+      {
+        "passes": "27",
+        "failures": "0",
+        "errors": [],
+        "page": "agenda_test"
+      },
+      {
+        "passes": "14",
+        "failures": "0",
+        "errors": [],
+        "page": "personal_test"
+      },
+      {
+        "passes": "9",
+        "failures": "0",
+        "errors": [],
+        "page": "filtros_consulta_catalogo_test"
+      },
+      {
+        "passes": "63",
+        "failures": "0",
+        "errors": [],
+        "page": "atencion_test"
+      },
+      {
+        "passes": "18",
+        "failures": "0",
+        "errors": [],
+        "page": "login_test"
+      },
+      {
+        "passes": "16",
+        "failures": "0",
+        "errors": [],
+        "page": "sesion_autenticar_test"
+      },
+      {
+        "passes": "7",
+        "failures": "0",
+        "errors": [],
+        "page": "logout_test"
+      },
+      {
+        "passes": "12",
+        "failures": "0",
+        "errors": [],
+        "page": "shell_test"
+      },
+      {
+        "passes": "3",
+        "failures": "0",
+        "errors": [],
+        "page": "service_worker_version_test"
+      }
+    ]
+  },
+  "worker": {
+    "node": {
+      "tests": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "browser": {
+      "tests": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "restIntegration": {
+    "tests": 142,
+    "passed": 142,
+    "failed": 0,
+    "checks": [
+      {
+        "name": "consulta_procedimiento pagina 0",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento pagina 50",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento pagina 100",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento pagina 150",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento recorrido sin duplicados ni omisiones",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento conjunto vacio o sin coincidencias ''",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento conjunto vacio o sin coincidencias '11111111-0000-0000-0000-000000000999'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento ids duplicados no multiplican filas",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento rechaza conjunto 'x'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento rechaza conjunto ' 50000000-0000-0000-0000-000000000001'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento rechaza conjunto '50000000-0000-0000-0000-000000000001,'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento rechaza conjunto '50000000-0000-0000-0000-000000000001,50000000'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento rechaza conjunto '1-1-1-1-1'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento acepta limite de 50 UUID",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento rechaza first=-1",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento rechaza max=0",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento rechaza max=51",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento conserva listado global",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso pagina 0",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso pagina 50",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso pagina 100",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso pagina 150",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso recorrido sin duplicados ni omisiones",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso conjunto vacio o sin coincidencias ''",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso conjunto vacio o sin coincidencias '11111111-0000-0000-0000-000000000999'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso ids duplicados no multiplican filas",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso rechaza conjunto 'x'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso rechaza conjunto ' 50000000-0000-0000-0000-000000000001'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso rechaza conjunto '50000000-0000-0000-0000-000000000001,'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso rechaza conjunto '50000000-0000-0000-0000-000000000001,50000000'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso rechaza conjunto '1-1-1-1-1'",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso acepta limite de 50 UUID",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso rechaza first=-1",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso rechaza max=0",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso rechaza max=51",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso conserva listado global",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso pagina 0",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso pagina 50",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso pagina 100",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso pagina 150",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso recorrido sin duplicados ni omisiones",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso conjunto vacio o sin coincidencias ''",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso conjunto vacio o sin coincidencias '11111111-0000-0000-0000-000000000999'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso ids duplicados no multiplican filas",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso rechaza conjunto 'x'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso rechaza conjunto ' 60000000-0000-0000-0000-000000000001'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso rechaza conjunto '60000000-0000-0000-0000-000000000001,'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso rechaza conjunto '60000000-0000-0000-0000-000000000001,60000000'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso rechaza conjunto '1-1-1-1-1'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso acepta limite de 50 UUID",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso rechaza first=-1",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso rechaza max=0",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso rechaza max=51",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso conserva listado global",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen pagina 0",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen pagina 50",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen pagina 100",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen pagina 150",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen recorrido sin duplicados ni omisiones",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen conjunto vacio o sin coincidencias ''",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen conjunto vacio o sin coincidencias '11111111-0000-0000-0000-000000000999'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen ids duplicados no multiplican filas",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen rechaza conjunto 'x'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen rechaza conjunto ' 70000000-0000-0000-0000-000000000001'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen rechaza conjunto '70000000-0000-0000-0000-000000000001,'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen rechaza conjunto '70000000-0000-0000-0000-000000000001,70000000'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen rechaza conjunto '1-1-1-1-1'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen acepta limite de 50 UUID",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen rechaza first=-1",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen rechaza max=0",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen rechaza max=51",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen conserva listado global",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia pagina 0",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia pagina 50",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia pagina 100",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia pagina 150",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia recorrido sin duplicados ni omisiones",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia conjunto vacio o sin coincidencias ''",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia conjunto vacio o sin coincidencias '11111111-0000-0000-0000-000000000999'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia ids duplicados no multiplican filas",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia rechaza conjunto 'x'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia rechaza conjunto ' 70000000-0000-0000-0000-000000000001'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia rechaza conjunto '70000000-0000-0000-0000-000000000001,'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia rechaza conjunto '70000000-0000-0000-0000-000000000001,70000000'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia rechaza conjunto '1-1-1-1-1'",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia acepta limite de 50 UUID",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia rechaza first=-1",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia rechaza max=0",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia rechaza max=51",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia conserva listado global",
+        "passed": true
+      },
+      {
+        "name": "orden_examen pagina 0",
+        "passed": true
+      },
+      {
+        "name": "orden_examen pagina 50",
+        "passed": true
+      },
+      {
+        "name": "orden_examen pagina 100",
+        "passed": true
+      },
+      {
+        "name": "orden_examen pagina 150",
+        "passed": true
+      },
+      {
+        "name": "orden_examen recorrido sin duplicados ni omisiones",
+        "passed": true
+      },
+      {
+        "name": "orden_examen conjunto vacio o sin coincidencias ''",
+        "passed": true
+      },
+      {
+        "name": "orden_examen conjunto vacio o sin coincidencias '11111111-0000-0000-0000-000000000999'",
+        "passed": true
+      },
+      {
+        "name": "orden_examen ids duplicados no multiplican filas",
+        "passed": true
+      },
+      {
+        "name": "orden_examen rechaza conjunto 'x'",
+        "passed": true
+      },
+      {
+        "name": "orden_examen rechaza conjunto ' 50000000-0000-0000-0000-000000000001'",
+        "passed": true
+      },
+      {
+        "name": "orden_examen rechaza conjunto '50000000-0000-0000-0000-000000000001,'",
+        "passed": true
+      },
+      {
+        "name": "orden_examen rechaza conjunto '50000000-0000-0000-0000-000000000001,50000000'",
+        "passed": true
+      },
+      {
+        "name": "orden_examen rechaza conjunto '1-1-1-1-1'",
+        "passed": true
+      },
+      {
+        "name": "orden_examen acepta limite de 50 UUID",
+        "passed": true
+      },
+      {
+        "name": "orden_examen rechaza first=-1",
+        "passed": true
+      },
+      {
+        "name": "orden_examen rechaza max=0",
+        "passed": true
+      },
+      {
+        "name": "orden_examen rechaza max=51",
+        "passed": true
+      },
+      {
+        "name": "orden_examen conserva listado global",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado pagina 0",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado pagina 50",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado pagina 100",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado pagina 150",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado recorrido sin duplicados ni omisiones",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado conjunto vacio o sin coincidencias ''",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado conjunto vacio o sin coincidencias '11111111-0000-0000-0000-000000000999'",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado ids duplicados no multiplican filas",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado rechaza conjunto 'x'",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado rechaza conjunto ' f0000000-0000-0000-0000-000000000001'",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado rechaza conjunto 'f0000000-0000-0000-0000-000000000001,'",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado rechaza conjunto 'f0000000-0000-0000-0000-000000000001,f0000000'",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado rechaza conjunto '1-1-1-1-1'",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado acepta limite de 50 UUID",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado rechaza first=-1",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado rechaza max=0",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado rechaza max=51",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado conserva listado global",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento union de dos propietarios existentes",
+        "passed": true
+      },
+      {
+        "name": "consulta_procedimiento_paso union de dos propietarios existentes",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso union de dos propietarios existentes",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_examen union de dos propietarios existentes",
+        "passed": true
+      },
+      {
+        "name": "procedimiento_paso_secuencia union de dos propietarios existentes",
+        "passed": true
+      },
+      {
+        "name": "orden_examen union de dos propietarios existentes",
+        "passed": true
+      },
+      {
+        "name": "examen_resultado union de dos propietarios existentes",
+        "passed": true
+      },
+      {
+        "name": "configuraciones activo=true",
+        "passed": true
+      },
+      {
+        "name": "configuraciones activo=false",
+        "passed": true
+      },
+      {
+        "name": "configuraciones invalido activo=true",
+        "passed": true
+      },
+      {
+        "name": "configuraciones invalido pasos=70000000-0000-0000-0000-000000000001&activo=TRUE",
+        "passed": true
+      },
+      {
+        "name": "configuraciones invalido pasos=&activo=",
+        "passed": true
+      },
+      {
+        "name": "secuencias incluyen entrada externa y extremos nulos",
+        "passed": true
+      },
+      {
+        "name": "contrato consulta individual preservado",
+        "passed": true
+      },
+      {
+        "name": "catalogo activo preservado",
+        "passed": true
+      },
+      {
+        "name": "todas las tablas sinteticas permanecen intactas",
+        "passed": true
+      }
+    ],
+    "databaseUnchanged": true,
+    "tablesBefore": {
+      "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+      "consulta": "123:89e866513732346e90e298cb5c015a08",
+      "consulta_procedimiento": "124:5790f1d01247dd9258a51a13ead5c00c",
+      "consulta_procedimiento_paso": "124:8c404ea347fc38b687ce92a081393318",
+      "documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "examen": "123:9059aac03b8590f8fdabba329492dfee",
+      "examen_resultado": "124:90c3dfd718fcf2d674bd439ca51a3980",
+      "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "orden_examen": "124:08e68bb29f08bef147bfd04a3305326b",
+      "persona": "260:b17673d763d97ac33e59ccc470efdb9d",
+      "persona_rol": "260:7508426f340e89b97772a104fd66e151",
+      "procedimiento": "130:df8a85ea8858470011b27eccc46c3605",
+      "procedimiento_paso": "124:591600f320c3cd8504773dacd8c1fd1b",
+      "procedimiento_paso_examen": "124:371cfb81315cf8e00538da7545f6610d",
+      "procedimiento_paso_secuencia": "127:09682bc13b62476d87abd456f8b65581",
+      "rol": "2:1ac162db769fc54285609e57edbded91",
+      "tipo_documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "tablesAfter": {
+      "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+      "consulta": "123:89e866513732346e90e298cb5c015a08",
+      "consulta_procedimiento": "124:5790f1d01247dd9258a51a13ead5c00c",
+      "consulta_procedimiento_paso": "124:8c404ea347fc38b687ce92a081393318",
+      "documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "examen": "123:9059aac03b8590f8fdabba329492dfee",
+      "examen_resultado": "124:90c3dfd718fcf2d674bd439ca51a3980",
+      "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "orden_examen": "124:08e68bb29f08bef147bfd04a3305326b",
+      "persona": "260:b17673d763d97ac33e59ccc470efdb9d",
+      "persona_rol": "260:7508426f340e89b97772a104fd66e151",
+      "procedimiento": "130:df8a85ea8858470011b27eccc46c3605",
+      "procedimiento_paso": "124:591600f320c3cd8504773dacd8c1fd1b",
+      "procedimiento_paso_examen": "124:371cfb81315cf8e00538da7545f6610d",
+      "procedimiento_paso_secuencia": "127:09682bc13b62476d87abd456f8b65581",
+      "rol": "2:1ac162db769fc54285609e57edbded91",
+      "tipo_documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "base": "http://127.0.0.1:52041/GalenoSV-1.0-SNAPSHOT/resources/v1/",
+    "container": "galeno-pagination-it-AMMQ7G"
+  },
+  "limitations": [
+    "Pruebas frontend simuladas e integración REST independientes; no integración completa navegador-backend.",
+    "Sin despliegue ni cambios en datos existentes.",
+    "Paso 5 no implementado."
+  ]
+}

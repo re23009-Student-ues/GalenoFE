@@ -106,7 +106,7 @@ class GalenoCitas extends HTMLElement {
         this.estado('Cargando tipos de documento…');
         this.querySelector('[data-reintentar]').hidden = true;
         try {
-            const tipos = (await listarCompleto('tipo_documento', 'idTipoDocumento')).filter(t => t.activo === true);
+            const tipos = (await listarCompleto('tipo_documento?activo=true', 'idTipoDocumento')).filter(t => t.activo === true);
             if (!this.vigente(version)) return;
             this.tipos = tipos;
             this.campo('tipo').innerHTML = '<option value="">Selecciona un tipo</option>' + tipos.map(t => `<option value="${esc(t.idTipoDocumento)}">${esc(t.nombre)}</option>`).join('');

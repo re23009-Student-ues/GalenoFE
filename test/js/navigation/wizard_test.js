@@ -34,6 +34,16 @@ suite('Wizard', () => {
         assert.isFalse(await wizard.previous()); assert.deepEqual(changes, [['step-2', 'step-1'], ['step-1', 'step-2']]);
         const metadata = wizard.getSteps(); metadata[0].title = 'Mutado'; assert.equal(wizard.getSteps()[0].title, 'Paso 1');
     });
+    test('Progreso externo refleja datos persistidos, sin completar pasos por visitarlos', async () => {
+        const completos = new Set(['step-1']);
+        const wizard = create({ linear: false, isStepComplete: id => completos.has(id) });
+        assert.equal(wizard.progress.value, 1);
+        await wizard.goToStep('step-3');
+        assert.equal(wizard.progress.value, 1); assert.isFalse(wizard.getSteps()[1].completed);
+        completos.add('step-2'); wizard.render(); assert.equal(wizard.progress.value, 2);
+        wizard.setData({ draft: true }); assert.equal(wizard.progress.value, 2);
+        completos.delete('step-1'); wizard.render(); assert.isFalse(wizard.getSteps()[0].completed);
+    });
     test('Render repetido no duplica DOM, formularios ni listeners', async () => {
         const wizard = create(); const root = wizard.root, panel = wizard.steps[0].panel;
         wizard.render().render(); assert.strictEqual(wizard.root, root); assert.strictEqual(wizard.steps[0].panel, panel);

@@ -41,7 +41,7 @@ export default class Wizard {
         }
         if (['linear', 'showProgress', 'showStepNumbers', 'allowBackNavigation'].some(key => typeof o[key] !== 'boolean') ||
             ['previousText', 'nextText', 'finishText', 'loadingText'].some(key => typeof o[key] !== 'string' || !o[key].trim()) ||
-            ['onStepChange', 'onComplete'].some(key => o[key] !== undefined && typeof o[key] !== 'function') ||
+            ['onStepChange', 'onComplete', 'isStepComplete'].some(key => o[key] !== undefined && typeof o[key] !== 'function') ||
             !Array.isArray(o.steps) || !o.steps.length) throw new TypeError('Wizard: configuración inválida.');
         const ids = new Set(), contents = [];
         this.steps = o.steps.map(step => {
@@ -268,6 +268,12 @@ export default class Wizard {
 
     update() {
         if (!this.root || this.destroyed) return;
+        if (this.options.isStepComplete) {
+            this.steps.forEach(step => {
+                try { step.completed = this.options.isStepComplete(step.id) === true; }
+                catch { step.completed = false; }
+            });
+        }
         const busy = this.busy(), done = this.state === 'completed';
         this.root.dataset.state = this.state; this.root.setAttribute('aria-busy', String(busy));
         this.steps.forEach((step, index) => {

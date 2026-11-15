@@ -50,9 +50,9 @@ class ResumenController extends HTMLElement {
         }
         if (!this.isConnected || version !== this.version) return;   // el usuario ya cambió de pantalla
 
-        const hoy = new Date();
-        const mesCorto = hoy.toLocaleDateString('es', { month: 'short' });
-        const hoyLargo = hoy.toLocaleDateString('es', { day: 'numeric', month: 'long' });
+        const hoy = new Date(d.evaluadoEn);
+        const mesCorto = hoy.toLocaleDateString('es', { month: 'short', timeZone: d.zona });
+        const hoyLargo = hoy.toLocaleDateString('es', { day: 'numeric', month: 'long', timeZone: d.zona });
         const { manana, tarde, noche } = d.porHorario;
         const totalHorario = manana + tarde + noche;
 
@@ -105,7 +105,7 @@ class ResumenController extends HTMLElement {
                     <h3>Próximas consultas</h3>
                     ${d.proximas.length
                         ? `<ul class="lista-proximas">${d.proximas.map(c => `
-                            <li><strong>${esc(c.paciente)}</strong><small>${esc(formatoCorto(c.inicio))}</small></li>`).join('')}</ul>`
+                            <li><strong>${esc(c.paciente)}</strong><small>${esc(formatoCorto(c.inicio, d.zona))}</small></li>`).join('')}</ul>`
                         : '<p class="vacio">No hay consultas próximas</p>'}
                 </div>
 
@@ -118,7 +118,7 @@ class ResumenController extends HTMLElement {
                                 <tbody>${d.recientes.map(c => `
                                     <tr>
                                         <td>${esc(c.paciente)}</td>
-                                        <td>${esc(formatoCorto(c.inicio))}</td>
+                                        <td>${esc(formatoCorto(c.inicio, d.zona))}</td>
                                         <td>${esc(c.observaciones)}</td>
                                     </tr>`).join('')}</tbody>
                             </table>

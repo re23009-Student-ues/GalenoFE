@@ -20,8 +20,8 @@ export function estadoConsulta(c, ahora = new Date(), pasos = []) {
 }
 
 
-export function formatoCorto(fecha) {
-    return fecha.toLocaleString("es-SV", { dateStyle: "medium", timeStyle: "short" });
+export function formatoCorto(fecha, zona) {
+    return fecha.toLocaleString("es-SV", { dateStyle: "medium", timeStyle: "short", ...(zona ? { timeZone: zona } : {}) });
 }
 
 /** Años cumplidos a la fecha local actual; conserva el día civil recibido del REST. */

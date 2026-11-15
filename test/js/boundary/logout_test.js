@@ -1,4 +1,5 @@
 import { assert } from '../lib/chai/index.js';
+import { dashboardFixture } from '../control/relaciones_fixture.js';
 
 mocha.setup('tdd');
 const wait = () => new Promise(resolve => setTimeout(resolve, 20));
@@ -25,8 +26,8 @@ suite('Confirmar cierre de sesión (main.js real, REST simulado)', () => {
             requests.push({ url, method: options.method });
             const path = new URL(url).pathname;
             const resource = path.includes('/persona_rol/persona/') ? 'persona_rol' : path.split('/').pop();
-            assert.include(['persona_rol', 'consulta'], resource, 'Conserva los recursos existentes');
-            return new Response(JSON.stringify(resource === 'persona_rol' ? [user] : []), {
+            assert.include(['persona_rol', 'consulta', 'resumen'], resource, 'Conserva los recursos existentes');
+            return new Response(JSON.stringify(resource === 'persona_rol' ? [user] : resource === 'resumen' ? dashboardFixture() : []), {
                 status: 200, headers: { 'Total-registros': resource === 'persona_rol' ? '1' : '0' }
             });
         };

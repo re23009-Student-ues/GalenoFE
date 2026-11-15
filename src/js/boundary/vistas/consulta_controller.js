@@ -1,7 +1,6 @@
 import TarjetaConsulta from "../componentes/tarjeta_consulta.js";
-import { listarConsultas } from "../../control/resumen_service.js";
 import ConsultaProcedimientoPasoService from '../../control/consultaProcedimientoPaso_service.js';
-import { leer, filtrarConsultasPorRol } from "../../control/agenda_service.js";
+import { leer, filtrarConsultasPorRol, listarConsultasDelRol } from "../../control/agenda_service.js";
 import { esc } from "../util_html.js";
 
 /**
@@ -23,18 +22,16 @@ class ConsultaController extends HTMLElement {
         this.innerHTML = `<p class="aviso">Cargando consultas…</p>`;
 
         let lista;
-        let pasos;
+        let resumenes;
         try {
             const id = this.parametros?.idConsulta;
             if (id) {
                 const consulta = await (await leer(`consulta/${encodeURIComponent(id)}`)).json();
                 if (!this.usuario?.idClinica?.idClinica || consulta.idPersonaRol?.idClinica?.idClinica !== this.usuario.idClinica.idClinica) throw new Error('La consulta no pertenece a la clínica del contexto actual');
-                lista = [consulta];
-            } else lista = await listarConsultas(this.usuario);
+                lista = await filtrarConsultasPorRol([consulta], this.usuario);
+            } else lista = await listarConsultasDelRol(this.usuario);
             if (!this.isConnected) return;
-            lista = await filtrarConsultasPorRol(lista, this.usuario);
-            if (!this.isConnected) return;
-            pasos = await new ConsultaProcedimientoPasoService().listarParaConsultas(lista.map(consulta => consulta.idConsulta));
+            resumenes = await new ConsultaProcedimientoPasoService().resumirParaConsultas(lista.map(consulta => consulta.idConsulta));
         } catch (err) {
             console.error(err);
             if (!this.isConnected) return;
@@ -50,14 +47,11 @@ class ConsultaController extends HTMLElement {
 
         const tarjetas = document.createElement("div");
         tarjetas.className = "lista-consultas";
-        const porConsulta = new Map(lista.map(consulta => [consulta.idConsulta, []]));
-        for (const paso of pasos) {
-            porConsulta.get(paso.idConsultaProcedimiento?.idConsulta?.idConsulta)?.push(paso);
-        }
+        const porConsulta = new Map(resumenes.map(resumen => [resumen.idConsulta, resumen]));
         lista.forEach(consulta => {
             const tarjeta = new TarjetaConsulta();
             tarjeta.consulta = consulta;
-            tarjeta.pasos = porConsulta.get(consulta.idConsulta);
+            tarjeta.resumenEstado = porConsulta.get(consulta.idConsulta);
             const registro = document.createElement('button');
             registro.type = 'button';
             registro.className = 'consulta__seleccionar';

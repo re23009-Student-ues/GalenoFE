@@ -1,3 +1,4 @@
+import { respuestaRelacionesFixture, estadosFixture, dashboardFixture } from './control/relaciones_fixture.js';
 import { assert } from './lib/chai/index.js';
 import sinon from './lib/sinon/sinon-esm.js';
 import { listarCompleto, validarPaciente, buscarCitas, filtrarCitas, validarFormatoDocumento, cargarAgenda, ticketPDF, validarRango, diaAgenda } from '../../src/js/control/agenda_service.js';
@@ -10,8 +11,8 @@ const paciente = { idPersonaRol: 'pac', idPersona: { idPersona: 'persona', nombr
 const empleado = { ...paciente, idPersonaRol: 'emp', idRol: { idRol: 'med', nombre: 'Médico' } };
 const consulta = { idConsulta: 'c1', idPersonaRol: paciente, fechaInicio: '2026-11-12T23:59:59-06:00' };
 const procedimiento = { idConsultaProcedimiento: 'cp1', idConsulta: consulta, idProcedimiento: { idProcedimiento: 'pr1', nombre: 'General' } };
-const origen = { idProcedimientoPaso: 'tri', nombre: 'Triaje', idRol: { idRol: 'enf' } };
-const destino = { idProcedimientoPaso: 'at', nombre: 'Atención', idRol: { idRol: 'med' } };
+const origen = { idProcedimientoPaso: 'tri', idProcedimiento: { idProcedimiento: 'pr1' }, nombre: 'Triaje', idRol: { idRol: 'enf' } };
+const destino = { idProcedimientoPaso: 'at', idProcedimiento: { idProcedimiento: 'pr1' }, nombre: 'Atención', idRol: { idRol: 'med' } };
 const tipo = { idTipoDocumento: 'dui', nombre: 'DUI', activo: true, expresionRegular: '[0-9]{8}-[0-9]' };
 const respuesta = datos => new Response(JSON.stringify(datos), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const settle = () => new Promise(r => setTimeout(r, 25));
@@ -25,10 +26,12 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   fetchStub = sandbox.stub(globalThis, 'fetch');
   fetchStub.callsFake(async url => {
    const path = new URL(url).pathname.split('/resources/v1/')[1];
-   const datos = { tipo_documento: [tipo], 'documento/buscar': { idPersona: paciente.idPersona }, 'persona_rol/persona/persona': [paciente, empleado], consulta: [consulta], consulta_procedimiento: [procedimiento], consulta_procedimiento_paso: [], procedimiento_paso_secuencia: [], 'procedimiento_paso/procedimiento/pr1': [destino] };
+   const datos = { tipo_documento: [tipo], 'documento/buscar': { idPersona: paciente.idPersona }, 'persona_rol/persona/persona': [paciente, empleado], consulta: [consulta], consulta_procedimiento: [procedimiento], consulta_procedimiento_paso: [], procedimiento_paso_secuencia: [], procedimiento_paso: [destino] };
+   if (path === 'consulta/estados') return estadosFixture(url, [consulta]);
+   if (path === 'consulta/resumen') return respuesta(dashboardFixture());
    if (path === 'consulta/c1') return respuesta(consulta);
    if (!(path in datos)) throw new Error('Petición no simulada: ' + path);
-   return respuesta(datos[path]);
+   return respuestaRelacionesFixture(url, datos[path]);
   });
  });
  teardown(() => { fixture.replaceChildren(); sandbox.restore(); for (const [clave, valor] of [['sesionPersona',sesionPrevia],['sesionPersonaRol',contextoPrevio]]) { if(valor === null) sessionStorage.removeItem(clave); else sessionStorage.setItem(clave,valor); } window.location.hash = ''; });
@@ -42,7 +45,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   const norte = {...paciente, idPersonaRol:'pac-norte', idClinica:{idClinica:'norte',nombre:'Norte'}};
   fetchStub.callsFake(async url => new URL(url).pathname.endsWith('/consulta')
    ? respuesta([consulta, {...consulta,idConsulta:'c2',idPersonaRol:norte}, {...consulta,idConsulta:'ajena',idPersonaRol:{...paciente,idPersonaRol:'otro'}}, {...consulta,idConsulta:'clinica-ajena',idPersonaRol:{...paciente,idClinica:{idClinica:'ajena'}}}])
-   : respuesta([procedimiento]));
+   : respuestaRelacionesFixture(url, [procedimiento]));
   const citas = await buscarCitas([paciente,norte]);
   assert.sameMembers(citas.map(c=>c.idConsulta),['c1','c2']);
   assert.equal(citas[0].idPersonaRol.idClinica.nombre,'Central');
@@ -76,8 +79,8 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
  test('HU1 no actualiza catálogo después de desmontar', async () => { let resolver; fetchStub.callsFake(()=>new Promise(r=>resolver=r)); const vista=document.createElement('galeno-citas'); fixture.append(vista); vista.remove(); resolver(respuesta([tipo])); await settle(); assert.isTrue(vista.campo('tipo').disabled); });
  test('agenda cruza ramas por secuencia, no por fecha', async () => {
   const segundo = { ...origen, idProcedimientoPaso:'lab', nombre:'Laboratorio' };
-  const rutas = { consulta:[consulta],consulta_procedimiento:[procedimiento],consulta_procedimiento_paso:[origen,segundo].map((d,i)=>({idConsultaProcedimientoPaso:'e'+i,idConsultaProcedimiento:procedimiento,idProcedimientoPaso:d,estado:'ESTADO_REAL',valor:'<img src=x onerror=alert(1)>',idPersonaRol:empleado})),procedimiento_paso_secuencia:[origen,segundo].map((d,i)=>({idProcedimientoPasoSecuencia:'s'+i,idProcedimientoPaso:d,idProcedimientoPasoReferencia:destino,tipoSecuencia:'REAL'})), 'procedimiento_paso/procedimiento/pr1':[origen,segundo,destino] };
-  fetchStub.callsFake(async url=>respuesta(rutas[new URL(url).pathname.split('/resources/v1/')[1]]));
+  const rutas = { consulta:[consulta],consulta_procedimiento:[procedimiento],consulta_procedimiento_paso:[origen,segundo].map((d,i)=>({idConsultaProcedimientoPaso:'e'+i,idConsultaProcedimiento:procedimiento,idProcedimientoPaso:d,estado:'ESTADO_REAL',valor:'<img src=x onerror=alert(1)>',idPersonaRol:empleado})),procedimiento_paso_secuencia:[origen,segundo].map((d,i)=>({idProcedimientoPasoSecuencia:'s'+i,idProcedimientoPaso:d,idProcedimientoPasoReferencia:destino,tipoSecuencia:'REAL'})), procedimiento_paso:[origen,segundo,destino] };
+  fetchStub.callsFake(async url=>respuestaRelacionesFixture(url, rutas[new URL(url).pathname.split('/resources/v1/')[1]]));
   const lista=await cargarAgenda(empleado,'2026-11-12','2026-11-12'); assert.lengthOf(lista[0].procedimientos[0].pasosPrevios,2);
   const vista=document.createElement('galeno-agenda'); vista.usuario=empleado; fixture.append(vista); vista.querySelectorAll('input').forEach(i=>i.value='2026-11-12'); await vista.cargar(); assert.isNull(vista.querySelector('img')); assert.include(vista.querySelector('pre').textContent,'<img');
   let ruta; vista.addEventListener('galeno-navegar', e=>ruta=e.detail.ruta); vista.querySelector('[data-consulta]').click(); assert.equal(ruta,'/atencion/c1');
@@ -103,7 +106,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
    if(path.endsWith('/documento/buscar')) return respuesta({idPersona:paciente.idPersona});
    if(path.endsWith('/persona_rol/persona/persona')) return respuesta([paciente]);
    if(path.endsWith('/consulta')) return new Promise(r=>resolver=r);
-   return respuesta([procedimiento]);
+   return respuestaRelacionesFixture(url, [procedimiento]);
   });
   const pendiente=vista.buscar();await settle();
   vista.campo('numero').value='nuevo';vista.campo('numero').dispatchEvent(new Event('input',{bubbles:true}));

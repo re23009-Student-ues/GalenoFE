@@ -1,3 +1,4 @@
+import { estadosFixture, dashboardFixture } from '../control/relaciones_fixture.js';
 import { assert } from '../lib/chai/index.js';
 import sinon from '../lib/sinon/sinon-esm.js';
 import { establecerContexto, obtenerContexto } from '../../../src/js/control/sesion_service.js';
@@ -31,6 +32,15 @@ suite('Contexto, dashboard y consultas del personal', () => {
         definiciones = [{ idProcedimientoPaso: 'atencion', idRol: medico.idRol }];
         fetchStub = sandbox.stub(globalThis, 'fetch').callsFake(async url => {
             const ruta = new URL(url).pathname.split('/resources/v1/')[1];
+            if (ruta === 'consulta/estados') return estadosFixture(url, consultas);
+            if (ruta === 'consulta/resumen') return new Response(JSON.stringify(dashboardFixture(consultas.slice(0, 2))));
+            if (ruta === 'consulta') {
+                const params = new URL(url).searchParams;
+                const rows = consultas.filter(c => c.idPersonaRol.idClinica.idClinica === params.get('clinica') &&
+                    procedimientos.some(p => p.idConsulta.idConsulta === c.idConsulta && p.idProcedimiento.idProcedimiento === 'general' &&
+                        definiciones.some(d => d.idRol?.idRol === params.get('rol'))));
+                return new Response(JSON.stringify(rows), { headers: { 'Total-registros': String(rows.length) } });
+            }
             if (ruta === 'consulta_procedimiento') return new Response(JSON.stringify(procedimientos));
             if (ruta === 'procedimiento_paso/procedimiento/general') return new Response(JSON.stringify(definiciones));
             throw new Error('Petición no simulada: ' + ruta);
@@ -56,7 +66,8 @@ suite('Contexto, dashboard y consultas del personal', () => {
     test('el personal recibe las consultas de su clínica, no las externas', async () => {
         assert.deepEqual((await listarConsultas(medico)).map(c => c.idConsulta).sort(), ['primera', 'segunda']);
         const resumen = await cargarResumen(medico);
-        assert.lengthOf(resumen.consultas, 2);
+        assert.equal(resumen.consultasAnio, 2);
+        assert.notProperty(resumen, 'consultas');
         assert.equal(resumen.clinica, 'Central');
     });
     test('el menú conserva solo Inicio y Agenda Médica', () => {
@@ -82,11 +93,12 @@ suite('Contexto, dashboard y consultas del personal', () => {
         assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
         assert.include(fixture.textContent, 'No hay consultas con pasos para tu rol');
     });
-    test('incluye el rol en cualquier procedimiento sin exigir registros y consulta cada catálogo una vez', async () => {
+    test('consulta participación por rol sin exigir registros ni descargar catálogos', async () => {
         procedimientos.unshift({ ...procedimientos[0], idConsultaProcedimiento: 'sin-pasos', idProcedimiento: { idProcedimiento: 'vacio' } });
         fetchStub.withArgs(sinon.match('/procedimiento_paso/procedimiento/vacio?')).resolves(new Response('[]'));
         assert.lengthOf(await filtrarConsultasPorRol(consultas, medico), 2);
-        assert.equal(fetchStub.getCalls().filter(c => c.args[0].includes('/procedimiento_paso/procedimiento/general?')).length, 1);
+        assert.equal(fetchStub.getCalls().filter(c => c.args[0].includes('/consulta?')).length, 1);
+        assert.isFalse(fetchStub.getCalls().some(c => c.args[0].includes('/procedimiento_paso/')));
         sinon.assert.notCalled(ConsultaProcedimientoPasoService.prototype.listarParaConsultas);
     });
     test('sin rol o clínica válidos no muestra consultas ni hace peticiones', async () => {
@@ -102,24 +114,27 @@ suite('Contexto, dashboard y consultas del personal', () => {
         assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
         assert.include(fixture.textContent, 'No hay consultas con pasos para tu rol');
     });
-    test('las tarjetas conservan todos los pasos de ejecución de la consulta visible', async () => {
+    test('las tarjetas usan resúmenes de todos los pasos sin descargar ejecuciones', async () => {
         const pasos = [{ idConsultaProcedimientoPaso: 'pendiente', estado: 'PENDIENTE', idConsultaProcedimiento: procedimientos[0], idProcedimientoPaso: { idRol: { idRol: 'otro' } } }];
-        ConsultaProcedimientoPasoService.prototype.listarParaConsultas.resolves(pasos);
+        fetchStub.withArgs(sinon.match('/consulta/estados?')).callsFake(async url => estadosFixture(url, consultas, pasos));
         router.manejarRuta('/consultas'); await settle();
         const tarjeta = [...fixture.querySelectorAll('tarjeta-consulta')].find(t => t.consulta.idConsulta === 'primera');
-        assert.deepEqual(tarjeta.pasos, pasos);
+        assert.equal(tarjeta.resumenEstado.totalPasos, 1);
+        assert.equal(tarjeta.resumenEstado.estado, 'Programada');
+        assert.deepEqual(tarjeta.pasos, []);
+        sinon.assert.notCalled(ConsultaProcedimientoPasoService.prototype.listarParaConsultas);
     });
-    test('un error de catálogo muestra error sin tarjetas parciales', async () => {
-        fetchStub.withArgs(sinon.match('/procedimiento_paso/')).rejects(new Error('Sin servidor'));
+    test('un error de consulta por rol muestra error sin tarjetas parciales', async () => {
+        fetchStub.withArgs(sinon.match('/consulta?')).rejects(new Error('Sin servidor'));
         router.manejarRuta('/consultas'); await settle();
         assert.exists(fixture.querySelector('.aviso--error'));
         assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
     });
-    test('espera todas las páginas de definiciones antes de decidir la participación', async () => {
-        fetchStub.withArgs(sinon.match('/procedimiento_paso/')).callsFake(async url => {
+    test('espera todas las páginas de consultas filtradas antes de decidir la participación', async () => {
+        fetchStub.withArgs(sinon.match('/consulta?')).callsFake(async url => {
             const first = Number(new URL(url).searchParams.get('first'));
-            const filas = first === 0 ? Array.from({ length: 50 }, (_, i) => ({ idProcedimientoPaso: 'otro-' + i, idRol: { idRol: 'otro' } })) : definiciones;
-            return new Response(JSON.stringify(filas), { headers: { 'Total-registros': '51' } });
+            const filas = first === 0 ? Array.from({ length: 50 }, (_, i) => ({ ...consultas[0], idConsulta: 'otra-' + i })) : consultas.slice(0, 2);
+            return new Response(JSON.stringify(filas), { headers: { 'Total-registros': '52' } });
         });
         assert.lengthOf(await filtrarConsultasPorRol(consultas, medico), 2);
     });
@@ -133,8 +148,8 @@ suite('Contexto, dashboard y consultas del personal', () => {
     });
     test('una respuesta pendiente no vuelve a montar consultas al salir', async () => {
         let resolver;
-        ConsultaService.prototype.findAll.returns(new Promise(resolve => { resolver = resolve; }));
-        router.manejarRuta('/consultas'); router.detener(); resolver(consultas); await settle();
+        fetchStub.withArgs(sinon.match('/consulta?')).returns(new Promise(resolve => { resolver = resolve; }));
+        router.manejarRuta('/consultas'); router.detener(); resolver(new Response(JSON.stringify(consultas))); await settle();
         assert.equal(fixture.querySelector('#test-root').childElementCount, 0);
     });
 });

@@ -14,6 +14,7 @@ class TarjetaConsulta extends HTMLElement {
         super();
         this.tarjeta = new TarjetaSimple();
         this.consulta = new Consulta();
+        this.resumenEstado = null; // DTO de lectura del backend, separado de las ejecuciones.
         this.pasos = []; // Pasos reales de esta consulta, asignados antes de conectar.
         this.root = this.attachShadow({ mode: "open" });
     }
@@ -22,7 +23,7 @@ class TarjetaConsulta extends HTMLElement {
         const c = this.consulta;
         const persona = c.idPersonaRol?.idPersona;
         const nombre = `${persona?.nombres ?? ""} ${persona?.apellidos ?? ""}`.trim();
-        const estado = estadoConsulta(c, new Date(), this.pasos);
+        const estado = this.resumenEstado?.estado ?? estadoConsulta(c, new Date(), this.pasos);
 
         const titulo = this.crearElemento("p", "titulo", formatoFecha(c.fechaInicio));
         const paciente = this.crearElemento("p", "contenido", `Paciente: ${nombre || "Sin nombre"}`);

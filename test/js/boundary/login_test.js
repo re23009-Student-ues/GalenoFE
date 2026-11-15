@@ -190,6 +190,11 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
         window.location.hash = '/dashboard';
         aplicacion = iniciarAplicacion(); await aplicacion.listo; await pausa();
         fixture.querySelector('#btn-salir').click(); await pausa();
+        // El cierre existente requiere ConfirmDialog; confirmar también en la prueba.
+        const confirmar = document.querySelector('.confirm-dialog__confirm');
+        assert.exists(confirmar); confirmar.click();
+        for (let i = 0; i < 50 && obtenerSesion(); i++) await pausa();
+        await pausa();
         assert.isNull(obtenerSesion()); assert.isNull(obtenerContexto());
         assert.equal(window.location.hash, '#/citas');
         assert.isNull(fixture.querySelector('#login-form'));

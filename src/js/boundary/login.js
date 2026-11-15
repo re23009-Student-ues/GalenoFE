@@ -64,7 +64,7 @@ class GalenoLogin extends HTMLElement {
             aviso.textContent = "Cargando…";
             btnReintentar.hidden = true;
             try {
-                lista = (await new TipoDocumentoService().findAll()).filter(tipo => tipo.activo === true);
+                lista = (await new TipoDocumentoService({ activo: true }).findAll()).filter(tipo => tipo.activo === true);
                 if (!vigente()) return;
                 break;
             } catch (err) {

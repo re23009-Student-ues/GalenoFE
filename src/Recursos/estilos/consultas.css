@@ -46,6 +46,18 @@ atencion-controller { display: block; color: var(--texto, #26313f); }
 .atencion__archivo input { max-width: 100%; }
 .atencion__tabla td:last-child { min-width: 240px; }
 .atencion__boton:disabled { opacity: .6; cursor: default; }
+.atencion__seleccionar-procedimiento[aria-pressed="true"] { background: var(--marino, #1f3a5f); color: #fff; opacity: 1; }
+.atencion__selector-procedimiento, .atencion__detalles-generales { margin-top: 16px; padding: 16px; background: #fff; border-radius: 12px; }
+.atencion__selector-procedimiento label, .atencion__sucesor, .atencion__predecesor { display: grid; gap: 8px; margin-top: 12px; }
+.atencion__selector-procedimiento select, .atencion__sucesor select, .atencion__predecesor select { width: 100%; max-width: 100%; padding: 10px; box-sizing: border-box; font: inherit; }
+.atencion__paso-medico { min-width: 0; }
+.atencion__estado-paso { font-weight: 600; }
+.atencion__paso-medico h4 { margin: 20px 0 12px; }
+.atencion__examen-opcion, .atencion__resultado-paso { padding: 12px 0; border-bottom: 1px solid #cbd5e1; }
+.atencion__detalles-generales summary { cursor: pointer; font-weight: 600; }
+.atencion__detalles-generales[open] summary { margin-bottom: 16px; }
+.atencion__limite-transicion { margin-top: 16px; }
+.atencion__sucesor[hidden], .atencion__predecesor[hidden] { display: none; }
 .atencion__examen input:focus-visible { outline: 3px solid var(--marino, #1f3a5f); outline-offset: 3px; }
 .atencion__estado { display: inline-block; padding: 4px 10px; border-radius: 20px; background: #e2e8f0; }
 .atencion__estado[data-estado="Programada"] { background: #dbeafe; color: #1e40af; }

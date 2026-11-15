@@ -57,6 +57,7 @@ contactForm.addEventListener('input', () => {
 | `data` | `{}` | Objeto de estado compartido inicial, clonado |
 | `onStepChange` | Sin callback | Síncrono `(current, previous)`; excepción muestra aviso seguro sin revertir la navegación |
 | `onComplete` | Sin callback | Síncrono/asíncrono `(data)`; por defecto completa sin efectos externos |
+| `isStepComplete` | Sin callback | Síncrono `(id) => boolean`; progreso desde un estado externo, en vez de inferirlo por navegar |
 
 Cada paso: `id`, `title` (textos no vacíos), `description` (texto opcional),
 `content` (Element, Text o DocumentFragment), `validate` (callback opcional),
@@ -148,6 +149,13 @@ Los opcionales pueden omitirse al saltar en modo no lineal, pero se validan si s
 visitan y se intenta salir hacia adelante.
 La barra cuenta pasos validados: un opcional omitido no se marca completado.
 
+Para flujos con estados persistidos puede suministrarse `isStepComplete: id =>
+estados.get(id) === 'COMPLETADO'`. Se consulta en cada actualización y solo `true`
+marca completado; errores o valores distintos se consideran incompletos. Al editar,
+navegar o reiniciar se conserva esa fuente externa. Después de actualizar los datos
+externos llamar `render()` para sincronizar. Sin esta opción se mantiene la regla
+original de progreso por validación; Wizard no conoce REST ni estados médicos.
+
 La presentación usa botones nativos (Tab, Shift+Tab, Enter/Espacio), lista ordenada,
 `aria-current="step"`, regiones de estado/error, títulos enfocables y paneles
 etiquetados. Las flechas del área del carrusel desplazan, sin seleccionar pasos. El foco
@@ -225,7 +233,7 @@ iniciadas. Los datos compartidos deben ser objetos planos con valores clonables,
 sin funciones ni nodos DOM; setData no combina objetos anidados recursivamente.
 La lectura efectiva con tecnologías de asistencia debe verificarse manualmente.
 
-Validación del carrusel y centrado: 51/51 casos en escritorio y 51/51 en móvil
+Validación del Wizard, carrusel, centrado y progreso externo: 52/52 casos en escritorio y 52/52 en móvil
 emulado de 360 × 640 con movimiento reducido, incluyendo las 31 pruebas anteriores.
 Cubre 2, 3, 10 y 20 pasos, títulos largos, resize, contenedor oculto, Modal,
 opciones, extremos, teclado, navegación, independencia de instancias y limpieza.

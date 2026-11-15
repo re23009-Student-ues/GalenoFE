@@ -44,82 +44,96 @@ y ruta pendiente al iniciar sesión.
 ### Estado de la consulta en agenda y atención
 
 Agenda Médica conserva solo consultas de la clínica activa con algún paso definido
-para `usuario.idRol.idRol`. Cruza `consulta_procedimiento` con
-`procedimiento_paso/procedimiento/{id}`, paginando completamente y consultando cada
-procedimiento distinto una vez por carga. Incluye pasos sin ejecución y no exige
-asignación a la persona de la sesión. También aplica al acceso por `/consulta/:idConsulta`.
-Si falla el cruce, muestra el error sin presentar una lista parcial.
+para `usuario.idRol.idRol`. Consulta `GET consulta?clinica=…&rol=…`; el backend
+usa EXISTS sobre procedimientos y definiciones de pasos, sin exigir ejecución ni
+responsable asignado. También se comprueba la participación por rol al acceder a
+`/consulta/:idConsulta`. Las páginas deben completarse antes de mostrar resultados;
+un fallo no se presenta como lista parcial.
 
-La agenda carga los pasos con `ConsultaProcedimientoPasoService.listarParaConsultas`
-desde el recurso existente `consulta_procedimiento_paso` y los agrupa por
-`idConsultaProcedimiento.idConsulta.idConsulta`, incluyendo todos los procedimientos
-de cada consulta. La paginación debe terminar correctamente antes de mostrar las
-tarjetas. No se hace una petición por tarjeta.
+Las tarjetas de Agenda Médica reciben `TarjetaConsulta.resumenEstado` desde
+`GET consulta/estados?consultas=…`: DTO con total de ejecuciones, finalizadas,
+estado e instante del servidor. No descargan ejecuciones solo para decidir el
+estado, ni convierten los conteos en pasos ficticios. El cliente divide conjuntos
+en bloques de 50, completa sus páginas y rechaza resúmenes ausentes o ajenos.
 
-`estadoConsulta(consulta, ahora, pasos)` muestra **Finalizada** solo si hay al menos
-un paso y todos tienen `estado` `COMPLETADO` o `FINALIZADO` (sin distinguir mayúsculas
-y espacios exteriores). `fechaFin` nunca determina la finalización. Sin pasos o
-con alguno pendiente, en curso, cancelado, desconocido o sin estado, permanece
-Programada si `fechaInicio` es futura y En curso en otro caso.
+Finalizada exige ejecuciones no vacías, todas COMPLETADO/FINALIZADO, sin distinguir
+mayúsculas y espacios exteriores. FechaFin no determina finalización. Si no se
+cumple: Programada con inicio futuro y En curso en otro caso, incluido inicio nulo.
+El resumen considera todos los procedimientos y roles de la consulta.
 
-`tarjeta-consulta.pasos` recibe los pasos reales antes de conectar el componente.
-El detalle de atención aplica la misma función después de cargar sus pasos;
-mientras tanto muestra «Verificando pasos…». Si falla esa carga muestra «No se
-pudo verificar» y permite reintentar. La agenda muestra error de carga antes de
-emitir conclusiones con datos incompletos. No se crean endpoints, pasos ni estados
-persistidos en el navegador para resolver esta regla.
+Atención conserva `listarParaConsultas` y `estadoConsulta(consulta, ahora, pasos)`
+porque necesita ejecuciones reales para formularios y responsables; mientras
+carga muestra «Verificando pasos…» y ante fallo «No se pudo verificar», con reintento.
+El detalle de agenda por rol conserva sus registros para mostrar antecedentes.
+Los DTO agregados nunca se usan como ejecuciones editables del Wizard.
 
-El detalle de atención organiza siete apartados con el Wizard existente: información
-general, procedimientos, pasos de atención, exámenes disponibles, órdenes, resultados
-y observaciones/cierre. Los formularios mantienen sus nodos al navegar. Carga los
-recursos paginados mediante `atencion_service.js` y cruza los UUID por consulta;
-los procedimientos se muestran aunque todavía no tengan ejecuciones.
-Encima del Wizard permanece un encabezado con avatar circular (iniciales del
-primer nombre y primer apellido del paciente), y tres líneas: nombre completo,
-edad y documento, sin numeración. Un GET
-paginado de `documento` busca el primer documento con valor de esa persona y
-muestra tipo y número debajo; se detiene al encontrar uno, sin cargar el resto.
-Sin documento muestra «Sin documentos registrados»; ante errores ofrece reintentar
-solo esa búsqueda, conservando Wizard y borradores;
-sin idPersona no se consulta el recurso. Esta carga es independiente de los pasos
-y descarta respuestas de cargas anteriores o de una vista desconectada.
+La atención usa el Wizard existente con un paso por ejecución real de
+`consulta_procedimiento_paso`. `atencion_controller.js` coordina carga y encabezado;
+`atencion_flujo.js` conserva los formularios y borradores por UUID de ejecución,
+selección de procedimiento y navegación según `procedimiento_paso_secuencia`.
+No hay pasos médicos fijos ni ejecuciones fabricadas. Un único procedimiento del
+rol activo se abre automáticamente; varios usan selector. Los procedimientos de
+otros roles no se ofrecen para atender. Un grafo cíclico, duplicado o incompleto
+no se convierte en una cadena arbitraria. Los pasos sin ejecución se avisan y no
+se inventan registros.
 
-Los TextArea de valor, indicaciones de órdenes existentes, resultado/interpretación
-y observaciones tienen guardado explícito por registro. Solo son editables para
-el rol participante del paso (o del catálogo para observaciones), manteniendo la
-clínica activa. Los otros roles se muestran en lectura. Antes de PUT se relee el
-registro, se verifica clínica/rol y se comparan los campos editados para detectar
-cambios previos de otra sesión; se conservan los demás valores. Esta comparación
-no sustituye control de concurrencia atómico del backend. También permite POST
-de resultados para órdenes existentes sin resultados. Tras un 201 sin UUID, intenta
-recuperarlo del listado; si falla, informa que fue registrado y evita repetir POST.
-Fechas, responsables y estados de pasos son información registrada, sin transiciones
-automáticas. La consulta no tiene responsable empleado directo: se muestran los
-responsables de sus pasos.
+El encabezado permanece fuera del Wizard: paciente, iniciales, edad, documento,
+fecha, responsable, procedimiento y estado. Atención obtiene su consulta mediante
+`GET consulta/{id}`, sin descargar el listado global. Documento se busca con
+`GET documento?persona={idPersona}&first=…&max=50`, con carga y reintento independientes.
+El filtro pagina solo documentos de esa persona y conserva Total-registros filtrado.
+Si hay varios, se muestra el de menor UUID con valor no vacío, como en el recorrido
+global anterior; un error de carga no se presenta como ausencia de documento. Observaciones de consulta
+(lectura) y de procedimiento (lectura) están fuera de
+los pasos y no se duplican. El PUT genérico de consulta está bloqueado: su merge
+puede eliminar procedimientos y pasos omitidos en el JSON por orphanRemoval.
+El PUT genérico de procedimiento tampoco se usa para editar
+observaciones: contiene colecciones con cascadas/orphanRemoval; requiere un DTO o
+una operación que actualice campos de la entidad administrada sin sustituirlas.
 
-Finalizar consulta exige carga completa y ausencia de ediciones o selecciones sin
-guardar. Relee todos los pasos, exige al menos uno y todos COMPLETADO/FINALIZADO,
-y guarda `consulta.fechaFin` por PUT, conservando la regla visual de estado basada
-en pasos. No completa pasos pendientes ni crea órdenes implícitas.
+Cada paso contiene TextArea de atención y, si existen configuraciones activas,
+Checkbox propios del paso. Ningún examen se selecciona automáticamente. Indicaciones
+por selección y registros existentes se conservan en borrador al navegar; los
+resultados se leen/editan con el permiso por rol que ya usaba la pantalla. Solo
+se registra un resultado para una orden existente cuando el empleado escribe
+contenido explícitamente; no se crean resultados vacíos. Los enlaces de adjuntos
+solo admiten http/https; otras rutas se muestran como referencias, sin inventar
+un endpoint de descarga o subida.
 
-`OrdenExamen` no relaciona un examen: los Checkbox generan borradores de indicaciones
-que se conservan al navegar, pero no se envían ni se atribuyen a órdenes existentes.
-El backend debe agregar `idProcedimientoPasoExamen` (o una relación explícita al
-examen) a la orden y validar su correspondencia con el paso para habilitar su creación.
-`ExamenResultado.rutaAtestado` se muestra como referencia; la entrada de archivo
-permanece deshabilitada hasta disponer de subida/descarga de adjuntos. No se envían
-archivos ni se inventan rutas REST. Para un responsable único de consulta se necesita
-una relación de empleado independiente del paciente `idPersonaRol`.
+Guardar envía cambios escalares y originales a los PUT `/{id}/atencion` de
+consulta_procedimiento_paso, orden_examen y examen_resultado. El backend verifica
+contexto, relaciones persistidas, rol, estado y grafo bajo bloqueo; compara antes
+de escribir y actualiza solo campos permitidos de la entidad administrada, sin
+merge del árbol. Los PUT genéricos de esos tres recursos se rechazan. Los POST de
+resultados usan `/examen_resultado/atencion`, con contexto/consulta y clave UUID
+estable; recuperan el UUID desde Location canónico, sin búsqueda por contenido.
 
-Si falla la carga de pasos se informa estado no verificable. Si fallan complementos,
-se conservan los datos ya verificados y no se permite finalizar. Reintentar y salir
-destruyen Wizard, TextAreas y sus observadores; las respuestas tardías no modifican
-otra vista. Las observaciones nulas o ausentes se muestran vacías. Pruebas con REST
-simulado en `test/atencion_test.html`.
-Validación de esta integración: 39 pruebas de atención en escritorio y 39 en móvil
-emulado de 360 × 640 con movimiento reducido, 14 de personal, 22 de agenda y la
-suite del service worker, sin fallos. Los guardados se verificaron con REST simulado;
-no se realizaron escrituras sobre datos reales del backend.
+Un fallo parcial conserva lo pendiente y lo ya confirmado. Un conflicto 409 no
+hace avanzar ni sobrescribe datos; pide recargar. No hay transacción que abarque
+todos los CRUD del Wizard. Navegar nunca completa pasos; los estados cancelados
+o desconocidos muestran contenido en solo lectura. Siguiente conserva guardado
+antes de navegar; Anterior conserva nodos y borradores.
+
+Iniciar/completar pasos y finalizar procedimientos permanecen bloqueados: los
+contratos de escritura de atención actualizan contenido, sin definir esas
+transiciones clínicas. Las funciones antiguas de iniciar/cerrar mediante PUT
+genérico no permiten esa transición. No se cierra toda la consulta al
+revisar o terminar un procedimiento. La atención es obligatoria para solicitar
+completar; los exámenes permanecen opcionales.
+
+Se necesita una relación persistida de orden a `procedimiento_paso_examen` para
+crear órdenes identificables e idempotentes. No se asocian órdenes históricas por
+nombre, por posición ni por ser la única opción. No se eliminan órdenes/resultados
+al desmarcar. La migración SQL y los endpoints necesarios están documentados, no
+aplicados, en `docs/atencion-dinamica.md`.
+
+Salir con borradores solicita ConfirmDialog; se protegen también los eventos de
+navegación del menú y el cierre/recarga del navegador. Cambiar de procedimiento
+conserva sus propios borradores. Desconectar destruye Wizard, TextAreas, Checkbox,
+confirmaciones y listeners; las respuestas tardías no montan otra pantalla.
+Pruebas con REST simulado: `test/atencion_test.html` y
+`test/js/control/atencion_procedimientos_test.js`; regresiones del componente en
+`test/wizard_test.html`.
 
 ## 3. Sesión del empleado y navegación protegida
 
@@ -215,3 +229,96 @@ Buscar valida formato, consulta el documento y sus inscripciones y obtiene las c
 El helper propio `ejemploDocumento` en `control/documento_formato.js` se comparte entre HU1 y login. Sugiere un placeholder como `Ej.: 00000000-0` a partir de formatos habituales y solo lo muestra si satisface la expresión regular. Para expresiones no reconocidas sin ejemplo compatible se conservan las indicaciones del catálogo. No modifica lo escrito ni cambia la autenticación.
 
 Login agrega Volver a mis citas, disponible incluso durante la carga del catálogo o un ingreso pendiente. Emite `galeno-login-cancelado`, cancela sus listeners y descarta respuestas pendientes. Main cierra el overlay mediante `app.ocultarLogin()`, consume la ruta protegida pendiente y navega a `/citas` sin guardar sesión. El cierre exitoso de login reutiliza ocultarLogin. No se ejecutaron pruebas durante este ajuste.
+
+## Actualización de caché después del rollback
+
+La versión estática es `galenosv-v15`, con `main.js?v=10` tanto en index como
+en ARCHIVOS. Instalar precarga desde red con `cache: reload`; activar elimina
+las cachés estáticas anteriores (incluidas v13/v14) y todas las `galeno-api-*`
+para descartar respuestas anteriores al rollback. La política REST original
+vuelve a guardar respuestas nuevas en `galeno-api-v1`. Se conservan sesión
+simulada, recursos de Wizard/Checkbox/atención y cachés de otras aplicaciones.
+`skipWaiting`, `clients.claim` y la recarga existente en `controllerchange`
+aplican la actualización a las pestañas controladas. Requiere servir los archivos
+actualizados y abrir o recargar la aplicación con conexión.
+
+Pruebas: `node test/serviceWorker_test.mjs` y
+`test/service_worker_version_test.html` (Mocha/Chai/Sinon).
+
+Validación de esta actualización: 11 pruebas del worker y 3 Mocha aprobadas.
+Instalación real verificada en Chromium aislado por loopback: v15 activada,
+main?v=10 restaurado precargado, v13/v14 y caché API anterior eliminadas;
+caché ajena conservada. No se consultó el backend.
+
+## Paso 1 de la auditoría: consulta individual y documentos por persona
+
+Implementación y pruebas en [paso1-consulta-documento.md](paso1-consulta-documento.md).
+El login simulado y los demás pasos del plan permanecen sin cambios.
+
+## Paso 2 de la auditoría: filtros y catálogo activo
+
+`GET consulta` admite `clinica` e `inscripcion` (UUID); juntos aplican intersección.
+`GET tipo_documento` admite `activo=true` o `activo=false`. Sin filtros conservan
+los listados globales. Cada variante devuelve array, paginación y Total-registros
+del mismo filtro. El frontend usa clínica en resumen/agenda y solicita catálogo
+activo en login/citas. El ingreso por documento y la sesión simulada se conservan.
+No se añaden filtros por rol o fechas, agregados ni cambios transaccionales.
+Detalle y pruebas: [paso2-filtros-catalogo.md](paso2-filtros-catalogo.md).
+
+## Paso 3 de la auditoría: citas y agenda por rol
+
+`GET consulta?persona=<UUID>` obtiene citas de las inscripciones de paciente en
+sus clínicas; no se combina con otros filtros. `GET consulta?clinica=<UUID>&rol=<UUID>`
+consulta participación por definiciones, incluidas las que no tienen ejecución;
+admite desde/hasta opcionales como días YYYY-MM-DD en America/El_Salvador.
+Mantiene arrays, paginación y totales filtrados. El paso 4 de relaciones aún no se
+implementa. Detalle: [paso3-citas-agenda.md](paso3-citas-agenda.md).
+
+## Paso 4 de la auditoría: relaciones por conjuntos
+
+Citas, agenda, atención y `listarParaConsultas` solicitan relaciones mediante
+conjuntos de UUID: consultas para procedimientos/ejecuciones/órdenes,
+procedimientos para definiciones, pasos para configuraciones/secuencias y órdenes
+para resultados. Cada petición admite hasta 50 UUID y pagina con total filtrado;
+el cliente divide conjuntos mayores, omite vacíos y rechaza datos ajenos o páginas
+incompletas. Las secuencias incluyen origen **o** destino; las definiciones sin
+ejecución se conservan. El ingreso simulado se conserva; el paso 5 se documenta a continuación.
+Contrato, pruebas y límites: [paso4-relaciones-conjuntos.md](paso4-relaciones-conjuntos.md).
+
+## Paso 5 de la auditoría: estados y dashboard agregado
+
+`GET consulta/estados?consultas=…` resume los estados por conjuntos de hasta 50 UUID.
+`GET consulta/resumen?clinica=…&inscripcion=…` devuelve contadores, doce meses,
+horarios y cinco próximas/cinco recientes, calculados por el backend en
+America/El_Salvador. El dashboard valida el DTO y adapta las fechas de sus filas;
+ya no descarga consultas para agregarlas. Conserva su alcance por clínica y,
+para paciente, inscripción; no añade filtro de rol a los agregados.
+
+El login amañado y los contratos de escritura se conservan. No se implementó el
+paso 6. Contrato y evidencia: [paso5-resumen-estados-dashboard.md](paso5-resumen-estados-dashboard.md).
+
+## Paso 6 de la auditoría: resultados, Location y reintentos
+
+`POST examen_resultado` comprueba y crea bajo bloqueo de la orden; si ya tiene
+resultados, rechaza una creación nueva con 409 y conserva los registros históricos.
+Devuelve 201 con Location. `Idempotency-Key` UUID permite reintentar el mismo envío
+sin duplicar: replay idéntico → 200 con el mismo Location; contenido/orden distinto
+→ 409. No se aplican migraciones ni se alteran PUT/DELETE u otros escritores.
+
+Atención conserva la clave por borrador, recupera únicamente el UUID de Location
+y elimina la búsqueda posterior por contenido. Una confirmación sin recuperación
+segura mantiene el resultado en solo lectura, sin repetir el POST confirmado.
+Login amañado, permisos visuales, Wizard y borradores se conservan. La concurrencia
+de creación no sustituye las validaciones generales del paso 7, aún no implementado.
+Contrato, límites y evidencia: [paso6-resultados-location-concurrencia.md](paso6-resultados-location-concurrencia.md).
+
+## Paso 7 de la auditoría: escrituras de atención validadas
+
+Los PUT específicos `/recurso/{id}/atencion` aceptan únicamente contexto, consulta,
+cambios y originales para valor, indicaciones, resultado e interpretación. Validan
+relaciones persistidas y reglas del flujo en la transacción del servicio; no usan
+merge ni reemplazan colecciones. Los POST de resultados exigen contexto persistido,
+conservando Location e idempotencia. La identidad sigue simulada, sin autenticación
+backend nueva. Contrato, límites y evidencia en
+[paso7-validaciones-transaccionales.md](paso7-validaciones-transaccionales.md).
+El paso 8 de caché no se implementó.

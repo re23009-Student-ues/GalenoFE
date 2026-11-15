@@ -1,7 +1,14 @@
-const CACHE = 'galenosv-v12';
-const CACHE_API = 'galeno-api-v1';
+// Paso 8: estáticos offline; respuestas REST únicamente desde la red.
+const CACHE = 'galenosv-v16';
+const POLITICA_API = 'sin-cache-rest-v1';
 const ARCHIVOS = [
   './',
+  'js/boundary/componentes/form/checkbox/Checkbox.js',
+  'js/boundary/componentes/form/checkbox/index.js',
+  'js/boundary/componentes/form/checkbox/README.md',
+  'Recursos/estilos/checkbox.css',
+  'ejemplos/checkbox.html',
+  'ejemplos/checkbox.js',
   'js/control/agenda_service.js',
   'js/control/documento_formato.js',
   'js/control/atencion_service.js',
@@ -97,10 +104,12 @@ const ARCHIVOS = [
   'js/boundary/util_html.js',
   'js/boundary/vistas/consulta_controller.js',
   'js/boundary/vistas/atencion_controller.js',
+  'js/boundary/vistas/atencion_flujo.js',
   'js/boundary/vistas/resumen_controller.js',
   'js/control/consultaProcedimientoPaso_service.js',
   'js/control/consulta_service.js',
   'js/control/default_service.js',
+  'js/control/transporte_rest.js',
   'js/control/fechas.js',
   'js/control/personaRol_service.js',
   'js/control/resumen_service.js',
@@ -112,7 +121,7 @@ const ARCHIVOS = [
   'js/entity/default_error.js',
   'js/entity/default_response.js',
   'js/entity/persona_rol.js',
-  'js/main.js?v=8',
+  'js/main.js?v=11',
   'js/router.js'
 ];
 const RUTAS_ESTATICAS = new Set(ARCHIVOS.map(archivo => new URL(archivo, self.registration.scope).pathname));
@@ -131,7 +140,7 @@ self.addEventListener('activate', event => {
     const nombres = await caches.keys();
     await Promise.all(nombres.filter(nombre =>
       (nombre.startsWith('galenosv-') && nombre !== CACHE) ||
-      (nombre.startsWith('galeno-api-') && nombre !== CACHE_API)
+      nombre.startsWith('galeno-api-')
     ).map(nombre => caches.delete(nombre)));
     await self.clients.claim();
   })());
@@ -140,34 +149,24 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET') return;
-  // Incluye el origen REST del puerto 9080 y el prefijo de despliegue, si existe.
-  if (url.pathname.includes('/resources/v1/')) {
+  // API de Galeno: solo red, incluso ante timeout, no-store o cachés históricas existentes.
+  const origen = new URL(self.registration.scope);
+  if (url.hostname === origen.hostname && ['http:', 'https:'].includes(url.protocol) &&
+      url.pathname.startsWith('/GalenoSV-1.0-SNAPSHOT/resources/v1/')) {
     event.respondWith((async () => {
-      let cache;
-      try { cache = await caches.open(CACHE_API); } catch (error) { console.warn('Caché API no disponible:', error); }
       const controller = new AbortController();
       let temporizador;
       try {
-        const timeout = new Promise((resolve, reject) => {
-          temporizador = setTimeout(() => {
-            controller.abort();
-            reject(new Error('Tiempo de espera de API agotado'));
-          }, 3000);
-        });
-        const response = await Promise.race([
-          fetch(event.request, { cache: 'no-cache', signal: controller.signal }), timeout
+        return await Promise.race([
+          fetch(event.request, { cache: 'no-store', signal: controller.signal }),
+          new Promise((resolve, reject) => {
+            temporizador = setTimeout(() => {
+              reject(new Error('Tiempo de espera de API agotado; se requiere conexión.'));
+              controller.abort();
+            }, 10000);
+          })
         ]);
-        if (response.status === 200 && ['cors', 'basic'].includes(response.type)) {
-          try { await cache?.put(event.request, response.clone()); } catch (error) { console.warn('No se pudo guardar la respuesta API:', error); }
-        }
-        return response;
-      } catch (error) {
-        const cached = await cache?.match(event.request);
-        if (cached) return cached;
-        throw error;
-      } finally {
-        clearTimeout(temporizador);
-      }
+      } finally { clearTimeout(temporizador); }
     })());
     return;
   }
@@ -190,4 +189,9 @@ self.addEventListener('fetch', event => {
       throw error;
     }
   })());
+});
+
+// Un cliente actualizado nunca debe aceptar el fallback REST de un worker anterior.
+self.addEventListener('message', event => {
+  if (event.data?.tipo === 'galeno-politica-rest') event.ports?.[0]?.postMessage({ politica: POLITICA_API });
 });

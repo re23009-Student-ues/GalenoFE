@@ -1,12 +1,16 @@
+import { filtrarRelacionesFixture } from '../control/relaciones_fixture.js';
 import { assert } from '../lib/chai/index.js';
 import sinon from '../lib/sinon/sinon-esm.js';
 import { crearRouter } from '../../../src/js/router.js';
-import { calcularEdad, estadoConsulta } from '../../../src/js/control/fechas.js';
-import { guardarCamposAtencion } from '../../../src/js/control/atencion_service.js';
+import { Toast } from '../../../src/js/boundary/componentes/feedback/index.js';
+import { pruebasProcedimientos } from '../control/atencion_procedimientos_test.js';
+import { pruebasDocumentoPaciente } from '../control/atencion_consulta_documento_test.js';
 
 mocha.setup('tdd');
+pruebasProcedimientos();
+pruebasDocumentoPaciente();
 suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
-    let sandbox, fixture, router, consultas, pasos, fetchStub, originalURL, configuraciones, ordenes, resultados, responder, documentos;
+    let sandbox, fixture, router, consultas, pasos, fetchStub, originalURL, configuraciones, ordenes, resultados, responder, documentos, secuencias, procedimientos, catalogos;
     const usuario = { idPersonaRol: 'doctor-1', idPersona: { nombres: 'Doctor' }, idRol: { idRol: 'medico', nombre: 'Doctor' }, idClinica: { idClinica: 'clinica-1' } };
     const espera = async predicate => {
         for (let i = 0; i < 50 && !predicate(); i++) await new Promise(resolve => setTimeout(resolve, 10));
@@ -15,38 +19,56 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
     setup(() => {
         originalURL = location.href;
         sandbox = sinon.createSandbox();
+        sandbox.spy(Toast, 'success'); sandbox.spy(Toast, 'warning'); sandbox.spy(Toast, 'error');
         consultas = [{ idConsulta: 'consulta-1', fechaInicio: '2026-11-12T08:00:00-06:00',
             idPersonaRol: { idPersonaRol: 'paciente-1', idClinica: { idClinica: 'clinica-1' },
                 idPersona: { idPersona: 'persona-1', nombres: 'Ana', apellidos: 'López', fechaNacimiento: `${new Date().getFullYear() - 30}-01-01` } } }];
-        pasos = [{ idConsultaProcedimientoPaso: 'paso-1', estado: 'EN_CURSO',
+        pasos = [{ idConsultaProcedimientoPaso: 'paso-1', estado: 'EN_PROCESO',
             idConsultaProcedimiento: { idConsultaProcedimiento: 'cp-1', idConsulta: consultas[0], idProcedimiento: { idProcedimiento: 'proc-1', nombre: 'Control médico' } },
             idPersonaRol: usuario, idProcedimientoPaso: { idProcedimientoPaso: 'def-1', nombre: 'Evaluación', idRol: usuario.idRol } }];
-        configuraciones = []; ordenes = []; resultados = []; documentos = [];
+        configuraciones = []; ordenes = []; resultados = []; documentos = []; secuencias = []; procedimientos = null; catalogos = {};
         responder = async (url, options) => {
             const ruta = new URL(url).pathname.split('/resources/v1/')[1];
             const recursos = { consulta: consultas, consulta_procedimiento_paso: pasos, documento: documentos,
-                consulta_procedimiento: consultas.map(c => ({ idConsultaProcedimiento: `cp-${c.idConsulta}`, idConsulta: c, idProcedimiento: { idProcedimiento: 'proc-1', nombre: 'Control médico' } })),
+                consulta_procedimiento: procedimientos ?? consultas.map(c => ({ idConsultaProcedimiento: c.idConsulta === 'consulta-1' ? 'cp-1' : `cp-${c.idConsulta}`, idConsulta: c, idProcedimiento: { idProcedimiento: 'proc-1', nombre: 'Control médico' } })),
                 procedimiento_paso_examen: configuraciones, orden_examen: ordenes, examen_resultado: resultados,
-                'procedimiento_paso/procedimiento/proc-1': [{ idProcedimientoPaso: 'def-1', nombre: 'Evaluación', idRol: usuario.idRol }] };
+                procedimiento_paso_secuencia: secuencias,
+                'procedimiento_paso/procedimiento/proc-1': [{ idProcedimientoPaso: 'def-1', nombre: 'Evaluación', idRol: usuario.idRol }], ...catalogos };
             const [recurso, id] = ruta.split('/');
             if (options.method === 'POST') {
                 assert.equal(recurso, 'examen_resultado');
                 const body = JSON.parse(options.body);
-                const data = { ...body, idOrdenExamen: ordenes.find(o => o.idOrdenExamen === body.idOrdenExamen.idOrdenExamen), idExamenResultado: 'nuevo-resultado' }; resultados.push(data);
-                return new Response(null, { status: 201 });
+                const data = { ...body, idOrdenExamen: ordenes.find(o => o.idOrdenExamen === body.idOrdenExamen.idOrdenExamen), idExamenResultado: options.headers['Idempotency-Key'] }; resultados.push(data);
+                return new Response(null, { status: 201, headers: { Location: `${url.replace(/\/atencion$/, '')}/${data.idExamenResultado}` } });
             }
             if (options.method === 'PUT') {
                 assert.include(['consulta', 'consulta_procedimiento_paso', 'orden_examen', 'examen_resultado'], recurso);
                 const data = JSON.parse(options.body);
                 const keys = { consulta: 'idConsulta', consulta_procedimiento_paso: 'idConsultaProcedimientoPaso', orden_examen: 'idOrdenExamen', examen_resultado: 'idExamenResultado' };
-                const registro = recursos[recurso].find(r => r[keys[recurso]] === id); Object.assign(registro, data);
-                return new Response(JSON.stringify(data));
+                const registro = recursos[recurso].find(r => r[keys[recurso]] === id);
+                assert.deepEqual(Object.keys(data).sort(), ['cambios', 'consulta', 'contexto', 'originales']);
+                assert.equal(data.contexto, usuario.idPersonaRol); assert.equal(data.consulta, 'consulta-1');
+                for (const campo of Object.keys(data.cambios)) {
+                    if ((registro[campo] ?? null) !== data.originales[campo] && registro[campo] !== data.cambios[campo]) return new Response('', { status: 409 });
+                }
+                Object.assign(registro, data.cambios);
+                return new Response(JSON.stringify(registro));
             }
             assert.equal(options.method, 'GET');
-            let data = recursos[ruta];
+            let data = ruta === 'procedimiento_paso' ? Object.entries(recursos)
+                .filter(([path]) => path.startsWith('procedimiento_paso/procedimiento/'))
+                .flatMap(([path, defs]) => defs.map(d => ({ ...d, idProcedimiento: { idProcedimiento: path.split('/').pop() } }))) : recursos[ruta];
             if (data === undefined && recursos[recurso]) data = recursos[recurso].find(r => Object.values(r).includes(id));
+            if (recurso === 'consulta' && id && data === undefined) return new Response(null, { status: 404 });
+            if (ruta === 'documento') {
+                const params = new URL(url).searchParams;
+                const filtrados = params.has('persona') ? data.filter(d => d.idPersona?.idPersona === params.get('persona')) : data;
+                const first = Number(params.get('first') || 0), max = Number(params.get('max') || 50);
+                return new Response(JSON.stringify(filtrados.slice(first, first + max)), { headers: { 'Total-registros': String(filtrados.length) } });
+            }
             assert.exists(data, `Endpoint existente simulado: ${ruta}`);
             if (!Array.isArray(data)) return new Response(JSON.stringify(data));
+            data = filtrarRelacionesFixture(url, data);
             return new Response(JSON.stringify(data), { status: 200, headers: { 'Total-registros': String(data.length) } });
         };
         fetchStub = sandbox.stub(window, 'fetch').callsFake(responder);
@@ -56,482 +78,329 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         fixture.append(tituloEl, contenedor);
         router = crearRouter({ contenedor, tituloEl, obtenerUsuario: () => usuario });
     });
-    teardown(() => { router.detener(); fixture.remove(); sandbox.restore(); history.replaceState({}, '', originalURL); });
+    teardown(() => { router.detener(); fixture.remove(); Toast.dismissAll(); sandbox.restore(); history.replaceState({}, '', originalURL); });
 
-    test('Seleccionar consulta abre atención SPA con paciente, edad, procedimiento y paso', async () => {
-        history.replaceState({}, '', '#/consultas');
-        router.iniciar();
-        await espera(() => fixture.querySelector('.consulta__seleccionar'));
-        fixture.querySelector('.consulta__seleccionar').click();
-        await espera(() => fixture.querySelector('.atencion__tabla'));
-        assert.equal(location.hash, '#/atencion/consulta-1');
-        assert.include(fixture.textContent, 'Ana López'); assert.include(fixture.textContent, '30 años');
-        assert.include(fixture.textContent, 'Control médico'); assert.include(fixture.textContent, 'Paso en curso: Evaluación');
-        assert.lengthOf(fixture.querySelectorAll('atencion-controller'), 1);
-        assert.notExists(fixture.querySelector('consulta-controller'));
-        fixture.querySelector('.atencion__boton').click();
-        await espera(() => fixture.querySelector('.consulta__seleccionar'));
-        assert.equal(location.hash, '#/consultas');
-    });
-    test('Sin selección no hace peticiones ni crea registros', () => {
-        router.manejarRuta('/atencion');
-        assert.include(fixture.textContent, 'Selecciona un registro'); assert.isFalse(fetchStub.called);
-    });
-    test('Consulta ajena a clínica no carga pasos', async () => {
-        consultas[0].idPersonaRol.idClinica.idClinica = 'otra-clinica';
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.textContent.includes('no está disponible'));
-        assert.equal(fetchStub.callCount, 1); assert.notInclude(fixture.textContent, 'Ana López');
-    });
-    test('Campos ausentes y sin pasos: no inventa datos', async () => {
-        delete consultas[0].idPersonaRol.idPersona.fechaNacimiento; pasos = [];
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.textContent.includes('no devuelve procedimientos'));
-        assert.include(fixture.textContent, 'No disponible'); assert.notExists(fixture.querySelector('tbody'));
-    });
-    test('Pendiente no se presenta como paso actual y texto REST se muestra seguro', async () => {
-        pasos[0].estado = 'PENDIENTE'; pasos[0].idProcedimientoPaso.nombre = '<img src=x onerror=alert(1)>';
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.querySelector('tbody'));
-        assert.include(fixture.textContent, 'no indica un paso en curso');
-        assert.include(fixture.textContent, '<img src=x'); assert.notExists(fixture.querySelector('img'));
-    });
-    test('Error REST no filtra detalles y permite reintentar', async () => {
-        fetchStub.onFirstCall().rejects(new Error('detalle privado del servidor'));
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.querySelector('[role=alert]'));
-        assert.notInclude(fixture.textContent, 'detalle privado');
-        [...fixture.querySelectorAll('button')].find(button => button.textContent === 'Reintentar').click();
-        await espera(() => fixture.querySelector('tbody'));
-    });
-    test('Error al cargar pasos conserva paciente y no presenta pasos incompletos', async () => {
-        fetchStub.onSecondCall().resolves(new Response('', { status: 500 }));
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.querySelector('[role=alert]'));
-        assert.include(fixture.textContent, 'Ana López'); assert.notExists(fixture.querySelector('.atencion__tabla'));
-    });
-    test('Respuesta tardía no reemplaza la siguiente pantalla', async () => {
-        let resolve;
-        fetchStub.onFirstCall().returns(new Promise(done => { resolve = done; }));
-        router.manejarRuta('/atencion/consulta-1');
-        router.manejarRuta('/citas');
-        resolve(new Response(JSON.stringify(consultas), { status: 200 }));
-        await new Promise(done => setTimeout(done, 20));
-        assert.exists(fixture.querySelector('galeno-citas')); assert.notExists(fixture.querySelector('atencion-controller'));
-    });
-    test('Edad: cumpleaños, recién nacido, fecha bisiesta y formato REST sin desfase horario', () => {
-        const hoy = new Date(2026, 10, 12);
-        assert.equal(calcularEdad('1996-11-13', hoy), 29);
-        assert.equal(calcularEdad('1996-11-12', hoy), 30);
-        assert.equal(calcularEdad('1996-11-11', hoy), 30);
-        assert.equal(calcularEdad('2026-11-12', hoy), 0);
-        assert.equal(calcularEdad('1996-11-12T00:00:00Z', hoy), 30);
-        assert.equal(calcularEdad('2000-02-29', new Date(2026, 1, 28)), 25);
-        assert.equal(calcularEdad('2000-02-29', new Date(2026, 2, 1)), 26);
-        for (const fecha of [null, undefined, '', 'sin fecha', '2025-02-29', '2000-13-01', '2000-04-31', '2026-11-13']) {
-            assert.isNull(calcularEdad(fecha, hoy));
-        }
-    });
-    test('Finalización exige pasos no vacíos y todos completos; ignora fechaFin', () => {
-        const hoy = new Date(2026, 10, 12);
-        const consulta = { fechaInicio: '2026-11-01T08:00:00', fechaFin: '2026-11-02T08:00:00' };
-        for (const pendientes of [[], null, [{ estado: 'PENDIENTE' }], [{ estado: 'EN_CURSO' }],
-            [{ estado: 'CANCELADO' }], [{ estado: 'DESCONOCIDO' }], [{}], [null],
-            [{ estado: 'COMPLETADO' }, { estado: 'PENDIENTE' }]]) {
-            assert.equal(estadoConsulta(consulta, hoy, pendientes), 'En curso');
-        }
-        const completos = [{ estado: ' completado ' }, { estado: 'FINALIZADO' }];
-        assert.equal(estadoConsulta({ ...consulta, fechaFin: null }, hoy, completos), 'Finalizada');
-        assert.equal(estadoConsulta({ ...consulta, fechaFin: '2030-01-01' }, hoy, completos), 'Finalizada');
-        assert.equal(estadoConsulta({ ...consulta, fechaInicio: '2030-01-01' }, hoy, []), 'Programada');
-    });
-    test('Agenda y atención muestran Finalizada con todos los pasos reales completados', async () => {
-        consultas[0].fechaFin = null;
-        pasos[0].estado = 'COMPLETADO';
-        pasos.push({ ...pasos[0], idConsultaProcedimientoPaso: 'paso-2', estado: 'FINALIZADO' });
-        router.manejarRuta('/consultas');
-        await espera(() => fixture.querySelector('tarjeta-consulta'));
-        const tarjeta = fixture.querySelector('tarjeta-consulta');
-        assert.equal(tarjeta.shadowRoot.querySelector('.estado').textContent, 'Finalizada');
-        assert.equal(tarjeta.pasos.length, 2);
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.querySelector('.atencion__tabla'));
-        assert.equal(fixture.querySelector('.atencion__estado').textContent, 'Finalizada');
-    });
-    test('Fecha de fin pasada no finaliza agenda ni atención con pasos pendientes', async () => {
-        consultas[0].fechaFin = '2020-01-01T08:00:00';
-        pasos[0].estado = 'PENDIENTE';
-        router.manejarRuta('/consultas');
-        await espera(() => fixture.querySelector('tarjeta-consulta'));
-        assert.notEqual(fixture.querySelector('tarjeta-consulta').shadowRoot.querySelector('.estado').textContent, 'Finalizada');
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.querySelector('.atencion__tabla'));
-        assert.notEqual(fixture.querySelector('.atencion__estado').textContent, 'Finalizada');
-    });
-    test('Agrupa por consulta e incluye pasos de todos sus procedimientos', async () => {
-        consultas.push({ ...consultas[0], idConsulta: 'consulta-2' });
-        pasos[0].estado = 'COMPLETADO';
-        pasos.push({ ...pasos[0], idConsultaProcedimientoPaso: 'paso-2', estado: 'PENDIENTE',
-            idConsultaProcedimiento: { idConsulta: { idConsulta: 'consulta-1' }, idProcedimiento: { nombre: 'Otro procedimiento' } } });
-        pasos.push({ ...pasos[0], idConsultaProcedimientoPaso: 'paso-3',
-            idConsultaProcedimiento: { idConsulta: { idConsulta: 'consulta-2' }, idProcedimiento: { nombre: 'Control' } } });
-        router.manejarRuta('/consultas');
-        await espera(() => fixture.querySelectorAll('tarjeta-consulta').length === 2);
-        const tarjetas = [...fixture.querySelectorAll('tarjeta-consulta')];
-        assert.notEqual(tarjetas.find(card => card.consulta.idConsulta === 'consulta-1').shadowRoot.querySelector('.estado').textContent, 'Finalizada');
-        assert.equal(tarjetas.find(card => card.consulta.idConsulta === 'consulta-2').shadowRoot.querySelector('.estado').textContent, 'Finalizada');
-        assert.equal(fetchStub.getCalls().filter(c => new URL(c.args[0]).pathname.endsWith('/consulta_procedimiento_paso')).length, 1, 'Una carga paginada de pasos para toda la agenda');
-    });
-    test('Espera todas las páginas: un pendiente en la segunda impide finalizar', async () => {
-        pasos[0].estado = 'COMPLETADO';
-        fetchStub.callsFake(async (url, options) => {
-            const u = new URL(url);
-            if (!u.pathname.endsWith('/consulta_procedimiento_paso')) return responder(url, options);
-            const first = Number(u.searchParams.get('first'));
-            const page = first === 0 ? pasos : [{ ...pasos[0], idConsultaProcedimientoPaso: 'paso-final', estado: 'PENDIENTE' }];
-            return new Response(JSON.stringify(page), { status: 200, headers: { 'Total-registros': '2' } });
-        });
-        router.manejarRuta('/consultas');
-        await espera(() => fixture.querySelector('tarjeta-consulta'));
-        const card = fixture.querySelector('tarjeta-consulta');
-        assert.notEqual(card.shadowRoot.querySelector('.estado').textContent, 'Finalizada');
-        assert.equal(card.pasos.length, 2);
-        assert.equal(fetchStub.getCalls().filter(c => new URL(c.args[0]).pathname.endsWith('/consulta_procedimiento_paso')).length, 2);
-    });
-    test('Fallo del REST de pasos no muestra una finalización basada en fechas', async () => {
-        consultas[0].fechaFin = '2020-01-01T08:00:00';
-        fetchStub.onSecondCall().resolves(new Response('', { status: 500 }));
-        router.manejarRuta('/consultas');
-        await espera(() => fixture.querySelector('.aviso--error'));
-        assert.notExists(fixture.querySelector('tarjeta-consulta'));
-    });
-    test('Fallo de verificación en atención deja el estado no disponible', async () => {
-        consultas[0].fechaFin = '2020-01-01T08:00:00';
-        fetchStub.onSecondCall().resolves(new Response('', { status: 500 }));
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.querySelector('[role=alert]'));
-        assert.equal(fixture.querySelector('.atencion__estado').textContent, 'No se pudo verificar');
-    });
-    test('Observaciones se cargan desde consulta y son editables para el rol participante', async () => {
-        consultas[0].observaciones = 'Primera línea\nSegunda línea <img src=x onerror=alert(1)>';
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.querySelector('atencion-controller')?.detalle);
-        const field = fixture.querySelector('atencion-controller').observaciones;
-        assert.equal(field.getValue(), consultas[0].observaciones);
-        assert.equal(field.control.value, consultas[0].observaciones);
-        assert.equal(field.control.name, 'observaciones');
-        assert.isFalse(field.control.readOnly); assert.isFalse(field.control.disabled);
-        assert.equal(field.label.firstElementChild.textContent, 'Observaciones de la consulta');
-        assert.isTrue(field.required.hidden);
-        assert.equal(field.counter.textContent, `${consultas[0].observaciones.length} caracteres`);
-        assert.notExists(fixture.querySelector('img'));
-        assert.isTrue(fetchStub.getCalls().every(c => c.args[1].method === 'GET'), 'Cargar no guarda registros');
-    });
-    test('Observaciones nulas o ausentes muestran campo vacío sin texto inventado', async () => {
-        for (const value of [null, undefined, '']) {
-            consultas[0].observaciones = value;
-            router.manejarRuta('/atencion/consulta-1');
-            await espera(() => fixture.querySelector('.atencion__tabla'));
-            const field = fixture.querySelector('atencion-controller').observaciones;
-            assert.equal(field.getValue(), ''); assert.equal(field.control.placeholder, 'Sin observaciones registradas.');
-            assert.equal(field.counter.textContent, '0 caracteres');
-        }
-    });
-    test('Reintentar conserva las observaciones si falla la carga de pasos y reemplaza la instancia', async () => {
-        consultas[0].observaciones = 'Observación recibida del servicio';
-        fetchStub.onSecondCall().resolves(new Response('', { status: 500 }));
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.querySelector('[role=alert]'));
-        const controller = fixture.querySelector('atencion-controller'), previous = controller.observaciones;
-        assert.equal(previous.getValue(), consultas[0].observaciones);
-        [...fixture.querySelectorAll('button')].find(button => button.textContent === 'Reintentar').click();
-        await espera(() => fixture.querySelector('.atencion__tabla'));
-        assert.isTrue(previous.destroyed); assert.isNull(previous.observer);
-        assert.notStrictEqual(controller.observaciones, previous);
-        assert.equal(controller.observaciones.getValue(), consultas[0].observaciones);
-        assert.lengthOf(fixture.querySelectorAll('.atencion__observaciones galeno-textarea'), 1);
-    });
-    test('Salir de atención destruye el TextArea y libera su observador', async () => {
-        consultas[0].observaciones = 'Nota del servicio';
-        router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.querySelector('.atencion__tabla'));
-        const controller = fixture.querySelector('atencion-controller'), field = controller.observaciones;
-        router.manejarRuta('/citas');
-        assert.isTrue(field.destroyed); assert.isNull(field.observer); assert.isNull(controller.observaciones);
-        assert.notExists(fixture.querySelector('galeno-textarea'));
-    });
+    // Las pruebas del antiguo Wizard de siete apartados se sustituyen por el flujo real.
     async function cargar() {
         router.manejarRuta('/atencion/consulta-1');
         await espera(() => fixture.querySelector('atencion-controller')?.detalle);
         return fixture.querySelector('atencion-controller');
     }
-    test('Encabezado encima del Wizard muestra iniciales, nombre y edad del paciente', async () => {
-        Object.assign(consultas[0].idPersonaRol.idPersona, { nombres: '  Ana María ', apellidos: ' López Pérez ' });
-        const controller = await cargar(), header = controller.querySelector('.atencion__paciente');
-        assert.equal(header.querySelector('.atencion__paciente-avatar').textContent, 'AL');
-        assert.equal(header.querySelector('.atencion__paciente-avatar').getAttribute('aria-hidden'), 'true');
-        assert.include(header.querySelector('.atencion__paciente-nombre').textContent, 'Ana María');
-        assert.equal(header.querySelector('.atencion__paciente-edad').textContent, 'Edad: 30 años');
-        assert.strictEqual(header.nextElementSibling, controller.querySelector('.atencion__wizard'));
-        assert.equal(getComputedStyle(header.querySelector('.atencion__paciente-identidad')).flexDirection, 'column');
-        await controller.wizard.goToStep('cierre'); assert.isFalse(header.hidden);
-    });
-    test('Documento opcional muestra solo uno que pertenezca al paciente, con tipo y valor seguros', async () => {
-        documentos = [{ idDocumento: 'ajeno', idPersona: { idPersona: 'doctor-1' }, valor: 'NO MOSTRAR' },
-            { idDocumento: 'vacio', idPersona: { idPersona: 'persona-1' }, valor: ' ' },
-            { idDocumento: 'dui', idPersona: { idPersona: 'persona-1' }, idTipoDocumento: { nombre: 'DUI' }, valor: '12345678-9' },
-            { idDocumento: 'otro', idPersona: { idPersona: 'persona-1' }, valor: 'OTRO DOCUMENTO' }];
-        const controller = await cargar();
-        await espera(() => controller.querySelector('.atencion__paciente-documento').textContent.includes('12345678-9'));
-        assert.equal(controller.querySelector('.atencion__paciente-documento').textContent, 'DUI: 12345678-9');
-        assert.notInclude(controller.querySelector('.atencion__paciente').textContent, 'NO MOSTRAR');
-        assert.notInclude(controller.querySelector('.atencion__paciente').textContent, 'OTRO DOCUMENTO');
-    });
-    test('Sin documento o si falla su carga, el encabezado y la atención siguen disponibles', async () => {
-        const controller = await cargar(); assert.equal(controller.querySelector('.atencion__paciente-documento').textContent, 'Sin documentos registrados.');
-        fetchStub.withArgs(sinon.match('/documento?')).resolves(new Response('', { status: 500 }));
-        await controller.cargar();
-        assert.exists(controller.wizard); assert.exists(controller.detalle);
-        assert.equal(controller.querySelector('.atencion__paciente-documento').textContent, 'No se pudo cargar el documento.');
-        assert.exists(controller.querySelector('.atencion__paciente-reintentar'));
-        assert.notExists(controller.querySelector('.aviso--error[role=alert]'));
-    });
-    test('Identidad incompleta no inventa nombre, edad ni documentos', async () => {
-        consultas[0].idPersonaRol.idPersona = {};
-        const controller = await cargar(), header = controller.querySelector('.atencion__paciente');
-        assert.equal(header.querySelector('.atencion__paciente-avatar').textContent, '?');
-        assert.equal(header.querySelector('.atencion__paciente-nombre').textContent, 'Nombre no disponible');
-        assert.equal(header.querySelector('.atencion__paciente-edad').textContent, 'Edad: No disponible');
-        assert.isFalse(fetchStub.getCalls().some(c => new URL(c.args[0]).pathname.endsWith('/documento')));
-    });
-    test('Respuesta tardía de documentos no reemplaza la identidad de la nueva carga', async () => {
-        let resolver;
-        fetchStub.withArgs(sinon.match('/documento?')).onFirstCall().returns(new Promise(resolve => { resolver = resolve; }));
-        const controller = await cargar();
-        consultas[0].idPersonaRol.idPersona = { idPersona: 'persona-2', nombres: 'Luis', apellidos: 'Pérez' };
-        await controller.cargar();
-        resolver(new Response(JSON.stringify([{ idDocumento: 'viejo', idPersona: { idPersona: 'persona-1' }, valor: 'DOCUMENTO ANTERIOR' }])));
-        await new Promise(resolve => setTimeout(resolve, 20));
-        assert.equal(controller.querySelector('.atencion__paciente-avatar').textContent, 'LP');
-        assert.equal(controller.querySelector('.atencion__paciente-documento').textContent, 'Sin documentos registrados.');
-        assert.notInclude(controller.querySelector('.atencion__paciente').textContent, 'DOCUMENTO ANTERIOR');
-    });
-    test('Documento encontrado no espera otras páginas que podrían fallar', async () => {
-        fetchStub.withArgs(sinon.match('/documento?')).callsFake(async url => {
-            assert.equal(new URL(url).searchParams.get('first'), '0');
-            return new Response(JSON.stringify([{ idDocumento: 'dui', idPersona: { idPersona: 'persona-1' }, valor: '12345678-9' }]), { headers: { 'Total-registros': '100' } });
-        });
-        const controller = await cargar();
-        await espera(() => controller.querySelector('.atencion__paciente-documento').textContent.includes('12345678-9'));
-        assert.lengthOf(fetchStub.getCalls().filter(c => c.args[0].includes('/documento?')), 1);
-    });
-    test('Busca en páginas siguientes y admite la relación de persona como UUID', async () => {
-        fetchStub.withArgs(sinon.match('/documento?')).callsFake(async url => {
-            const first = Number(new URL(url).searchParams.get('first'));
-            const rows = first === 0 ? Array.from({ length: 50 }, (_, i) => ({ idDocumento: `ajeno-${i}`, idPersona: 'otra-persona', valor: 'NO MOSTRAR' })) :
-                [{ idDocumento: 'propio', idPersona: ' PERSONA-1 ', valor: '98765432-1' }];
-            return new Response(JSON.stringify(rows), { headers: { 'Total-registros': '51' } });
-        });
-        const controller = await cargar();
-        await espera(() => controller.querySelector('.atencion__paciente-documento').textContent.includes('98765432-1'));
-        assert.notInclude(controller.querySelector('.atencion__paciente').textContent, 'NO MOSTRAR');
-    });
-    test('Reintentar documento recupera el dato sin reconstruir Wizard ni perder borradores', async () => {
-        fetchStub.withArgs(sinon.match('/documento?')).resolves(new Response('', { status: 500 }));
-        const controller = await cargar(), wizard = controller.wizard;
-        controller.observaciones.setValue('Mi borrador');
-        fetchStub.withArgs(sinon.match('/documento?')).resolves(new Response(JSON.stringify([{ idDocumento: 'dui', idPersona: { idPersona: 'persona-1' }, valor: '12345678-9' }])));
-        controller.querySelector('.atencion__paciente-reintentar').click();
-        await espera(() => controller.querySelector('.atencion__paciente-documento').textContent.includes('12345678-9'));
-        assert.strictEqual(controller.wizard, wizard); assert.equal(controller.observaciones.getValue(), 'Mi borrador');
-        assert.notExists(controller.querySelector('.atencion__paciente-reintentar'));
-    });
-    function examenes() {
-        configuraciones = [{ idProcedimientoPasoExamen: 'config-1', activo: true,
-            idProcedimientoPaso: pasos[0].idProcedimientoPaso, idExamen: { idExamen: 'ex-1', nombre: 'Hemograma', activo: true } }];
-        ordenes = [{ idOrdenExamen: 'orden-1', fechaCreacion: '2026-11-12T08:00:00-06:00', indicaciones: 'Indicaciones existentes', idConsultaProcedimientoPaso: pasos[0] }];
-        resultados = [{ idExamenResultado: 'resultado-1', idOrdenExamen: ordenes[0], resultado: 'Resultado existente', interpretacion: 'Interpretación existente', rutaAtestado: 'archivo.pdf' }];
+    function cadena(cantidad = 3) {
+        const p = pasos[0].idConsultaProcedimiento;
+        const defs = Array.from({ length: cantidad }, (_, i) => ({ idProcedimientoPaso: `def-${i + 1}`, nombre: `Atención ${i + 1}`, idRol: usuario.idRol }));
+        catalogos['procedimiento_paso/procedimiento/proc-1'] = defs;
+        pasos = defs.map((d, i) => ({ idConsultaProcedimientoPaso: `paso-${i + 1}`, idConsultaProcedimiento: p, idProcedimientoPaso: d,
+            idPersonaRol: usuario, estado: i === 0 ? 'COMPLETADO' : 'PENDIENTE', valor: `Valor ${i + 1}` }));
+        secuencias = defs.slice(1).map((d, i) => ({ idProcedimientoPasoSecuencia: `s-${i}`, idProcedimientoPaso: defs[i], idProcedimientoPasoReferencia: d, tipoSecuencia: 'DEPENDIENTE' }));
     }
-    test('Wizard contiene los siete apartados en orden y conserva el contenido al navegar', async () => {
-        const controller = await cargar(), wizard = controller.wizard;
-        assert.deepEqual(wizard.getSteps().map(s => s.title), ['Información general', 'Procedimientos', 'Pasos de atención',
-            'Exámenes disponibles', 'Órdenes de examen', 'Resultados de exámenes', 'Observaciones y cierre']);
-        assert.equal(wizard.getCurrentStep().id, 'registro');
-        assert.equal(wizard.forward.textContent, 'Siguiente');
-        const valor = controller.querySelector('.atencion__pasos textarea'); valor.value = 'Borrador';
-        await wizard.goToStep('pasos'); await wizard.goToStep('cierre'); await wizard.previous(); await wizard.goToStep('pasos');
-        assert.strictEqual(controller.querySelector('.atencion__pasos textarea'), valor); assert.equal(valor.value, 'Borrador');
-        assert.isTrue(fetchStub.getCalls().every(c => c.args[1].method === 'GET'));
+    const escrituras = () => fetchStub.getCalls().filter(c => c.args[1].method !== 'GET');
+    test('Sin selección no consulta ni crea registros', () => {
+        router.manejarRuta('/atencion'); assert.include(fixture.textContent, 'Selecciona un registro'); assert.isFalse(fetchStub.called);
     });
-    test('Información general muestra fechas, referencia y responsable del registro, no al paciente como empleado', async () => {
-        consultas[0].referenciaExterna = 'REF-123'; consultas[0].fechaFin = '2026-11-12T09:00:00-06:00';
-        const controller = await cargar();
-        assert.include(controller.apartados[0].textContent, 'REF-123');
-        assert.include(controller.apartados[0].textContent, 'Fecha de finalización');
-        assert.equal(controller.querySelector('.atencion__responsables').textContent, 'Doctor');
+    test('Atención obtiene solo consulta/{id}, sin descargar el listado de consultas', async () => {
+        await cargar();
+        const lecturas = fetchStub.getCalls().map(call => new URL(call.args[0]));
+        assert.equal(lecturas.filter(url => url.pathname.endsWith('/consulta/consulta-1')).length, 1);
+        assert.isFalse(lecturas.some(url => url.pathname.endsWith('/consulta')));
+        const documentosPaciente = lecturas.filter(url => url.pathname.endsWith('/documento'));
+        assert.isTrue(documentosPaciente.every(url => url.searchParams.get('persona') === 'persona-1'));
     });
-    test('Procedimientos sin ejecución se cargan del recurso de asignaciones', async () => {
-        pasos = [];
-        const controller = await cargar();
-        assert.include(controller.apartados[1].textContent, 'Control médico');
-        assert.notExists(controller.querySelector('.atencion__pasos tbody'));
-    });
-    test('Solo muestra configuraciones activas relacionadas, y órdenes y resultados de la consulta', async () => {
-        examenes();
-        configuraciones.push({ ...configuraciones[0], idProcedimientoPasoExamen: 'inactiva', activo: false },
-            { ...configuraciones[0], idProcedimientoPasoExamen: 'otro', idProcedimientoPaso: { idProcedimientoPaso: 'otro' } },
-            { ...configuraciones[0], idProcedimientoPasoExamen: 'ex-inactivo', idExamen: { ...configuraciones[0].idExamen, activo: false } });
-        ordenes.push({ idOrdenExamen: 'ajena', idConsultaProcedimientoPaso: { idConsultaProcedimiento: { idConsulta: { idConsulta: 'otra' } } } });
-        resultados.push({ idExamenResultado: 'ajeno', idOrdenExamen: ordenes[1], resultado: 'NO MOSTRAR' });
-        const controller = await cargar();
-        assert.lengthOf(controller.apartados[3].querySelectorAll('input[type=checkbox]'), 1);
-        assert.include(controller.apartados[4].textContent, 'Orden orden-1'); assert.notInclude(controller.apartados[4].textContent, 'Orden ajena');
-        assert.notInclude(controller.apartados[5].textContent, 'NO MOSTRAR');
-        assert.isTrue(controller.apartados[5].querySelector('input[type=file]').disabled);
-    });
-    test('Checkbox genera borrador de indicaciones y conserva texto al desmarcar, sin enviar órdenes incompletas', async () => {
-        examenes(); const controller = await cargar();
-        const checkbox = controller.apartados[3].querySelector('input'); checkbox.click();
-        const texto = controller.borradores.querySelector('textarea'); texto.value = 'Indicación local';
-        checkbox.click(); assert.isTrue(controller.borradores.firstElementChild.hidden);
-        checkbox.click(); assert.equal(controller.borradores.querySelector('textarea').value, 'Indicación local');
-        assert.isFalse(controller.validarCierre().valid);
-        assert.isTrue(fetchStub.getCalls().every(c => c.args[1].method === 'GET'));
-    });
-    test('Guardar valor conserva responsable, fechas y estado, sin duplicar solicitudes por doble clic', async () => {
-        pasos[0].fechaInicio = '2026-11-12T08:00:00-06:00';
-        const controller = await cargar();
-        const campo = controller.apartados[2].querySelector('textarea'); campo.value = 'Atención brindada';
-        const button = controller.apartados[2].querySelector('.atencion__boton'); button.click(); button.click();
-        await espera(() => controller.apartados[2].textContent.includes('Cambios guardados'));
-        const puts = fetchStub.getCalls().filter(c => c.args[1].method === 'PUT'); assert.lengthOf(puts, 1);
-        const payload = JSON.parse(puts[0].args[1].body);
-        assert.equal(payload.valor, 'Atención brindada'); assert.equal(payload.estado, 'EN_CURSO');
-        assert.equal(payload.idPersonaRol.idPersonaRol, 'doctor-1'); assert.equal(payload.fechaInicio, pasos[0].fechaInicio);
-    });
-    test('Guarda indicaciones, resultado e interpretación de registros existentes', async () => {
-        examenes(); const controller = await cargar();
-        controller.apartados[4].querySelector('textarea').value = 'Nuevas indicaciones';
-        controller.apartados[4].querySelector('.atencion__boton').click();
-        await espera(() => controller.apartados[4].textContent.includes('Cambios guardados'));
-        const fields = controller.apartados[5].querySelectorAll('textarea'); fields[0].value = 'Nuevo resultado'; fields[1].value = 'Nueva interpretación';
-        controller.apartados[5].querySelector('.atencion__boton').click();
-        await espera(() => controller.apartados[5].textContent.includes('Cambios guardados'));
-        assert.equal(ordenes[0].indicaciones, 'Nuevas indicaciones');
-        assert.equal(resultados[0].resultado, 'Nuevo resultado'); assert.equal(resultados[0].interpretacion, 'Nueva interpretación');
-        assert.equal(resultados[0].rutaAtestado, 'archivo.pdf');
-    });
-    test('Registra resultado para una orden existente y luego permite editarlo con PUT', async () => {
-        examenes(); resultados = []; const controller = await cargar();
-        const fields = controller.apartados[5].querySelectorAll('textarea');
-        fields[0].value = 'Resultado nuevo'; fields[1].value = 'Interpretación nueva';
-        const button = controller.apartados[5].querySelector('.atencion__boton'); button.click();
-        await espera(() => controller.apartados[5].textContent.includes('Cambios guardados'));
-        assert.lengthOf(resultados, 1); assert.equal(resultados[0].idOrdenExamen.idOrdenExamen, 'orden-1');
-        fields[0].value = 'Resultado corregido'; button.click();
-        await espera(() => resultados[0].resultado === 'Resultado corregido' && !button.disabled);
-        assert.lengthOf(fetchStub.getCalls().filter(c => c.args[1].method === 'POST'), 1);
-        assert.lengthOf(fetchStub.getCalls().filter(c => c.args[1].method === 'PUT'), 1);
-    });
-    test('POST confirmado sin poder recuperar UUID no ofrece repetir la creación', async () => {
-        examenes(); resultados = []; const controller = await cargar();
-        let creado = false;
-        fetchStub.callsFake(async (url, options) => {
-            if (new URL(url).pathname.endsWith('/examen_resultado') && options.method === 'GET' && creado) return new Response('', { status: 500 });
-            const response = await responder(url, options);
-            if (options.method === 'POST') creado = true;
-            return response;
-        });
-        controller.apartados[5].querySelector('textarea').value = 'Resultado confirmado';
-        const button = controller.apartados[5].querySelector('.atencion__boton'); button.click();
-        await espera(() => controller.apartados[5].textContent.includes('Resultado registrado. Vuelve'));
-        assert.isTrue(button.disabled); assert.lengthOf(resultados, 1);
-        button.click(); assert.lengthOf(fetchStub.getCalls().filter(c => c.args[1].method === 'POST'), 1);
-    });
-    test('Guarda observaciones sin cambiar otros campos de consulta y bloquea cierre con borradores', async () => {
-        consultas[0].referenciaExterna = 'REF'; const controller = await cargar();
-        controller.observaciones.setValue('Observaciones actualizadas'); assert.isFalse(controller.validarCierre().valid);
-        controller.apartados[6].querySelector('.atencion__boton').click();
-        await espera(() => controller.apartados[6].textContent.includes('Cambios guardados'));
-        assert.equal(consultas[0].observaciones, 'Observaciones actualizadas'); assert.equal(consultas[0].referenciaExterna, 'REF');
-        assert.isTrue(controller.validarCierre().valid);
-    });
-    test('Error al guardar conserva texto y permite reintentar sin anunciar éxito', async () => {
-        const controller = await cargar();
-        controller.observaciones.setValue('Borrador conservado');
-        fetchStub.withArgs(sinon.match.any, sinon.match({ method: 'PUT' })).resolves(new Response('', { status: 500 }));
-        const boton = controller.apartados[6].querySelector('.atencion__boton'); boton.click();
-        await espera(() => controller.apartados[6].textContent.includes('Error del servidor'));
-        assert.equal(controller.observaciones.getValue(), 'Borrador conservado'); assert.isFalse(boton.disabled);
-        assert.isFalse(controller.validarCierre().valid);
-        fetchStub.withArgs(sinon.match.any, sinon.match({ method: 'PUT' })).callsFake(responder);
-        boton.click(); await espera(() => controller.apartados[6].textContent.includes('Cambios guardados'));
-    });
-    test('Campos de otros roles se muestran solo lectura y el servicio rechaza escribirlos', async () => {
-        pasos[0].idProcedimientoPaso.idRol = { idRol: 'otro' }; const controller = await cargar();
-        assert.isTrue(controller.apartados[2].querySelector('textarea').readOnly);
-        assert.notExists(controller.apartados[2].querySelector('.atencion__boton'));
-        let error;
-        try { await guardarCamposAtencion('consulta_procedimiento_paso', pasos[0], { valor: 'No permitido' }, usuario, 'consulta-1'); } catch (e) { error = e; }
-        assert.include(error.message, 'rol o a la clínica');
-        assert.isFalse(fetchStub.getCalls().some(c => c.args[1].method === 'PUT'));
-    });
-    test('El guardado rechaza otra clínica y campos ajenos al contrato', async () => {
-        for (const [cambios, contexto] of [[{ valor: 'No permitido' }, { ...usuario, idClinica: { idClinica: 'otra' } }],
-            [{ estado: 'COMPLETADO' }, usuario]]) {
-            let error;
-            try { await guardarCamposAtencion('consulta_procedimiento_paso', pasos[0], cambios, contexto, 'consulta-1'); } catch (e) { error = e; }
-            assert.instanceOf(error, Error);
-        }
-        assert.isFalse(fetchStub.getCalls().some(c => c.args[1].method === 'PUT'));
-    });
-    test('El Wizard y la tabla no provocan desbordamiento horizontal de la vista', async () => {
-        examenes(); const controller = await cargar();
-        controller.parentElement.style.maxWidth = '100%';
-        await controller.wizard.goToStep('pasos');
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        assert.isAtMost(controller.scrollWidth, controller.clientWidth + 1);
-        assert.isAtMost(controller.wizard.root.scrollWidth, controller.wizard.root.clientWidth + 1);
-        assert.equal(getComputedStyle(controller.querySelector('.atencion__tabla')).overflowX, 'auto');
-    });
-    test('Conflicto concurrente no sobrescribe un valor cambiado en el servidor', async () => {
-        pasos[0].valor = 'Inicial'; const controller = await cargar();
-        controller.apartados[2].querySelector('textarea').value = 'Mi cambio'; pasos[0].valor = 'Cambio de otra sesión';
-        controller.apartados[2].querySelector('.atencion__boton').click();
-        await espera(() => controller.apartados[2].textContent.includes('cambió en el servidor'));
-        assert.equal(pasos[0].valor, 'Cambio de otra sesión');
-        assert.isFalse(fetchStub.getCalls().some(c => c.args[1].method === 'PUT'));
-    });
-    test('Fallo de complementos conserva pasos verificados y bloquea el cierre', async () => {
-        fetchStub.withArgs(sinon.match('/procedimiento_paso_examen?')).resolves(new Response('', { status: 500 }));
+    test('Consulta inexistente devuelve aviso sin cargar otras colecciones', async () => {
+        consultas = [];
         router.manejarRuta('/atencion/consulta-1');
-        await espera(() => fixture.querySelector('[role=alert]'));
-        const controller = fixture.querySelector('atencion-controller');
-        assert.exists(controller.querySelector('.atencion__tabla'));
-        assert.equal(controller.querySelector('.atencion__estado').textContent, 'En curso');
-        assert.isFalse(controller.validarCierre().valid); assert.isTrue(controller.observaciones.control.readOnly);
+        await espera(() => fixture.textContent.includes('no está disponible'));
+        assert.equal(fetchStub.callCount, 1); assert.notExists(fixture.querySelector('galeno-wizard'));
     });
-    test('Finalizar vuelve a verificar pasos y no cierra pendientes ni inventa estados', async () => {
-        const controller = await cargar();
-        await controller.wizard.goToStep('cierre'); assert.isFalse(await controller.wizard.next());
-        assert.include(controller.mensajeCierre.textContent, 'Completa todos los pasos');
-        assert.notExists(consultas[0].fechaFin);
-        assert.isFalse(fetchStub.getCalls().some(c => c.args[1].method === 'PUT'));
+    test('Consulta inexistente o de otra clínica no carga su detalle', async () => {
+        consultas[0].idPersonaRol.idClinica.idClinica = 'otra';
+        router.manejarRuta('/atencion/consulta-1'); await espera(() => fixture.textContent.includes('no está disponible'));
+        assert.equal(fetchStub.callCount, 1); assert.notExists(fixture.querySelector('galeno-wizard'));
     });
-    test('Finalizar guarda fechaFin con todos los pasos completos y bloquea doble finalización', async () => {
-        pasos[0].estado = 'COMPLETADO'; const controller = await cargar();
-        await controller.wizard.goToStep('cierre'); assert.isTrue(await controller.wizard.next());
-        assert.isTrue(Number.isFinite(Date.parse(consultas[0].fechaFin)));
-        assert.include(controller.mensajeCierre.textContent, 'Consulta finalizada');
-        assert.equal(pasos[0].estado, 'COMPLETADO'); assert.isFalse(await controller.wizard.next());
-        assert.lengthOf(fetchStub.getCalls().filter(c => c.args[1].method === 'PUT'), 1);
+    test('Una asignación se abre directamente y cada paso del Wizard es una ejecución real', async () => {
+        cadena(3); const controller = await cargar();
+        assert.notExists(controller.querySelector('.atencion__elegir-procedimiento'));
+        assert.deepEqual(controller.flujo.wizard.getSteps().map(p => p.id), ['paso-1', 'paso-2', 'paso-3']);
+        assert.deepEqual(controller.flujo.wizard.getSteps().map(p => p.title), ['Atención 1', 'Atención 2', 'Atención 3']);
+        assert.equal(controller.flujo.wizard.progress.value, 1); assert.lengthOf(escrituras(), 0);
     });
-    test('Salir destruye Wizard y todos los TextAreas sin respuesta tardía sobre otra vista', async () => {
-        examenes(); const controller = await cargar(), wizard = controller.wizard, campos = [...controller.campos];
-        router.manejarRuta('/citas');
-        assert.isTrue(wizard.destroyed); assert.isNull(wizard.carouselObserver);
-        assert.isTrue(campos.every(c => c.destroyed && c.observer === null));
-        assert.isNull(controller.wizard); assert.notExists(fixture.querySelector('galeno-wizard'));
+    test('Ordena por secuencias aunque catálogo y ejecuciones lleguen invertidos', async () => {
+        cadena(3); pasos.reverse(); catalogos['procedimiento_paso/procedimiento/proc-1'].reverse();
+        const controller = await cargar(); assert.deepEqual(controller.flujo.wizard.getSteps().map(p => p.id), ['paso-1', 'paso-2', 'paso-3']);
+    });
+    test('Registro omite UUID, finalización, paciente y edad; encabezado conserva la identidad', async () => {
+        cadena(2); const c = await cargar();
+        const registro = c.querySelector('.atencion__registro');
+        const etiquetas = [...registro.querySelectorAll('dt')].map(n => n.textContent);
+        for (const etiqueta of ['Consulta', 'Paciente', 'Edad', 'Fecha de finalización']) assert.notInclude(etiquetas, etiqueta);
+        assert.notInclude(registro.textContent, consultas[0].idConsulta);
+        assert.notInclude(registro.textContent, 'Ana López');
+        assert.notInclude(registro.textContent, '30 años');
+        assert.include(etiquetas, 'Fecha de inicio');
+        assert.equal(c.querySelector('.atencion__paciente-avatar').textContent, 'AL');
+        assert.include(c.querySelector('.atencion__paciente').textContent, 'Ana López');
+        assert.include(c.querySelector('.atencion__paciente').textContent, '30 años');
+        assert.equal(getComputedStyle(c.querySelector('.atencion__paciente-identidad')).flexDirection, 'column');
+        assert.equal(c.querySelector('.atencion__procedimiento-actual').textContent, 'Control médico');
+        assert.equal(c.querySelector('.atencion__responsables').textContent, 'Doctor');
+        await c.flujo.siguiente(); assert.isFalse(c.querySelector('.atencion__paciente').hidden);
+        assert.equal(c.querySelector('.atencion__estado-atencion').textContent, 'PENDIENTE');
+    });
+    test('Documento corresponde a la persona y no al empleado, y errores opcionales se pueden reintentar', async () => {
+        documentos = [{ idDocumento: 'ajeno', idPersona: { idPersona: 'otro' }, valor: 'NO MOSTRAR' },
+            { idDocumento: 'propio', idPersona: { idPersona: 'persona-1' }, idTipoDocumento: { nombre: 'DUI' }, valor: '12345678-9' }];
+        const c = await cargar(); await espera(() => c.querySelector('.atencion__paciente-documento').textContent.includes('12345678-9'));
+        assert.notInclude(c.querySelector('.atencion__paciente').textContent, 'NO MOSTRAR');
+        fetchStub.withArgs(sinon.match('/documento?')).resolves(new Response('', { status: 500 }));
+        await c.cargar(); assert.exists(c.querySelector('.atencion__paciente-reintentar'));
+        fetchStub.withArgs(sinon.match('/documento?')).callsFake(responder); c.querySelector('.atencion__paciente-reintentar').click();
+        await espera(() => c.querySelector('.atencion__paciente-documento').textContent.includes('12345678-9'));
+    });
+    test('Guardar atención usa PUT y Toast; no completa, cambia fechas ni crea resultados u órdenes', async () => {
+        const c = await cargar(), f = c.flujo; f.actual().valor.setValue('Atención registrada');
+        assert.isTrue(await f.guardarActual());
+        assert.equal(pasos[0].valor, 'Atención registrada'); assert.equal(pasos[0].estado, 'EN_PROCESO');
+        assert.lengthOf(escrituras(), 1); assert.equal(escrituras()[0].args[1].method, 'PUT');
+        sinon.assert.calledWithMatch(Toast.success, 'Atención guardada');
+        assert.notExists(pasos[0].fechaFin); assert.lengthOf(ordenes, 0); assert.lengthOf(resultados, 0);
+    });
+    test('Guardar dos veces no repite PUT si no hubo nuevos cambios', async () => {
+        const c = await cargar(); c.flujo.actual().valor.setValue('Un cambio');
+        await c.flujo.guardarActual(); await c.flujo.guardarActual(); assert.lengthOf(escrituras(), 1);
+    });
+    test('Siguiente guarda borrador y espera confirmación antes de avanzar', async () => {
+        cadena(2); const c = await cargar(), f = c.flujo; f.actual().valor.setValue('Atención actualizada');
+        let resolver;
+        fetchStub.withArgs(sinon.match.any, sinon.match({ method: 'PUT' })).callsFake((url, opciones) => new Promise(resolve => { resolver = () => responder(url, opciones).then(resolve); }));
+        const pendiente = f.siguiente(); await espera(() => resolver);
+        assert.equal(f.wizard.getCurrentStep().id, 'paso-1');
+        resolver(); assert.isTrue(await pendiente); assert.equal(f.wizard.getCurrentStep().id, 'paso-2');
+        assert.equal(pasos[0].valor, 'Atención actualizada');
+    });
+    test('Un fallo de guardado impide avanzar y conserva el borrador para reintentar', async () => {
+        cadena(2); const c = await cargar(), f = c.flujo; f.actual().valor.setValue('Borrador');
+        fetchStub.withArgs(sinon.match.any, sinon.match({ method: 'PUT' })).resolves(new Response('', { status: 500 }));
+        assert.isFalse(await f.siguiente()); assert.equal(f.wizard.getCurrentStep().id, 'paso-1'); assert.equal(f.actual().valor.getValue(), 'Borrador');
+        fetchStub.withArgs(sinon.match.any, sinon.match({ method: 'PUT' })).callsFake(responder);
+        assert.isTrue(await f.siguiente()); assert.equal(f.wizard.getCurrentStep().id, 'paso-2');
+    });
+    test('Anterior conserva nodos y borradores y está deshabilitado en el primer paso', async () => {
+        cadena(2); const c = await cargar(), f = c.flujo;
+        assert.isTrue(f.wizard.back.disabled); await f.siguiente(); const campo = f.actual().valor;
+        campo.setValue('Borrador del segundo'); assert.isTrue(await f.anterior());
+        assert.isTrue(f.wizard.back.disabled); await f.siguiente();
+        assert.strictEqual(f.actual().valor, campo); assert.equal(campo.getValue(), 'Borrador del segundo');
+    });
+    test('Visitar y retroceder nunca marca completado un paso pendiente', async () => {
+        cadena(2); const c = await cargar(), f = c.flujo;
+        await f.siguiente(); await f.anterior(); await f.siguiente();
+        assert.equal(f.wizard.progress.value, 1); assert.equal(pasos[1].estado, 'PENDIENTE');
+        assert.isFalse(f.wizard.getSteps()[1].completed); assert.lengthOf(escrituras(), 0);
+    });
+    test('No avanza desde un pendiente sin operación backend y exige atención para solicitar completar', async () => {
+        cadena(2); pasos[0].estado = 'PENDIENTE'; const c = await cargar(), f = c.flujo;
+        f.actual().valor.setValue(' '); assert.isFalse(await f.siguiente()); sinon.assert.calledWithMatch(Toast.warning, 'obligatoria');
+        f.actual().valor.setValue('Registrada'); assert.isFalse(await f.siguiente());
+        assert.equal(f.wizard.getCurrentStep().id, 'paso-1'); assert.isTrue(f.wizard.forward.disabled); assert.lengthOf(escrituras(), 0);
+    });
+    test('Bifurcaciones permiten elegir sucesor habilitado sin completar la otra rama', async () => {
+        cadena(3); secuencias[1].idProcedimientoPaso = pasos[0].idProcedimientoPaso;
+        const c = await cargar(), f = c.flujo;
+        assert.isTrue(f.wizard.forward.disabled); assert.isFalse(f.actual().sucesor.wrapper.hidden);
+        f.actual().sucesor.select.value = 'paso-3'; f.actual().sucesor.select.dispatchEvent(new Event('change', { bubbles: true }));
+        assert.isTrue(await f.siguiente()); assert.equal(f.wizard.getCurrentStep().id, 'paso-3');
+        assert.equal(pasos[1].estado, 'PENDIENTE'); assert.equal(f.wizard.progress.value, 1);
+    });
+    test('Pasos con predecesores sin completar no pueden abrirse mediante el indicador', async () => {
+        cadena(3); pasos[0].estado = 'PENDIENTE'; const c = await cargar();
+        assert.isTrue(c.flujo.wizard.steps[1].button.disabled); assert.isFalse(await c.flujo.ir('paso-3'));
+        assert.lengthOf(escrituras(), 0);
+    });
+    test('Solo presenta exámenes activos del paso; ninguno viene seleccionado automáticamente', async () => {
+        configuraciones = [
+            { idProcedimientoPasoExamen: 'permitido', activo: true, idProcedimientoPaso: pasos[0].idProcedimientoPaso, idExamen: { idExamen: 'ex', nombre: 'Examen permitido', activo: true } },
+            { idProcedimientoPasoExamen: 'inactivo', activo: false, idProcedimientoPaso: pasos[0].idProcedimientoPaso, idExamen: { idExamen: 'ex2', nombre: 'NO MOSTRAR', activo: true } },
+            { idProcedimientoPasoExamen: 'ajeno', activo: true, idProcedimientoPaso: { idProcedimientoPaso: 'fuera' }, idExamen: { idExamen: 'ex3', nombre: 'NO MOSTRAR', activo: true } }
+        ];
+        const c = await cargar(), m = c.flujo.actual();
+        assert.lengthOf(m.examenes, 1); assert.equal(m.examenes[0].checkbox.root.localName, 'galeno-checkbox');
+        assert.isFalse(m.examenes[0].checkbox.getChecked()); assert.notInclude(m.root.textContent, 'NO MOSTRAR');
+    });
+    test('Sin exámenes disponibles se oculta toda la sección', async () => {
+        const c = await cargar(); assert.notExists(c.flujo.actual().root.querySelector('.atencion__examenes-paso'));
+    });
+    test('Checkbox e indicaciones se conservan al volver; selección sin relación REST no produce órdenes', async () => {
+        cadena(2); configuraciones = [{ idProcedimientoPasoExamen: 'config', activo: true, idProcedimientoPaso: pasos[0].idProcedimientoPaso, idExamen: { idExamen: 'ex', nombre: 'Examen', activo: true } }];
+        const c = await cargar(), f = c.flujo, m = f.actual(), e = m.examenes[0];
+        e.checkbox.control.click(); e.indicaciones.setValue('Borrador de indicaciones'); m.valor.setValue('Borrador valor');
+        assert.isFalse(await f.guardarActual()); assert.lengthOf(escrituras(), 0);
+        await f.ir('paso-2', false); await f.anterior();
+        assert.isTrue(e.checkbox.getChecked()); assert.equal(e.indicaciones.getValue(), 'Borrador de indicaciones');
+        e.checkbox.setChecked(false); assert.isTrue(await f.guardarActual()); assert.equal(pasos[0].valor, 'Borrador valor');
+    });
+    test('Órdenes sin examen identificable se conservan sin atribuirlas a una casilla', async () => {
+        ordenes = [{ idOrdenExamen: 'orden', idConsultaProcedimientoPaso: pasos[0], indicaciones: 'Indicaciones guardadas' }];
+        const c = await cargar(), m = c.flujo.actual();
+        assert.lengthOf(m.ordenes, 1); assert.include(m.root.textContent, 'no identifica el examen');
+        m.ordenes[0].campo.setValue('Actualizadas'); await c.flujo.guardarActual(); await c.flujo.guardarActual();
+        assert.equal(ordenes[0].indicaciones, 'Actualizadas'); assert.lengthOf(escrituras(), 1); assert.equal(escrituras()[0].args[1].method, 'PUT');
+    });
+    test('Guardado parcial conserva los campos pendientes y el reintento no repite lo ya confirmado', async () => {
+        cadena(2); ordenes = [{ idOrdenExamen: 'orden', idConsultaProcedimientoPaso: pasos[0], indicaciones: 'Inicial' }];
+        const c = await cargar(), m = c.flujo.actual(); m.valor.setValue('Atención nueva'); m.ordenes[0].campo.setValue('Indicación nueva');
+        fetchStub.withArgs(sinon.match('/orden_examen/orden'), sinon.match({ method: 'PUT' })).resolves(new Response('', { status: 500 }));
+        assert.isFalse(await c.flujo.guardarActual()); assert.equal(pasos[0].valor, 'Atención nueva'); assert.equal(ordenes[0].indicaciones, 'Inicial');
+        fetchStub.withArgs(sinon.match('/orden_examen/orden'), sinon.match({ method: 'PUT' })).callsFake(responder);
+        assert.isTrue(await c.flujo.guardarActual());
+        assert.equal(escrituras().filter(c => c.args[0].includes('/consulta_procedimiento_paso/')).length, 1);
+    });
+    test('Resultados se muestran solo si existen, con interpretación y adjuntos seguros', async () => {
+        ordenes = [{ idOrdenExamen: 'orden', idConsultaProcedimientoPaso: pasos[0], indicaciones: '' }];
+        resultados = [{ idExamenResultado: 'res', idOrdenExamen: ordenes[0], resultado: '<img src=x>', interpretacion: 'Interpretación', rutaAtestado: 'javascript:alert(1)' }];
+        const c = await cargar(), root = c.flujo.actual().root;
+        assert.exists(root.querySelector('.atencion__resultado-paso')); assert.notExists(root.querySelector('img'));
+        assert.notExists(root.querySelector('a')); assert.include(root.textContent, 'javascript:alert(1)');
+        assert.lengthOf(escrituras(), 0);
+    });
+    test('No crea resultados vacíos al cargar ni al guardar atención', async () => {
+        ordenes = [{ idOrdenExamen: 'orden', idConsultaProcedimientoPaso: pasos[0], indicaciones: '' }];
+        const c = await cargar(); c.flujo.actual().valor.setValue('Atendido'); await c.flujo.guardarActual();
+        assert.lengthOf(resultados, 0); assert.isFalse(escrituras().some(c => c.args[1].method === 'POST'));
+    });
+    test('Guarda resultado e interpretación existentes sin alterar adjunto o crear duplicados', async () => {
+        ordenes = [{ idOrdenExamen: 'orden', idConsultaProcedimientoPaso: pasos[0], indicaciones: '' }];
+        resultados = [{ idExamenResultado: 'res', idOrdenExamen: ordenes[0], resultado: 'Anterior', interpretacion: 'Anterior', rutaAtestado: 'https://example.test/archivo.pdf' }];
+        const c = await cargar(), r = c.flujo.actual().resultados[0];
+        r.valor.setValue('Actualizado'); r.interpretacion.setValue('Interpretación actualizada');
+        assert.isTrue(await c.flujo.guardarActual()); assert.isTrue(await c.flujo.guardarActual());
+        assert.equal(resultados[0].resultado, 'Actualizado'); assert.equal(resultados[0].interpretacion, 'Interpretación actualizada');
+        assert.equal(resultados[0].rutaAtestado, 'https://example.test/archivo.pdf'); assert.lengthOf(escrituras(), 1);
+        assert.equal(c.flujo.actual().root.querySelector('.atencion__adjunto a').getAttribute('rel'), 'noopener noreferrer');
+    });
+    test('Registrar un resultado nuevo exige contenido y un segundo guardado no duplica el POST', async () => {
+        ordenes = [{ idOrdenExamen: 'orden', idConsultaProcedimientoPaso: pasos[0], indicaciones: '' }];
+        const c = await cargar(), r = c.flujo.actual().resultados[0];
+        r.interpretacion.setValue('Sin resultado'); assert.isFalse(await c.flujo.guardarActual()); assert.lengthOf(escrituras(), 0);
+        r.valor.setValue('Resultado registrado'); assert.isTrue(await c.flujo.guardarActual()); assert.isTrue(await c.flujo.guardarActual());
+        assert.lengthOf(resultados, 1); assert.equal(escrituras().filter(c => c.args[1].method === 'POST').length, 1);
+    });
+    test('Estados cancelados o desconocidos se muestran sin edición de contenido', async () => {
+        for (const estado of ['CANCELADO', 'NUEVO_ESTADO']) {
+            pasos[0].estado = estado;
+            const c = await cargar(), m = c.flujo.actual();
+            assert.isTrue(m.valor.control.readOnly); assert.isTrue(c.flujo.guardarBoton.disabled);
+        }
+        assert.lengthOf(escrituras(), 0);
+    });
+    test('Resultados de pasos de otro rol son de solo lectura', async () => {
+        cadena(2); pasos[0].idProcedimientoPaso.idRol = { idRol: 'otro' };
+        ordenes = [{ idOrdenExamen: 'orden', idConsultaProcedimientoPaso: pasos[0], indicaciones: '' }];
+        resultados = [{ idExamenResultado: 'res', idOrdenExamen: ordenes[0], resultado: 'Resultado', interpretacion: 'Interpretación' }];
+        const c = await cargar(), r = c.flujo.actual().resultados[0];
+        assert.isTrue(r.valor.control.readOnly); assert.isTrue(r.interpretacion.control.readOnly);
+        assert.isTrue(c.flujo.guardarBoton.disabled); assert.lengthOf(escrituras(), 0);
+    });
+    test('Observaciones generales y de procedimiento se muestran una sola vez fuera del Wizard', async () => {
+        cadena(3); consultas[0].observaciones = 'Observación general';
+        procedimientos = [{ ...pasos[0].idConsultaProcedimiento, observaciones: 'Observación del procedimiento' }];
+        const c = await cargar(); assert.equal(c.observaciones.getValue(), 'Observación general');
+        assert.equal(c.observacionesProcedimiento.getValue(), 'Observación del procedimiento');
+        assert.notExists(c.flujo.wizard.root.querySelector('[name=observaciones]'));
+        assert.lengthOf(c.querySelectorAll('[name=observaciones]'), 1);
+        assert.isTrue(c.observaciones.control.readOnly);
+        assert.notExists(c.detallesGenerales.querySelector('button'));
+        assert.lengthOf(escrituras(), 0);
+    });
+    test('Varios procedimientos conservan sus propios borradores al cambiar de selección', async () => {
+        const otro = { ...pasos[0].idConsultaProcedimiento, idConsultaProcedimiento: 'cp-2', idProcedimiento: { idProcedimiento: 'proc-2', nombre: 'Procedimiento dos' } };
+        procedimientos = [pasos[0].idConsultaProcedimiento, otro];
+        const d = { idProcedimientoPaso: 'def-2', nombre: 'Paso propio del segundo', idRol: usuario.idRol };
+        catalogos['procedimiento_paso/procedimiento/proc-2'] = [d]; pasos.push({ ...pasos[0], idConsultaProcedimientoPaso: 'paso-2', idConsultaProcedimiento: otro, idProcedimientoPaso: d });
+        const c = await cargar(); assert.exists(c.querySelector('.atencion__elegir-procedimiento')); assert.notExists(c.flujo.wizard);
+        assert.isTrue(c.seleccionarProcedimiento('cp-1')); c.flujo.actual().valor.setValue('Borrador uno');
+        assert.isTrue(c.seleccionarProcedimiento('cp-2')); c.flujo.actual().valor.setValue('Borrador dos');
+        c.seleccionarProcedimiento('cp-1'); assert.equal(c.flujo.actual().valor.getValue(), 'Borrador uno');
+        c.seleccionarProcedimiento('cp-2'); assert.equal(c.flujo.actual().valor.getValue(), 'Borrador dos'); assert.lengthOf(escrituras(), 0);
+    });
+    test('Finalizar permanece bloqueado y nunca cierra toda la consulta u otros procedimientos', async () => {
+        const c = await cargar(); assert.equal(c.flujo.wizard.forward.textContent, 'Finalizar procedimiento'); assert.isTrue(c.flujo.wizard.forward.disabled);
+        c.flujo.wizard.forward.click(); assert.lengthOf(escrituras(), 0); assert.notExists(consultas[0].fechaFin);
+    });
+    test('Salir con borradores usa ConfirmDialog; cancelar conserva datos y confirmar permite salir', async () => {
+        history.replaceState({}, '', '#/atencion/consulta-1'); router.iniciar();
+        await espera(() => fixture.querySelector('atencion-controller')?.detalle);
+        const c = fixture.querySelector('atencion-controller'); c.flujo.actual().valor.setValue('Borrador');
+        const salida = c.salir(); await espera(() => document.querySelector('.confirm-dialog__cancel'));
+        document.querySelector('.confirm-dialog__cancel').click(); await salida; assert.isTrue(c.isConnected); assert.equal(c.flujo.actual().valor.getValue(), 'Borrador');
+        const segunda = c.salir(); await espera(() => document.querySelector('.confirm-dialog__confirm'));
+        document.querySelector('.confirm-dialog__confirm').click(); await segunda; await espera(() => !c.isConnected);
+    });
+    test('Fallo REST y respuesta tardía no crean un Wizard vacío ni reemplazan otra pantalla', async () => {
+        fetchStub.onSecondCall().resolves(new Response('', { status: 500 }));
+        router.manejarRuta('/atencion/consulta-1'); await espera(() => fixture.querySelector('.aviso--error'));
+        assert.notExists(fixture.querySelector('galeno-wizard'));
+        let resolver; fetchStub.onCall(fetchStub.callCount).returns(new Promise(r => { resolver = r; }));
+        const c = fixture.querySelector('atencion-controller'); const pendiente = c.cargar(); router.manejarRuta('/citas');
+        resolver(new Response(JSON.stringify(consultas))); await pendiente; assert.notExists(fixture.querySelector('atencion-controller'));
+    });
+    test('Procedimiento sin ejecuciones muestra un aviso sin pasos inventados', async () => {
+        pasos = []; const c = await cargar(); assert.notExists(c.flujo.wizard); assert.include(c.flujoHost.textContent, 'no tiene ejecuciones');
+    });
+    test('Errores de grafo bloquean el flujo sin escrituras', async () => {
+        cadena(2); secuencias.push({ idProcedimientoPasoSecuencia: 'ciclo', idProcedimientoPaso: pasos[1].idProcedimientoPaso, idProcedimientoPasoReferencia: pasos[0].idProcedimientoPaso });
+        const c = await cargar(); assert.notExists(c.flujo.wizard); sinon.assert.calledWithMatch(Toast.error, 'ciclo'); assert.lengthOf(escrituras(), 0);
+    });
+    test('Desconectar destruye Wizard, TextAreas, Checkbox y confirmaciones pendientes', async () => {
+        configuraciones = [{ idProcedimientoPasoExamen: 'config', activo: true, idProcedimientoPaso: pasos[0].idProcedimientoPaso, idExamen: { idExamen: 'ex', nombre: 'Examen', activo: true } }];
+        const c = await cargar(), flujo = c.flujo, wizard = flujo.wizard, campos = [...flujo.campos], checkbox = flujo.checkboxes[0];
+        router.detener(); assert.isTrue(wizard.destroyed); assert.isTrue(campos.every(campo => campo.destroyed)); assert.isTrue(checkbox.destroyed);
+        assert.isNull(c.flujo);
+    });
+    test('Consulta sin procedimientos muestra un aviso sin crear un Wizard vacío', async () => {
+        procedimientos = []; const c = await cargar();
+        assert.notExists(c.flujo.wizard); assert.include(c.selectorHost.textContent, 'No hay procedimientos'); assert.lengthOf(escrituras(), 0);
+    });
+    test('Un rol ajeno no obtiene formularios editables del procedimiento', async () => {
+        catalogos['procedimiento_paso/procedimiento/proc-1'] = [{ idProcedimientoPaso: 'def-1', nombre: 'Otro rol', idRol: { idRol: 'otro' } }];
+        const c = await cargar(); assert.notExists(c.flujo.wizard); assert.isTrue(c.observaciones.control.readOnly); assert.lengthOf(escrituras(), 0);
+    });
+    test('Valores nulos al cargar no se convierten en escrituras vacías al guardar otro registro', async () => {
+        pasos[0].valor = null;
+        ordenes = [{ idOrdenExamen: 'orden', idConsultaProcedimientoPaso: pasos[0], indicaciones: null }];
+        resultados = [{ idExamenResultado: 'res', idOrdenExamen: ordenes[0], resultado: null, interpretacion: null }];
+        const c = await cargar(); assert.isTrue(await c.flujo.guardarActual());
+        assert.lengthOf(escrituras(), 0); assert.isNull(pasos[0].valor); assert.isNull(ordenes[0].indicaciones); assert.isNull(resultados[0].resultado);
+    });
+    test('Navegación de menú con borrador exige confirmación y solo reenvía el destino confirmado', async () => {
+        const c = await cargar(); c.flujo.actual().valor.setValue('Borrador');
+        const target = document.createElement('button'); fixture.append(target);
+        const destinos = [], handler = e => destinos.push(e.detail.ruta);
+        document.addEventListener('galeno-navegar', handler);
+        try {
+            target.dispatchEvent(new CustomEvent('galeno-navegar', { detail: { ruta: '/dashboard' }, bubbles: true }));
+            await espera(() => c.confirmacion); c.confirmacion.footer.firstElementChild.click();
+            await espera(() => !c.confirmacion); assert.deepEqual(destinos, []);
+            target.dispatchEvent(new CustomEvent('galeno-navegar', { detail: { ruta: '/dashboard' }, bubbles: true }));
+            await espera(() => c.confirmacion); c.confirmacion.footer.lastElementChild.click();
+            await espera(() => destinos.length === 1); assert.deepEqual(destinos, ['/dashboard']);
+        } finally { document.removeEventListener('galeno-navegar', handler); }
+    });
+    test('Veinte pasos aprovechan el carrusel sin desbordar el contenedor en móvil', async () => {
+        cadena(20); pasos.forEach(p => p.estado = 'COMPLETADO');
+        const c = await cargar(), f = c.flujo; await f.ir('paso-20');
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        assert.isTrue(f.wizard.carouselActive); assert.isAtMost(f.wizard.root.scrollWidth, f.wizard.root.clientWidth + 1);
+        assert.isAtMost(c.scrollWidth, c.clientWidth + 1); assert.equal(f.wizard.getCurrentStep().id, 'paso-20');
+        assert.lengthOf(escrituras(), 0);
+    });
+    test('El estado visual se sincroniza con la respuesta releída al guardar, sin imponer una transición', async () => {
+        const c = await cargar(), m = c.flujo.actual(); m.valor.setValue('Actualizado'); pasos[0].estado = 'COMPLETADO';
+        assert.isTrue(await c.flujo.guardarActual()); assert.equal(pasos[0].valor, 'Actualizado');
+        assert.equal(c.querySelector('.atencion__estado-atencion').textContent, 'COMPLETADO');
+    });
+    test('No sobrescribe la atención de un paso completado con un valor vacío', async () => {
+        cadena(2); const c = await cargar(); c.flujo.actual().valor.setValue(' ');
+        assert.isFalse(await c.flujo.guardarActual()); assert.equal(pasos[0].valor, 'Valor 1'); assert.lengthOf(escrituras(), 0);
     });
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

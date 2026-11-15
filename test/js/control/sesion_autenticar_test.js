@@ -89,7 +89,7 @@ suite('Autenticación del personal por documento (HU2)', () => {
         assert.equal(url.searchParams.get('tipo'), 'dui');
         assert.equal(url.searchParams.get('valor'), valor);
         assert.equal(fetchStub.secondCall.args[0], `${url.origin}/GalenoSV-1.0-SNAPSHOT/resources/v1/persona_rol/persona/persona%2F1`);
-        sinon.assert.alwaysCalledWith(fetchStub, sinon.match.string, { method: 'GET' });
+        sinon.assert.alwaysCalledWith(fetchStub, sinon.match.string, sinon.match({ method: 'GET', cache: 'no-store' }));
         assert.isNull(obtenerSesion()); // Autenticar no persiste ni selecciona un rol.
     });
 
@@ -146,7 +146,7 @@ suite('Autenticación del personal por documento (HU2)', () => {
     test('sin conexión y sin respuesta guardada informa el mensaje offline', async () => {
         sandbox.stub(navigator, 'onLine').get(() => false);
         fetchStub.rejects(new TypeError('Sin conexión'));
-        const mensaje = 'Sin conexión y sin datos guardados para esta pantalla';
+        const mensaje = 'Sin conexión. Se requiere red para consultar datos actualizados.';
         await rechaza(new TipoDocumentoService().findRange(0, 10), mensaje);
         await rechaza(rolesDePersona('1'), mensaje);
     });
@@ -177,7 +177,7 @@ suite('Autenticación del personal por documento (HU2)', () => {
         fetchStub.resolves(respuesta([tipo]));
         const servicio = new TipoDocumentoService();
         assert.deepEqual(await servicio.findAll(), [tipo]);
-        sinon.assert.calledWith(fetchStub, `${servicio.BASE_URL}tipo_documento?first=0&max=50`, { method: 'GET' });
+        sinon.assert.calledWith(fetchStub, `${servicio.BASE_URL}tipo_documento?first=0&max=50`, sinon.match({ method: 'GET', cache: 'no-store' }));
     });
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

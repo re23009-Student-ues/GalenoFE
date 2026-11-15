@@ -1,3 +1,4 @@
+import { solicitarREST, mensajeTransporte } from './transporte_rest.js';
 import DefaultService from './default_service.js';
 import { buscarDocumento, rolesDePersona } from './sesion_service.js';
 import { esPaciente } from './roles.js';
@@ -27,9 +28,13 @@ export function validarRango(desde, hasta) {
 }
 export async function leer(ruta, opciones = {}) {
     let respuesta;
-    try { respuesta = await fetch(new DefaultService().BASE_URL + ruta, { method: 'GET', ...opciones }); }
-    catch { throw new Error(navigator.onLine === false ? 'Sin conexión y sin datos guardados para esta pantalla' : 'No se pudo conectar con el servidor'); }
-    if (!respuesta.ok) throw new Error(respuesta.status === 404 ? 'Recurso no disponible en el servidor (404)' : `Error del servidor (${respuesta.status})`);
+    try { respuesta = await solicitarREST(new DefaultService().BASE_URL + ruta, { method: 'GET', ...opciones }); }
+    catch (error) { throw new Error(mensajeTransporte(error, 'No se pudo conectar con el servidor')); }
+    if (!respuesta.ok) {
+        const error = new Error(respuesta.status === 404 ? 'Recurso no disponible en el servidor (404)' : `Error del servidor (${respuesta.status})`);
+        error.status = respuesta.status;
+        throw error;
+    }
     return respuesta;
 }
 /** Sin tope silencioso; detecta páginas repetidas y totales incompletos. */
@@ -56,6 +61,62 @@ export async function listarCompleto(recurso, clave) {
     }
     return [...datos.values()];
 }
+/** Relaciones acotadas: cada bloque completa su paginación y rechaza filas ajenas. */
+export async function listarPorConjunto(recurso, clave, parametro, ids, pertenece, filtros = {}) {
+    const unicos = [...new Set(ids)];
+    if (unicos.some(id => typeof id !== 'string' || !id.trim())) throw new Error('Relación sin identificador');
+    const encontrados = new Map();
+    for (let inicio = 0; inicio < unicos.length; inicio += 50) {
+        const bloque = new Set(unicos.slice(inicio, inicio + 50));
+        const parametros = new URLSearchParams({ ...filtros, [parametro]: [...bloque].join(',') });
+        const vistos = new Set();
+        let first = 0, totalAnterior;
+        while (true) {
+            const respuesta = await leer(`${recurso}?${parametros}&first=${first}&max=50`);
+            const filas = await respuesta.json();
+            const header = respuesta.headers.get('Total-registros');
+            const total = header !== null && header.trim() !== '' ? Number(header) : NaN;
+            if (!Array.isArray(filas) || filas.length > 50 || !Number.isSafeInteger(total) || total < 0 ||
+                    totalAnterior !== undefined && totalAnterior !== total || first + filas.length > total) {
+                throw new Error('Paginación de relaciones inválida');
+            }
+            totalAnterior = total;
+            for (const fila of filas) {
+                const id = fila?.[clave];
+                if (!id || vistos.has(id)) throw new Error('Relación sin identificador o página repetida');
+                if (!pertenece(fila, bloque)) throw new Error('El servidor devolvió relaciones ajenas al conjunto');
+                vistos.add(id);
+                encontrados.set(id, fila);
+            }
+            first += filas.length;
+            if (first === total) break;
+            if (filas.length !== 50) throw new Error('El servidor devolvió una lista incompleta de relaciones');
+        }
+    }
+    return [...encontrados.values()];
+}
+
+export function procedimientosParaConsultas(ids) {
+    return listarPorConjunto('consulta_procedimiento', 'idConsultaProcedimiento', 'consultas', ids,
+        (fila, bloque) => bloque.has(fila.idConsulta?.idConsulta));
+}
+export function ejecucionesParaConsultas(ids) {
+    return listarPorConjunto('consulta_procedimiento_paso', 'idConsultaProcedimientoPaso', 'consultas', ids,
+        (fila, bloque) => bloque.has(fila.idConsultaProcedimiento?.idConsulta?.idConsulta));
+}
+export function definicionesParaProcedimientos(ids) {
+    return listarPorConjunto('procedimiento_paso', 'idProcedimientoPaso', 'procedimientos', ids,
+        (fila, bloque) => bloque.has(fila.idProcedimiento?.idProcedimiento));
+}
+export function secuenciasParaPasos(ids) {
+    return listarPorConjunto('procedimiento_paso_secuencia', 'idProcedimientoPasoSecuencia', 'pasos', ids,
+        (fila, bloque) => bloque.has(fila.idProcedimientoPaso?.idProcedimientoPaso) || bloque.has(fila.idProcedimientoPasoReferencia?.idProcedimientoPaso));
+}
+export function resultadosParaOrdenes(ids) {
+    return listarPorConjunto('examen_resultado', 'idExamenResultado', 'ordenes', ids,
+        (fila, bloque) => bloque.has(fila.idOrdenExamen?.idOrdenExamen));
+}
+
 export function validarFormatoDocumento(tipo, numero) {
     let expresion;
     try {
@@ -74,21 +135,22 @@ export async function validarPaciente(tipo, numero) {
     if (!contextos.length) throw new Error('Esta persona no tiene inscripciones como paciente');
     return { persona, contextos };
 }
-/** Citas de todas las inscripciones del paciente; los filtros se aplican después, en memoria. */
+/** Citas filtradas por persona en backend; los filtros visuales de fecha siguen siendo locales. */
 export async function buscarCitas(contextos) {
     const inscripciones = new Map(contextos
         .filter(c => esPaciente(c) && c.idPersonaRol && c.idClinica?.idClinica)
         .map(c => [c.idPersonaRol, c]));
     if (!inscripciones.size) throw new Error('No hay inscripciones de paciente con clínica disponible');
-    const consultas = (await listarCompleto('consulta', 'idConsulta')).filter(c => {
+    const personas = new Set([...inscripciones.values()].map(c => c.idPersona?.idPersona));
+    if (personas.size !== 1 || ![...personas][0]) throw new Error('Las inscripciones deben pertenecer a una misma persona');
+    const consultas = (await listarCompleto(`consulta?persona=${encodeURIComponent([...personas][0])}`, 'idConsulta')).filter(c => {
         const paciente = c.idPersonaRol;
         return inscripciones.has(paciente?.idPersonaRol)
             && inscripciones.get(paciente.idPersonaRol).idClinica.idClinica === paciente.idClinica?.idClinica;
     });
     if (!consultas.length) return [];
-    const procedimientos = await listarCompleto('consulta_procedimiento', 'idConsultaProcedimiento');
-    const inicio = c => c.fechaInicio ? new Date(c.fechaInicio.replace(/\[.*\]$/, '')).getTime() : Infinity;
-    return consultas.sort((a, b) => inicio(a) - inicio(b)).map(c => ({
+    const procedimientos = await procedimientosParaConsultas(consultas.map(c => c.idConsulta));
+    return consultas.map(c => ({
         ...c, procedimientos: procedimientos.filter(p => p.idConsulta?.idConsulta === c.idConsulta)
     }));
 }
@@ -108,28 +170,22 @@ export async function ticketPDF(idConsulta) {
     if (!blob.size) throw new Error('El ticket PDF está vacío');
     return blob;
 }
-/** Consultas de la clínica con algún paso definido para el rol activo, aun sin ejecución. */
+/** La elegibilidad se consulta en backend por definiciones, sin exigir ejecuciones. */
+export async function listarConsultasDelRol(contexto, desde, hasta) {
+    const clinica = contexto?.idClinica?.idClinica, rol = contexto?.idRol?.idRol;
+    if (!clinica || !rol || esPaciente(contexto)) return [];
+    if (desde !== undefined || hasta !== undefined) validarRango(desde, hasta);
+    const filtros = new URLSearchParams({ clinica, rol });
+    if (desde !== undefined) filtros.set('desde', desde);
+    if (hasta !== undefined) filtros.set('hasta', hasta);
+    return (await listarCompleto(`consulta?${filtros}`, 'idConsulta'))
+        .filter(c => c.idPersonaRol?.idClinica?.idClinica === clinica);
+}
+
 export async function filtrarConsultasPorRol(consultas, contexto) {
-    const idRol = contexto?.idRol?.idRol;
-    const idClinica = contexto?.idClinica?.idClinica;
-    if (!idRol || !idClinica || esPaciente(contexto)) return [];
-    const candidatas = consultas.filter(c => c.idPersonaRol?.idClinica?.idClinica === idClinica);
+    const candidatas = consultas.filter(c => c.idPersonaRol?.idClinica?.idClinica === contexto?.idClinica?.idClinica);
     if (!candidatas.length) return [];
-    const ids = new Set(candidatas.map(c => c.idConsulta));
-    const procedimientos = (await listarCompleto('consulta_procedimiento', 'idConsultaProcedimiento'))
-        .filter(p => ids.has(p.idConsulta?.idConsulta));
-    const porProcedimiento = new Map();
-    for (const p of procedimientos) {
-        const id = p.idProcedimiento?.idProcedimiento;
-        if (!id) throw new Error('Procedimiento sin identificador');
-        if (!porProcedimiento.has(id)) {
-            const pasos = await listarCompleto(`procedimiento_paso/procedimiento/${encodeURIComponent(id)}`, 'idProcedimientoPaso');
-            porProcedimiento.set(id, pasos.some(paso => paso.idRol?.idRol === idRol));
-        }
-    }
-    const permitidas = new Set(procedimientos
-        .filter(p => porProcedimiento.get(p.idProcedimiento.idProcedimiento))
-        .map(p => p.idConsulta.idConsulta));
+    const permitidas = new Set((await listarConsultasDelRol(contexto)).map(c => c.idConsulta));
     return candidatas.filter(c => permitidas.has(c.idConsulta));
 }
 
@@ -137,21 +193,16 @@ export async function filtrarConsultasPorRol(consultas, contexto) {
 export async function cargarAgenda(contexto, desde, hasta) {
     validarRango(desde, hasta);
     if (!contexto?.idPersonaRol || !contexto.idClinica?.idClinica || !contexto.idRol?.idRol || esPaciente(contexto)) throw new Error('Selecciona un contexto laboral válido');
-    const consultas = (await listarCompleto('consulta', 'idConsulta')).filter(c => c.idPersonaRol?.idClinica?.idClinica === contexto.idClinica.idClinica).filter(c => c.fechaInicio != null).filter(c => { const dia = diaAgenda(c.fechaInicio); return dia >= desde && dia <= hasta; });
+    const consultas = await listarConsultasDelRol(contexto, desde, hasta);
     if (!consultas.length) return [];
-    const [procedimientos, ejecuciones, secuencias] = await Promise.all([
-        listarCompleto('consulta_procedimiento', 'idConsultaProcedimiento'),
-        listarCompleto('consulta_procedimiento_paso', 'idConsultaProcedimientoPaso'),
-        listarCompleto('procedimiento_paso_secuencia', 'idProcedimientoPasoSecuencia')
+    const idsConsultas = consultas.map(c => c.idConsulta);
+    const [relacionados, ejecuciones] = await Promise.all([
+        procedimientosParaConsultas(idsConsultas), ejecucionesParaConsultas(idsConsultas)
     ]);
-    const ids = new Set(consultas.map(c => c.idConsulta));
-    const relacionados = procedimientos.filter(p => ids.has(p.idConsulta?.idConsulta));
-    const catalogos = new Map();
-    for (const p of relacionados) {
-        const id = p.idProcedimiento?.idProcedimiento;
-        if (!id) throw new Error('Procedimiento sin identificador');
-        if (!catalogos.has(id)) catalogos.set(id, await listarCompleto(`procedimiento_paso/procedimiento/${encodeURIComponent(id)}`, 'idProcedimientoPaso'));
-    }
+    const definiciones = await definicionesParaProcedimientos(relacionados.map(p => p.idProcedimiento?.idProcedimiento));
+    const secuencias = await secuenciasParaPasos(definiciones.map(d => d.idProcedimientoPaso));
+    const catalogos = new Map([...new Set(relacionados.map(p => p.idProcedimiento.idProcedimiento))]
+        .map(id => [id, definiciones.filter(d => d.idProcedimiento.idProcedimiento === id)]));
     return consultas.map(c => ({ ...c, procedimientos: relacionados.filter(p => p.idConsulta.idConsulta === c.idConsulta).map(p => {
         const definiciones = catalogos.get(p.idProcedimiento.idProcedimiento);
         // El backend crea registros PENDIENTE antes de que se atiendan; fechaInicio no implica avance.

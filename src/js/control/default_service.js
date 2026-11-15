@@ -1,3 +1,4 @@
+import { solicitarREST, mensajeTransporte } from './transporte_rest.js';
 import DefaultError from "../entity/default_error.js";
 import DefaultResponse from "../entity/default_response.js";
 
@@ -16,7 +17,7 @@ class DefaultService {
     findRange(first, max) {
         let errorSalida = new DefaultError();
         let salida = new Promise((resolve, reject) => {
-            fetch(`${this.URL}?first=${first}&max=${max}`, { method: "GET" }).then(r => {
+            solicitarREST(`${this.URL}${this.URL.includes('?') ? '&' : '?'}first=${first}&max=${max}`, { method: "GET" }).then(r => {
                 if (r.status === 200) {
                     r.json().then(j => {
                         let resp = new DefaultResponse();
@@ -24,7 +25,7 @@ class DefaultService {
                         resp.totalDatos = r.headers.get("Total-registros");
                         resolve(resp);
                     }).catch(e => {
-                        errorSalida.mensaje = "Error al procesar los datos de respuesta";
+                        errorSalida.mensaje = e?.codigo ? e.message : "Error al procesar los datos de respuesta";
                         errorSalida.error = e;
                         reject(errorSalida);
                     });
@@ -34,9 +35,7 @@ class DefaultService {
                     reject(errorSalida);
                 }
             }).catch(e => {
-                errorSalida.mensaje = navigator.onLine === false
-                    ? "Sin conexión y sin datos guardados para esta pantalla"
-                    : "Error al acceder al repositorio";
+                errorSalida.mensaje = mensajeTransporte(e, "Error al acceder al repositorio");
                 errorSalida.error = e;
                 reject(errorSalida);
             });

@@ -25,14 +25,18 @@
     <galeno-app></galeno-app>
 
     <!-- Script principal con parámetro para evitar caché -->
-    <script src="js/main.js?v=11" type="module" defer></script>
+    <script src="js/main.js?v=22" type="module" defer></script>
 
     <script>
       if ('serviceWorker' in navigator) {
         // Una pestaña controlada por la versión anterior debe cargar los módulos nuevos.
-        const teniaControlador = Boolean(navigator.serviceWorker.controller);
+        let teniaControlador = Boolean(navigator.serviceWorker.controller);
         let recargando = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!teniaControlador) {
+            teniaControlador = Boolean(navigator.serviceWorker.controller);
+            return;
+          }
           if (teniaControlador && !recargando) {
             recargando = true;
             window.location.reload();

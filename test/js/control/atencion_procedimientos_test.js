@@ -1,6 +1,6 @@
 import { assert } from '../lib/chai/index.js';
 import sinon from '../lib/sinon/sinon-esm.js';
-import { procedimientosDelRol, iniciarPasoProcedimiento, finalizarAtencion, flujoDelProcedimiento, guardarCamposAtencion } from '../../../src/js/control/atencion_service.js';
+import { procedimientosDelRol, iniciarPasoProcedimiento, finalizarAtencion, flujoDelProcedimiento, pasosDelCamino, guardarCamposAtencion } from '../../../src/js/control/atencion_service.js';
 
 export function pruebasProcedimientos() {
     suite('Elegibilidad e inicio de procedimientos (REST simulado)', () => {
@@ -104,6 +104,24 @@ export function pruebasProcedimientos() {
             const flujo = flujoDelProcedimiento(detalle, procedimiento, pasos);
             assert.deepEqual([...flujo.siguientes.get('primero')].sort(), ['segundo', 'tercero']);
             assert.lengthOf(flujo.pasos, 3);
+        });
+        test('Oculta ramas y descendientes hasta elegir, incluidas las bifurcaciones anidadas', () => {
+            const enlaces = new Map([['inicio', new Set(['decision'])], ['decision', new Set(['a', 'b'])],
+                ['a', new Set(['a1', 'a2'])], ['b', new Set(['fin'])], ['a1', new Set(['fin'])],
+                ['a2', new Set(['fin'])], ['fin', new Set()]]);
+            const anteriores = new Map([...enlaces.keys()].map(id => [id, new Set()]));
+            for (const [id, destinos] of enlaces) for (const destino of destinos) anteriores.get(destino).add(id);
+            const flujo = { anteriores, siguientes: enlaces };
+            const elecciones = new Map();
+            assert.sameMembers([...pasosDelCamino(flujo, elecciones)], ['inicio', 'decision']);
+            elecciones.set('decision', 'a');
+            assert.sameMembers([...pasosDelCamino(flujo, elecciones)], ['inicio', 'decision', 'a']);
+            elecciones.set('a', 'a2');
+            assert.sameMembers([...pasosDelCamino(flujo, elecciones)], ['inicio', 'decision', 'a', 'a2', 'fin']);
+            elecciones.set('decision', 'b');
+            assert.sameMembers([...pasosDelCamino(flujo, elecciones)], ['inicio', 'decision', 'b', 'fin']);
+            elecciones.set('decision', 'ajeno');
+            assert.sameMembers([...pasosDelCamino(flujo, elecciones)], ['inicio', 'decision']);
         });
         test('No fabrica ejecuciones faltantes y rechaza duplicados, ciclos y referencias inválidas', () => {
             const flujo = flujoDelProcedimiento(detalle, procedimiento, pasos.slice(0, 1));

@@ -1,6 +1,6 @@
 import TarjetaSimple from './tarjeta_simple.js';
 import Consulta from '../../entity/consulta.js';
-import { formatoFecha, estadoConsulta } from "../../control/fechas.js";
+import { formatoFecha, estadoConsulta, estadoConsultaResponsable } from "../../control/fechas.js";
 
 /**
  * Tarjeta de una consulta, construida sobre <tarjeta-simple>.
@@ -15,6 +15,7 @@ class TarjetaConsulta extends HTMLElement {
         this.tarjeta = new TarjetaSimple();
         this.consulta = new Consulta();
         this.resumenEstado = null; // DTO de lectura del backend, separado de las ejecuciones.
+        this.responsable = null; // Contexto laboral para el estado de sus asignaciones.
         this.pasos = []; // Pasos reales de esta consulta, asignados antes de conectar.
         this.root = this.attachShadow({ mode: "open" });
     }
@@ -23,7 +24,8 @@ class TarjetaConsulta extends HTMLElement {
         const c = this.consulta;
         const persona = c.idPersonaRol?.idPersona;
         const nombre = `${persona?.nombres ?? ""} ${persona?.apellidos ?? ""}`.trim();
-        const estado = this.resumenEstado?.estado ?? estadoConsulta(c, new Date(), this.pasos);
+        const estado = this.responsable ? estadoConsultaResponsable(c, this.responsable, this.pasos) :
+            this.resumenEstado?.estado ?? estadoConsulta(c, new Date(), this.pasos);
 
         const titulo = this.crearElemento("p", "titulo", formatoFecha(c.fechaInicio));
         const paciente = this.crearElemento("p", "contenido", `Paciente: ${nombre || "Sin nombre"}`);

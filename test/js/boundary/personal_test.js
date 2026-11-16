@@ -114,15 +114,53 @@ suite('Contexto, dashboard y consultas del personal', () => {
         assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
         assert.include(fixture.textContent, 'No hay consultas con pasos para tu rol');
     });
-    test('las tarjetas usan resúmenes de todos los pasos sin descargar ejecuciones', async () => {
-        const pasos = [{ idConsultaProcedimientoPaso: 'pendiente', estado: 'PENDIENTE', idConsultaProcedimiento: procedimientos[0], idProcedimientoPaso: { idRol: { idRol: 'otro' } } }];
-        fetchStub.withArgs(sinon.match('/consulta/estados?')).callsFake(async url => estadosFixture(url, consultas, pasos));
+    test('completar lo asignado muestra Completado aunque otro responsable siga pendiente', async () => {
+        const paso = { idConsultaProcedimientoPaso: 'propio', estado: ' COMPLETADO ',
+            idPersonaRol: medico, idConsultaProcedimiento: procedimientos[0] };
+        const ajeno = { ...paso, idConsultaProcedimientoPaso: 'ajeno', estado: 'PENDIENTE',
+            idPersonaRol: { ...medico, idPersonaRol: 'otro-medico' } };
+        ConsultaProcedimientoPasoService.prototype.listarParaConsultas.resolves([paso, ajeno]);
         router.manejarRuta('/consultas'); await settle();
         const tarjeta = [...fixture.querySelectorAll('tarjeta-consulta')].find(t => t.consulta.idConsulta === 'primera');
-        assert.equal(tarjeta.resumenEstado.totalPasos, 1);
-        assert.equal(tarjeta.resumenEstado.estado, 'Programada');
-        assert.deepEqual(tarjeta.pasos, []);
-        sinon.assert.notCalled(ConsultaProcedimientoPasoService.prototype.listarParaConsultas);
+        assert.include(tarjeta.shadowRoot.textContent, 'Completado');
+        assert.notInclude(tarjeta.shadowRoot.textContent, 'En curso');
+        assert.isNull(tarjeta.resumenEstado);
+    });
+    test('una nueva asignación o reapertura cambia de Completado a En curso al recargar', async () => {
+        const paso = { idConsultaProcedimientoPaso: 'propio', estado: 'COMPLETADO',
+            idPersonaRol: medico, idConsultaProcedimiento: procedimientos[0] };
+        const registros = [paso];
+        ConsultaProcedimientoPasoService.prototype.listarParaConsultas.resolves(registros);
+        router.manejarRuta('/consultas'); await settle();
+        const pantalla = fixture.querySelector('consulta-controller');
+        const estado = () => [...fixture.querySelectorAll('tarjeta-consulta')]
+            .find(t => t.consulta.idConsulta === 'primera').shadowRoot.textContent;
+        assert.include(estado(), 'Completado');
+        registros.push({ ...paso, idConsultaProcedimientoPaso: 'reasignado', estado: 'PENDIENTE' });
+        await pantalla.cargar(); assert.include(estado(), 'En curso');
+        registros.pop(); paso.estado = 'PENDIENTE';
+        await pantalla.cargar(); assert.include(estado(), 'En curso');
+        paso.estado = 'FINALIZADO';
+        await pantalla.cargar(); assert.include(estado(), 'Completado');
+    });
+    test('los pasos INVALIDO de un camino descartado no cuentan como pendientes propios', async () => {
+        ConsultaProcedimientoPasoService.prototype.listarParaConsultas.resolves([
+            { idConsultaProcedimientoPaso: 'elegido', estado: 'COMPLETADO', idPersonaRol: medico, idConsultaProcedimiento: procedimientos[0] },
+            { idConsultaProcedimientoPaso: 'descartado', estado: ' INVALIDO ', idPersonaRol: medico, idConsultaProcedimiento: procedimientos[0] }
+        ]);
+        router.manejarRuta('/consultas'); await settle();
+        assert.include(fixture.querySelector('tarjeta-consulta').shadowRoot.textContent, 'Completado');
+    });
+    test('sin pasos asignados no declara completado el trabajo del responsable', async () => {
+        router.manejarRuta('/consultas'); await settle();
+        assert.isTrue([...fixture.querySelectorAll('tarjeta-consulta')]
+            .every(t => !t.shadowRoot.textContent.includes('Completado')));
+    });
+    test('un fallo de carga de asignaciones muestra error sin estados parciales', async () => {
+        ConsultaProcedimientoPasoService.prototype.listarParaConsultas.rejects(new Error('Sin asignaciones'));
+        router.manejarRuta('/consultas'); await settle();
+        assert.exists(fixture.querySelector('.aviso--error'));
+        assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
     });
     test('un error de consulta por rol muestra error sin tarjetas parciales', async () => {
         fetchStub.withArgs(sinon.match('/consulta?')).rejects(new Error('Sin servidor'));
@@ -138,13 +176,12 @@ suite('Contexto, dashboard y consultas del personal', () => {
         });
         assert.lengthOf(await filtrarConsultasPorRol(consultas, medico), 2);
     });
-    test('salir del dashboard libera su gráfica', async () => {
+    test('salir del dashboard desconecta contexto y agenda sin montar gráficas', async () => {
         router.manejarRuta('/dashboard'); await settle();
         const pantalla = fixture.querySelector('resumen-controller');
-        const grafica = pantalla.grafica;
-        assert.exists(grafica);
-        router.detener();
-        assert.isTrue(grafica.destroyed); assert.isNull(pantalla.grafica);
+        assert.deepEqual([...pantalla.children].map(n => n.localName), ['galeno-selector-contexto', 'galeno-agenda']);
+        const agenda = pantalla.querySelector('galeno-agenda'); const version = agenda.version;
+        router.detener(); assert.isFalse(agenda.isConnected); assert.isAbove(agenda.version, version);
     });
     test('una respuesta pendiente no vuelve a montar consultas al salir', async () => {
         let resolver;

@@ -1,0 +1,373 @@
+{
+  "step": 8,
+  "date": "2026-11-15",
+  "backendUnit": {
+    "tests": 267,
+    "passed": 267,
+    "failed": 0,
+    "offline": true,
+    "temporaryBuild": true
+  },
+  "frontend": {
+    "tests": 242,
+    "passed": 242,
+    "failed": 0,
+    "realRESTBlocked": true,
+    "suites": [
+      {
+        "state": "referencesCleaned",
+        "passes": "18",
+        "failures": "0",
+        "errors": [],
+        "suite": "cache_sensible"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "9",
+        "failures": "0",
+        "errors": [],
+        "suite": "validaciones_transaccionales"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "12",
+        "failures": "0",
+        "errors": [],
+        "suite": "resultados_location"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "13",
+        "failures": "0",
+        "errors": [],
+        "suite": "resumen_agregado"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "13",
+        "failures": "0",
+        "errors": [],
+        "suite": "relaciones_conjuntos"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "10",
+        "failures": "0",
+        "errors": [],
+        "suite": "citas_agenda_por_rol"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "27",
+        "failures": "0",
+        "errors": [],
+        "suite": "agenda"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "14",
+        "failures": "0",
+        "errors": [],
+        "suite": "personal"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "9",
+        "failures": "0",
+        "errors": [],
+        "suite": "filtros_consulta_catalogo"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "64",
+        "failures": "0",
+        "errors": [],
+        "suite": "atencion"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "18",
+        "failures": "0",
+        "errors": [],
+        "suite": "login"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "16",
+        "failures": "0",
+        "errors": [],
+        "suite": "sesion_autenticar"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "7",
+        "failures": "0",
+        "errors": [],
+        "suite": "logout"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "12",
+        "failures": "0",
+        "errors": [],
+        "suite": "shell"
+      },
+      {
+        "state": "referencesCleaned",
+        "passes": "3",
+        "failures": "0",
+        "errors": [],
+        "suite": "service_worker_version"
+      }
+    ]
+  },
+  "workerNode": {
+    "tests": 13,
+    "passed": 13,
+    "failed": 0
+  },
+  "browserWorkerVersion": {
+    "tests": 3,
+    "passed": 3,
+    "failed": 0
+  },
+  "realWorkerSyntheticHTTP": {
+    "tests": 7,
+    "passed": 7,
+    "failed": 0,
+    "checks": [
+      {
+        "name": "Cliente bloquea worker antiguo con fallback REST",
+        "passed": true
+      },
+      {
+        "name": "Activa v16, precarga v11/transporte y limpia API/v15 conservando caché ajena",
+        "passed": true
+      },
+      {
+        "name": "Lecturas sucesivas obtienen respuestas nuevas de la red",
+        "passed": true
+      },
+      {
+        "name": "POST sintético conserva 201/Location y lectura posterior actualizada",
+        "passed": true
+      },
+      {
+        "name": "Cambio de contexto invalida lectura real pendiente",
+        "passed": true
+      },
+      {
+        "name": "Fallo real de red nunca devuelve respuesta histórica preinsertada",
+        "passed": true
+      },
+      {
+        "name": "Limpieza selectiva conserva estáticos y caché ajena",
+        "passed": true
+      }
+    ],
+    "cacheKeys": [
+      "otra-app",
+      "galenosv-v16"
+    ],
+    "syntheticRest": true,
+    "realBackendUsed": false,
+    "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36"
+  },
+  "realBackendREST": {
+    "tests": 30,
+    "passed": 30,
+    "failed": 0,
+    "checks": [
+      {
+        "name": "no-store en consulta?clinica=10000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en consulta/50000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en consulta/estados?consultas=50000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en consulta/resumen?clinica=10000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en persona",
+        "passed": true
+      },
+      {
+        "name": "no-store en persona/30000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en persona_rol/persona/30000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en documento?persona=30000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en tipo_documento?activo=true",
+        "passed": true
+      },
+      {
+        "name": "no-store en consulta_procedimiento?consultas=50000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en consulta_procedimiento_paso?consultas=50000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en procedimiento_paso?procedimientos=60000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en procedimiento_paso_examen?pasos=70000000-0000-0000-0000-000000000001&activo=true",
+        "passed": true
+      },
+      {
+        "name": "no-store en procedimiento_paso_secuencia?pasos=70000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en orden_examen?consultas=50000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en examen_resultado?ordenes=f0000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en examen_resultado/d0000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "no-store en error 422 consulta?persona=x",
+        "passed": true
+      },
+      {
+        "name": "no-store en error 404 documento/buscar?tipo=80000000-0000-0000-0000-000000000001&valor=IT-AUSENTE",
+        "passed": true
+      },
+      {
+        "name": "no-store en error 404 examen_resultado/d0000000-0000-0000-0000-000000999999",
+        "passed": true
+      },
+      {
+        "name": "PUT generico rechazado tampoco es cacheable",
+        "passed": true
+      },
+      {
+        "name": "PUT transaccional invalido tampoco es cacheable",
+        "passed": true
+      },
+      {
+        "name": "POST invalido sin persistencia tampoco es cacheable",
+        "passed": true
+      },
+      {
+        "name": "preflight mantiene CORS y no-store",
+        "passed": true
+      },
+      {
+        "name": "HEAD mantiene politica sin cuerpo",
+        "passed": true
+      },
+      {
+        "name": "validadores antiguos no producen un 304 reutilizable",
+        "passed": true
+      },
+      {
+        "name": "conserva paginacion y Total-registros filtrado con no-store",
+        "passed": true
+      },
+      {
+        "name": "sin cache compartida de contexto 40000000-0000-0000-0000-000000000124",
+        "passed": true
+      },
+      {
+        "name": "sin cache compartida de contexto 40000000-0000-0000-0000-000000000245",
+        "passed": true
+      },
+      {
+        "name": "20 tablas sinteticas intactas tras lecturas y escrituras rechazadas",
+        "passed": true
+      }
+    ],
+    "databaseUnchanged": true,
+    "tablesBefore": {
+      "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+      "consulta": "123:89e866513732346e90e298cb5c015a08",
+      "consulta_procedimiento": "124:5790f1d01247dd9258a51a13ead5c00c",
+      "consulta_procedimiento_paso": "124:92bb6bdefe572c4ce7185840b523e526",
+      "documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "examen": "123:9059aac03b8590f8fdabba329492dfee",
+      "examen_resultado": "124:068c21f645de468f277e76493df2d8e4",
+      "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "orden_examen": "124:a82624c6456c98db8ac571c1ef501030",
+      "persona": "260:166b00aee2987501ca9c56e25871b71f",
+      "persona_rol": "260:7508426f340e89b97772a104fd66e151",
+      "procedimiento": "130:df8a85ea8858470011b27eccc46c3605",
+      "procedimiento_paso": "124:591600f320c3cd8504773dacd8c1fd1b",
+      "procedimiento_paso_examen": "124:c4d2340d438741ca671e75a31e8715e4",
+      "procedimiento_paso_secuencia": "127:09682bc13b62476d87abd456f8b65581",
+      "rol": "2:1ac162db769fc54285609e57edbded91",
+      "tipo_documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "tablesAfter": {
+      "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+      "consulta": "123:89e866513732346e90e298cb5c015a08",
+      "consulta_procedimiento": "124:5790f1d01247dd9258a51a13ead5c00c",
+      "consulta_procedimiento_paso": "124:92bb6bdefe572c4ce7185840b523e526",
+      "documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "examen": "123:9059aac03b8590f8fdabba329492dfee",
+      "examen_resultado": "124:068c21f645de468f277e76493df2d8e4",
+      "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "orden_examen": "124:a82624c6456c98db8ac571c1ef501030",
+      "persona": "260:166b00aee2987501ca9c56e25871b71f",
+      "persona_rol": "260:7508426f340e89b97772a104fd66e151",
+      "procedimiento": "130:df8a85ea8858470011b27eccc46c3605",
+      "procedimiento_paso": "124:591600f320c3cd8504773dacd8c1fd1b",
+      "procedimiento_paso_examen": "124:c4d2340d438741ca671e75a31e8715e4",
+      "procedimiento_paso_secuencia": "127:09682bc13b62476d87abd456f8b65581",
+      "rol": "2:1ac162db769fc54285609e57edbded91",
+      "tipo_documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "base": "http://127.0.0.1:53611/GalenoSV-1.0-SNAPSHOT/resources/v1/",
+    "container": "galeno-pagination-it-x6KSNd"
+  },
+  "staticChecks": {
+    "gitDiffCheckBoth": true,
+    "javascriptSyntax": true
+  },
+  "constraints": {
+    "fakeLoginPreserved": true,
+    "existingDataModified": false,
+    "deployed": false,
+    "dependenciesInstalled": false,
+    "migrations": false,
+    "commits": false,
+    "step9Implemented": false
+  },
+  "browserConfiguration": {
+    "executable": "/usr/bin/brave-browser",
+    "globalConfig": "~/.config/cd4a/config.json",
+    "isolatedContext": true
+  },
+  "limitations": [
+    "Browser unit tests mock REST; real worker uses synthetic HTTP and an in-memory POST. Backend REST tests run independently. No complete browser/backend integration is claimed.",
+    "Current normal deployed version is unverified. Old offline clients require connection and activation before the new worker applies.",
+    "Already rendered data may remain in memory; no offline REST fallback exists."
+  ]
+}

@@ -56,3 +56,4 @@
 ::slotted(.estado--programada) { color: var(--azul-fuerte, #1a73e8); }
 ::slotted(.estado--en-curso)   { color: #b26a00; }
 ::slotted(.estado--finalizada) { color: var(--texto-suave, #6f7b8a); }
+::slotted(.estado--completado) { color: #166534; }

@@ -74,17 +74,21 @@ suite('Paso 5: DTO de estados y dashboard agregado', () => {
         tarjeta.resumenEstado = estado('a', { totalPasos: 124, pasosFinalizados: 124, estado: 'Finalizada' }); fixture.append(tarjeta);
         assert.include(tarjeta.shadowRoot.textContent, 'Finalizada'); assert.deepEqual(tarjeta.pasos, []);
     });
-    test('las tarjetas no se montan si falla el resumen del estado', async () => {
+    test('las tarjetas no se montan si fallan las asignaciones', async () => {
         fetchStub.callsFake(async raw => new URL(raw).pathname.endsWith('/consulta') ? response([{ idConsulta: 'a', idPersonaRol: { idClinica: usuario.idClinica } }]) : new Response('', { status: 500 }));
         const vista = document.createElement('consulta-controller'); vista.usuario = usuario; fixture.append(vista); await hasta(() => !!vista.querySelector('.aviso--error'));
         assert.lengthOf(vista.querySelectorAll('tarjeta-consulta'), 0);
-        assert.isFalse(fetchStub.getCalls().some(c => String(c.args[0]).includes('/consulta_procedimiento_paso')));
+        assert.isTrue(fetchStub.getCalls().some(c => String(c.args[0]).includes('/consulta_procedimiento_paso')));
     });
-    test('dashboard usa año y día civiles del servidor aunque el navegador esté en enero', async () => {
-        fetchStub.callsFake(async raw => new URL(raw).pathname.endsWith('/consulta/resumen') ? response(dashboard()) : response([]));
-        const vista = document.createElement('resumen-controller'); vista.usuario = usuario; fixture.append(vista); await hasta(() => !!vista.querySelector('.stats'));
-        assert.include(vista.textContent, '2025'); assert.include(vista.textContent, '31'); assert.include(vista.textContent, 'diciembre');
-        assert.isNull(vista.querySelector('script')); assert.include(vista.textContent, '<script>');
-    });
+    test('dashboard monta únicamente contexto laboral y consultas por rol sin pedir resumen', async () => {
+        fetchStub.callsFake(async () => response([]));
+        const vista = document.createElement('resumen-controller'); vista.usuario = usuario; fixture.append(vista);
+        assert.deepEqual([...vista.children].map(n => n.localName), ['galeno-selector-contexto', 'galeno-agenda']);
+        assert.strictEqual(vista.firstElementChild.usuario, usuario); assert.strictEqual(vista.lastElementChild.usuario, usuario);
+        await hasta(() => !vista.querySelector('galeno-agenda [type=submit]').disabled);
+        assert.isFalse(fetchStub.getCalls().some(c => String(c.args[0]).includes('/consulta/resumen')));
+        assert.isNull(vista.querySelector('.stats,.dash-grid,.dona,svg,table'));
+        vista.cargar(); assert.lengthOf(vista.querySelectorAll('galeno-selector-contexto'), 1); assert.lengthOf(vista.querySelectorAll('galeno-agenda'), 1);
+    });;
 });
 mocha.run();

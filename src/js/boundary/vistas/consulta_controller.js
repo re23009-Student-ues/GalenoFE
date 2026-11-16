@@ -22,7 +22,7 @@ class ConsultaController extends HTMLElement {
         this.innerHTML = `<p class="aviso">Cargando consultas…</p>`;
 
         let lista;
-        let resumenes;
+        let pasos;
         try {
             const id = this.parametros?.idConsulta;
             if (id) {
@@ -31,7 +31,7 @@ class ConsultaController extends HTMLElement {
                 lista = await filtrarConsultasPorRol([consulta], this.usuario);
             } else lista = await listarConsultasDelRol(this.usuario);
             if (!this.isConnected) return;
-            resumenes = await new ConsultaProcedimientoPasoService().resumirParaConsultas(lista.map(consulta => consulta.idConsulta));
+            pasos = await new ConsultaProcedimientoPasoService().listarParaConsultas(lista.map(consulta => consulta.idConsulta));
         } catch (err) {
             console.error(err);
             if (!this.isConnected) return;
@@ -47,11 +47,13 @@ class ConsultaController extends HTMLElement {
 
         const tarjetas = document.createElement("div");
         tarjetas.className = "lista-consultas";
-        const porConsulta = new Map(resumenes.map(resumen => [resumen.idConsulta, resumen]));
+        const porConsulta = new Map(lista.map(consulta => [consulta.idConsulta, []]));
+        pasos.forEach(paso => porConsulta.get(paso.idConsultaProcedimiento?.idConsulta?.idConsulta)?.push(paso));
         lista.forEach(consulta => {
             const tarjeta = new TarjetaConsulta();
             tarjeta.consulta = consulta;
-            tarjeta.resumenEstado = porConsulta.get(consulta.idConsulta);
+            tarjeta.pasos = porConsulta.get(consulta.idConsulta);
+            tarjeta.responsable = this.usuario;
             const registro = document.createElement('button');
             registro.type = 'button';
             registro.className = 'consulta__seleccionar';

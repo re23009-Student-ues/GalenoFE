@@ -20,10 +20,12 @@ suite('Ejemplos restaurados', () => {
         return doc;
     }
     teardown(() => { frame?.remove(); frame = null; });
-    test('Catálogo: los doce ejemplos enlazados existen', async () => {
+    test('Catálogo: los ejemplos enlazados existen e incluyen TreeTable', async () => {
         const response = await fetch(new URL('index.html', base)); assert.isTrue(response.ok);
         const doc = new DOMParser().parseFromString(await response.text(), 'text/html');
-        const links = [...doc.querySelectorAll('tbody a')]; assert.lengthOf(links, 12);
+        const links = [...doc.querySelectorAll('tbody a')]; assert.isAtLeast(links.length, 12);
+        assert.exists(doc.querySelector('a[href="./tree-table.html"]'));
+        assert.exists(doc.querySelector('a[href="./tree.html"]'));
         const responses = await Promise.all(links.map(link => fetch(new URL(link.getAttribute('href'), base))));
         assert.isTrue(responses.every(item => item.ok));
     });
@@ -53,6 +55,24 @@ suite('Ejemplos restaurados', () => {
         await new Promise(resolve => setTimeout(resolve, 400));
         assert.include(doc.querySelector('#patientsTable tbody').textContent, 'Lucía Flores');
         assert.exists(doc.querySelector('#specialtiesTable table'));
+    });
+    test('TreeTable: búsqueda anidada y actualización dinámica', async () => {
+        const doc = await load('tree-table', 'galeno-tree-table table');
+        const tree = doc.querySelector('galeno-tree-table');
+        tree.setSearch('Informe'); assert.deepEqual(tree.view.map(node => node.id), [1, 2, 3]);
+        tree.setSearch(''); doc.querySelector('galeno-ejemplo-tree-table > button').click();
+        assert.isTrue(tree.nodes.has(7)); assert.include(tree.body.textContent, 'Nuevo informe');
+    });
+    test('Tree: búsqueda, alta/baja y carga diferida con reintento', async () => {
+        const doc = await load('tree', 'galeno-tree [role=tree]');
+        const [single, multiple] = doc.querySelectorAll('galeno-tree');
+        assert.isNull(single.querySelector('table'));
+        single.setSearch('main'); assert.deepEqual(single.view.map(node => node.id), ['root', 'src', 'main']);
+        single.setSearch(''); doc.querySelector('[data-add]').click();
+        assert.exists(single.getNode('new-1')); assert.exists(multiple.getNode('new-1'));
+        doc.querySelector('[data-remove]').click(); assert.isNull(single.getNode('new-1'));
+        await multiple.expandNode('remote'); assert.isTrue(multiple.errors.has('remote'));
+        await multiple.expandNode('remote'); assert.exists(multiple.getNode('remote-child'));
     });
     test('Calendar: eventos, eliminación y limpieza de instancias', async () => {
         const doc = await load('calendar', '#appointmentsCalendar .calendar');

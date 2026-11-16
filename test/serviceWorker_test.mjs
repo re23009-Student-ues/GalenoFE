@@ -80,9 +80,9 @@ test('Precarga completa: archivos existentes y módulos importados de la aplicac
 });
 
 test('Actualización elimina solo cachés anteriores de Galeno y toma control', async () => {
-    const w = worker(); w.store('galenosv-v1'); w.store('galenosv-v3'); w.store('galenosv-v4'); w.store('galenosv-v13'); w.store('galenosv-v14'); w.store('galenosv-v15'); w.store('galeno-api-v0'); w.store('galeno-api-v1'); w.store('otra-app');
+    const w = worker(); w.store('galenosv-v1'); w.store('galenosv-v3'); w.store('galenosv-v4'); w.store('galenosv-v13'); w.store('galenosv-v14'); w.store('galenosv-v15'); w.store('galenosv-v16'); w.store('galenosv-v17'); w.store('galenosv-v18'); w.store('galenosv-v19'); w.store('galeno-api-v0'); w.store('galeno-api-v1'); w.store('otra-app');
     await w.lifecycle('install'); await w.lifecycle('activate');
-    assert.deepEqual(w.deleted, ['galenosv-v1', 'galenosv-v3', 'galenosv-v4', 'galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galeno-api-v0', 'galeno-api-v1']);
+    assert.deepEqual(w.deleted, ['galenosv-v1', 'galenosv-v3', 'galenosv-v4', 'galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galeno-api-v0', 'galeno-api-v1']);
     assert.ok(!w.stores.has('galeno-api-v1'));
     assert.ok(w.stores.has('otra-app')); assert.equal(w.claimed, 1);
 });
@@ -101,10 +101,10 @@ test('Los módulos nuevos prevalecen sobre código obsoleto en caché', async ()
 test('Sin red usa caché exacta sin confundir parámetros de versión', async () => {
     const w = worker(); await w.lifecycle('install');
     const cache = [...w.stores.values()][0];
-    await cache.put(scope + 'js/main.js?v=11', new Response('main-v11'));
+    await cache.put(scope + 'js/main.js?v=22', new Response('main-v15'));
     w.setNetwork(async () => { throw new Error('offline'); });
-    assert.equal(await (await w.fetch('js/main.js?v=11')).text(), 'main-v11');
-    await assert.rejects(w.fetch('js/main.js?v=12'), /offline/);
+    assert.equal(await (await w.fetch('js/main.js?v=22')).text(), 'main-v15');
+    await assert.rejects(w.fetch('js/main.js?v=14'), /offline/);
 });
 
 test('No intercepta escrituras ni recursos ajenos a estáticos y API', () => {

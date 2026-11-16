@@ -10,6 +10,7 @@ export function formatoFecha(texto) {
 
 /** Finaliza solo con pasos reales no vacíos y todos completados; fechaFin no decide el estado. */
 export function estadoConsulta(c, ahora = new Date(), pasos = []) {
+    pasos = Array.isArray(pasos) ? pasos.filter(paso => String(paso?.estado ?? '').trim().toUpperCase() !== 'INVALIDO') : [];
     const inicio = parseFecha(c.fechaInicio);
     if (Array.isArray(pasos) && pasos.length && pasos.every(paso =>
         typeof paso?.estado === 'string' && ['COMPLETADO', 'FINALIZADO'].includes(paso.estado.trim().toUpperCase()))) {
@@ -17,6 +18,17 @@ export function estadoConsulta(c, ahora = new Date(), pasos = []) {
     }
     if (inicio && inicio > ahora) return "Programada";
     return "En curso";
+}
+
+
+/** Estado de trabajo del responsable; se recalcula con las asignaciones actuales. */
+export function estadoConsultaResponsable(c, contexto, pasos = [], ahora = new Date()) {
+    const asignados = pasos.filter(paso => String(paso?.estado ?? '').trim().toUpperCase() !== 'INVALIDO' && contexto?.idPersonaRol &&
+        paso.idPersonaRol?.idPersonaRol === contexto.idPersonaRol &&
+        paso.idConsultaProcedimiento?.idConsulta?.idConsulta === c.idConsulta);
+    if (!asignados.length) return estadoConsulta(c, ahora, pasos);
+    return asignados.every(paso => typeof paso.estado === 'string' &&
+        ['COMPLETADO', 'FINALIZADO'].includes(paso.estado.trim().toUpperCase())) ? 'Completado' : 'En curso';
 }
 
 

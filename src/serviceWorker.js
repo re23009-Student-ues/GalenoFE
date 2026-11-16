@@ -1,7 +1,17 @@
-// Paso 8: estáticos offline; respuestas REST únicamente desde la red.
-const CACHE = 'galenosv-v16';
+// HU4: solo el responsable actual puede regresar y se reasignan ambos pasos.
+const CACHE = 'galenosv-v27';
 const POLITICA_API = 'sin-cache-rest-v1';
 const ARCHIVOS = [
+  'js/boundary/componentes/data-display/Tree.js',
+  'js/boundary/componentes/data-display/tree_model.js',
+  'Recursos/estilos/tree.css',
+  'ejemplos/tree.html',
+  'ejemplos/tree.js',
+  'js/boundary/componentes/data-display/treeTable.js',
+  'js/boundary/componentes/data-display/tree_table_model.js',
+  'Recursos/estilos/treeTable.css',
+  'ejemplos/tree-table.html',
+  'ejemplos/tree-table.js',
   './',
   'js/boundary/componentes/form/checkbox/Checkbox.js',
   'js/boundary/componentes/form/checkbox/index.js',
@@ -121,7 +131,7 @@ const ARCHIVOS = [
   'js/entity/default_error.js',
   'js/entity/default_response.js',
   'js/entity/persona_rol.js',
-  'js/main.js?v=11',
+  'js/main.js?v=22',
   'js/router.js'
 ];
 const RUTAS_ESTATICAS = new Set(ARCHIVOS.map(archivo => new URL(archivo, self.registration.scope).pathname));

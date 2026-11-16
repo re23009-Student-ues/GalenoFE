@@ -2,7 +2,7 @@ import { assert } from '../lib/chai/index.js';
 import sinon from '../lib/sinon/sinon-esm.js';
 
 mocha.setup('tdd');
-suite('Paso 8: actualización y caché sensible', () => {
+suite('Actualización HU4 y caché sensible', () => {
     let source, html, sandbox, handlers, cache, cachesMock, selfMock;
     suiteSetup(async () => {
         [source, html] = await Promise.all(['../../../src/serviceWorker.js', '../../../src/index.html'].map(async path => {
@@ -22,21 +22,21 @@ suite('Paso 8: actualización y caché sensible', () => {
     async function lifecycle(type) {
         let completion; handlers.get(type)({ waitUntil(promise) { completion = promise; } }); await completion;
     }
-    test('precarga una versión posterior a v14 y el mismo main que carga el HTML', async () => {
+    test('precarga v27 y el mismo main actualizado que carga el HTML', async () => {
         await lifecycle('install');
-        sinon.assert.calledWithExactly(cachesMock.open, 'galenosv-v16');
+        sinon.assert.calledWithExactly(cachesMock.open, 'galenosv-v27');
         const index = new DOMParser().parseFromString(html, 'text/html');
         const main = index.querySelector('script[type="module"]').getAttribute('src');
-        assert.equal(main, 'js/main.js?v=11');
+        assert.equal(main, 'js/main.js?v=22');
         const requests = cache.addAll.firstCall.args[0];
         assert.isTrue(requests.some(request => request.url === new URL(main, selfMock.registration.scope).href));
         assert.isTrue(requests.every(request => request.cache === 'reload'));
         sinon.assert.calledOnce(selfMock.skipWaiting);
     });
     test('activación elimina versiones del rollback y caché API anterior; conserva otras aplicaciones', async () => {
-        cachesMock.keys.resolves(['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galeno-api-v0', 'galeno-api-v1', 'otra-app']);
+        cachesMock.keys.resolves(['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galenosv-v27', 'galeno-api-v0', 'galeno-api-v1', 'otra-app']);
         await lifecycle('activate');
-        assert.deepEqual(cachesMock.delete.getCalls().map(call => call.args[0]), ['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galeno-api-v0', 'galeno-api-v1']);
+        assert.deepEqual(cachesMock.delete.getCalls().map(call => call.args[0]), ['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galeno-api-v0', 'galeno-api-v1']);
         sinon.assert.calledOnce(selfMock.clients.claim);
     });
     test('precarga conserva Wizard, Checkbox y atención previos sin el cliente retirado', async () => {
@@ -46,6 +46,17 @@ suite('Paso 8: actualización y caché sensible', () => {
             assert.include(paths, new URL(file, selfMock.registration.scope).pathname);
         }
         assert.notInclude(paths, new URL('js/control/api_client.js', selfMock.registration.scope).pathname);
+    });
+    test('la primera toma de control no recarga, pero la actualización siguiente sí y solo una vez', () => {
+        const index = new DOMParser().parseFromString(html, 'text/html');
+        const inline = [...index.querySelectorAll('script:not([src])')].find(script => script.textContent.includes('controllerchange')).textContent;
+        const eventos = new Map(), reload = sandbox.spy();
+        const navegador = { serviceWorker: { controller: null, addEventListener: (tipo, handler) => eventos.set(tipo, handler) } };
+        const ventana = { location: { reload }, addEventListener: sandbox.stub() };
+        new Function('navigator', 'window', inline)(navegador, ventana);
+        navegador.serviceWorker.controller = { version: 16 }; eventos.get('controllerchange')(); sinon.assert.notCalled(reload);
+        navegador.serviceWorker.controller = { version: 17 }; eventos.get('controllerchange')(); sinon.assert.calledOnce(reload);
+        eventos.get('controllerchange')(); sinon.assert.calledOnce(reload);
     });
 });
 mocha.run();

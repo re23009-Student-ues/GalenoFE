@@ -1,10 +1,12 @@
+@import url('./tree.css');
+
 galeno-citas, galeno-agenda, galeno-tarjeta-cita, galeno-selector-contexto { display: block; }
 .agenda-panel { background: white; border-radius: 16px; padding: 24px; margin: 20px 0; color: var(--texto, #26313f); }
 .agenda-panel h2, .agenda-panel h3, .agenda-panel p { margin-bottom: 12px; }
 .agenda-form { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; margin: 16px 0; }
 .agenda-form label { display: flex; flex-direction: column; gap: 8px; flex: 1 1 200px; }
 .agenda-form input, .agenda-form select { min-width: 0; width: 100%; padding: 12px; border: 1px solid #bacddd; border-radius: 8px; font: inherit; }
-.agenda-panel button, galeno-citas .citas-grid button { background: #1a73e8; border: 0; border-radius: 8px; color: white; padding: 12px 18px; font: inherit; cursor: pointer; }
+.agenda-panel button:not(.tree__button), galeno-citas .citas-grid button { background: #1a73e8; border: 0; border-radius: 8px; color: white; padding: 12px 18px; font: inherit; cursor: pointer; }
 .agenda-panel button:disabled, galeno-citas .citas-grid button:disabled, .agenda-panel input:disabled, .agenda-panel select:disabled { opacity: .55; cursor: default; }
 .agenda-panel :focus-visible { outline: 3px solid #1f3a5f; outline-offset: 3px; }
 .agenda-panel [hidden] { display: none; }
@@ -31,3 +33,29 @@ galeno-citas galeno-tarjeta-cita { min-width: 0; overflow-wrap: anywhere; }
 galeno-citas [hidden] { display: none; }
 galeno-citas .citas-grid { margin: 24px 0; }
 galeno-citas galeno-tarjeta-cita [slot="pie"] p { margin-top: 8px; }
+
+/* El scroll queda dentro de cada árbol, incluso con registros largos. */
+galeno-agenda [data-lista] { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; margin-top: 16px; }
+galeno-agenda .agenda__consulta { min-width: 0; border: 1px solid var(--cielo, #d6e9f8); }
+galeno-agenda .agenda__paciente { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 4px 12px; overflow-wrap: anywhere; }
+galeno-agenda .agenda__paciente > * { grid-column: 1; }
+galeno-agenda .agenda__paciente .agenda__consulta-fecha { grid-column: 2; grid-row: 1 / span 3; text-align: right; align-self: start; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+galeno-agenda .agenda__consulta-fecha > span { white-space: nowrap; }
+galeno-agenda .agenda__paciente h3 { font-size: 1rem; margin: 0; }
+galeno-agenda .agenda__paciente p { font-size: .875rem; font-weight: normal; margin: 0; }
+galeno-agenda .agenda__paciente [hidden] { display: none; }
+galeno-agenda galeno-tree { min-width: 0; width: 100%; }
+galeno-agenda .tree__item { width: 100%; }
+galeno-agenda .tree__label { min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Árbol mínimo de pasos dentro de cada tarjeta de consulta. */
+galeno-agenda .agenda__consulta .tree { border: 0; background: transparent; }
+galeno-agenda .agenda__consulta .tree__toolbar,
+galeno-agenda .agenda__consulta .tree:has(.tree__item) .tree__status { display: none; }
+galeno-agenda .agenda__consulta .tree__item { min-height: 28px; }
+
+galeno-agenda .agenda__consulta .tree__label { flex: 1; }
+galeno-agenda .agenda__paso { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+galeno-agenda .agenda__paso > :first-child { min-width: 0; }
+galeno-agenda .agenda__paso--propio:hover > :first-child { color: var(--azul-fuerte, #1a73e8); text-decoration: underline; }
+galeno-agenda .agenda__paso-estado { margin-inline-start: auto; flex-shrink: 0; color: #166534; font-size: .8em; }

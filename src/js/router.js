@@ -15,6 +15,7 @@ const rutas = {
     '/consulta/:idConsulta': { publica: false, titulo: 'Consulta', tag: 'consulta-controller' },
     '/consultas': { publica: false, titulo: 'Agenda Médica', tag: 'consulta-controller' },
     '/atencion': { publica: false, titulo: 'Atención y Procedimientos', tag: 'atencion-controller' },
+    '/atencion/:idConsulta/paso/:idPaso': { publica: false, titulo: 'Atención y Procedimientos', tag: 'atencion-controller' },
     '/atencion/:idConsulta': { publica: false, titulo: 'Atención y Procedimientos', tag: 'atencion-controller' }
 };
 

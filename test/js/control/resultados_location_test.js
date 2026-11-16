@@ -11,7 +11,7 @@ suite('Paso 6: Location y reintentos de resultados', () => {
     const created = (url, status = 201) => new Response(null, { status, headers: { Location: `${url.replace(/\/atencion$/, '')}/${guardado.idExamenResultado}` } });
     setup(() => {
         sandbox = sinon.createSandbox(); posts = [];
-        orden = { idOrdenExamen: 'orden', idConsultaProcedimientoPaso: { idProcedimientoPaso: { idRol: contexto.idRol },
+        orden = { idOrdenExamen: 'orden', idConsultaProcedimientoPaso: { idPersonaRol: contexto, idProcedimientoPaso: { idRol: contexto.idRol },
             idConsultaProcedimiento: { idConsulta: { idConsulta: 'consulta', idPersonaRol: { idClinica: contexto.idClinica } } } } };
         fetchStub = sandbox.stub(window, 'fetch').callsFake(async (raw, options) => {
             const url = new URL(raw);

@@ -35,6 +35,96 @@ export function pasoDelRol(paso, contexto) {
     return !!contexto?.idRol?.idRol && paso?.idProcedimientoPaso?.idRol?.idRol === contexto.idRol.idRol;
 }
 
+export function esResponsableDelPaso(paso, contexto) {
+    return !!contexto?.idPersonaRol && paso?.idPersonaRol?.idPersonaRol === contexto.idPersonaRol && pasoDelRol(paso, contexto) &&
+        !!contexto.idClinica?.idClinica && paso.idConsultaProcedimiento?.idConsulta?.idPersonaRol?.idClinica?.idClinica === contexto.idClinica.idClinica;
+}
+
+/** Convención temporal mientras orden_examen no referencia el examen del catálogo. */
+export function prefijoOrdenExamen(paso, examen) {
+    const nombres = [paso?.idProcedimientoPaso?.nombre, examen?.idExamen?.nombre];
+    if (nombres.some(n => typeof n !== 'string' || !n.trim() || /[\r\n]/.test(n))) {
+        throw new Error('El paso y el examen deben tener nombres válidos para identificar la orden.');
+    }
+    return nombres.map(n => `[${n.trim()}]`).join(' ');
+}
+
+export function indicacionesOrdenExamen(paso, examen, texto = '') {
+    if (typeof texto !== 'string') throw new Error('Las indicaciones deben ser texto.');
+    return prefijoOrdenExamen(paso, examen) + (texto ? ` ${texto}` : '');
+}
+
+export function textoOrdenExamen(paso, examen, orden) {
+    if (!paso?.idConsultaProcedimientoPaso || orden?.idConsultaProcedimientoPaso?.idConsultaProcedimientoPaso !== paso.idConsultaProcedimientoPaso ||
+            examen?.idProcedimientoPaso?.idProcedimientoPaso !== paso.idProcedimientoPaso?.idProcedimientoPaso || typeof orden.indicaciones !== 'string') return null;
+    let prefijo;
+    try { prefijo = prefijoOrdenExamen(paso, examen); } catch { return null; }
+    const literal = prefijo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const coincidencia = new RegExp(`^${literal}(?: ([\\s\\S]*))?$`).exec(orden.indicaciones);
+    return coincidencia ? coincidencia[1] ?? '' : null;
+}
+
+/** Solo coincidencias únicas del mismo paso; nunca asigna órdenes históricas por posición. */
+export function ordenesDeExamenes(paso, examenes, ordenes) {
+    const asociaciones = new Map();
+    for (const examen of examenes) {
+        let prefijo;
+        try { prefijo = prefijoOrdenExamen(paso, examen); } catch { continue; }
+        if (examenes.filter(e => {
+            try { return prefijoOrdenExamen(paso, e) === prefijo; } catch { return false; }
+        }).length !== 1) continue;
+        const candidatas = ordenes.filter(o => textoOrdenExamen(paso, examen, o) !== null);
+        if (candidatas.length === 1) asociaciones.set(examen.idProcedimientoPasoExamen, candidatas[0]);
+    }
+    return asociaciones;
+}
+
+const enviosOrdenes = new WeakMap();
+export async function registrarOrdenAtencion(paso, examen, texto, contexto, idConsulta) {
+    const indicaciones = indicacionesOrdenExamen(paso, examen, texto);
+    if (!contexto?.idPersonaRol || !idConsulta || !paso?.idConsultaProcedimientoPaso || !examen?.idProcedimientoPasoExamen || examen.activo !== true || examen.idExamen?.activo !== true ||
+            examen.idProcedimientoPaso?.idProcedimientoPaso !== paso.idProcedimientoPaso?.idProcedimientoPaso) {
+        throw new Error('El examen no está disponible para este paso.');
+    }
+    const actual = await (await leer(`consulta_procedimiento_paso/${encodeURIComponent(paso.idConsultaProcedimientoPaso)}`)).json();
+    await validarRegistro('consulta_procedimiento_paso', actual, contexto, idConsulta);
+    if (!estadoEditableAtencion(actual) || actual.idConsultaProcedimiento?.fechaFin ||
+            actual.idProcedimientoPaso?.idProcedimientoPaso !== paso.idProcedimientoPaso?.idProcedimientoPaso ||
+            prefijoOrdenExamen(actual, examen) !== prefijoOrdenExamen(paso, examen)) throw new Error('El paso cambió o no permite registrar órdenes.');
+    const ordenes = await listarPorConjunto('orden_examen', 'idOrdenExamen', 'consultas', [idConsulta],
+        (fila, bloque) => bloque.has(fila.idConsultaProcedimientoPaso?.idConsultaProcedimiento?.idConsulta?.idConsulta));
+    const existentes = ordenes.filter(o => textoOrdenExamen(paso, examen, o) !== null);
+    if (existentes.length > 1) throw new Error('Hay varias órdenes con el mismo paso y examen. Revisa las órdenes antes de guardar.');
+    if (existentes.length === 1) return existentes[0];
+    let envios = enviosOrdenes.get(paso);
+    if (!envios) { envios = new Set(); enviosOrdenes.set(paso, envios); }
+    if (envios.has(examen.idProcedimientoPasoExamen)) {
+        throw new Error('No se pudo confirmar la orden enviada. Revisa el registro antes de volver a crearla.');
+    }
+    envios.add(examen.idProcedimientoPasoExamen);
+    let respuesta;
+    try {
+        respuesta = await leer('orden_examen', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ indicaciones, idConsultaProcedimientoPaso: { idConsultaProcedimientoPaso: paso.idConsultaProcedimientoPaso } }) });
+    } catch (error) {
+        if (error.status >= 400 && error.status < 500) envios.delete(examen.idProcedimientoPasoExamen);
+        throw error;
+    }
+    if (respuesta.status !== 201) throw new Error('El servidor no confirmó la creación de la orden.');
+    const base = new URL('orden_examen/', new DefaultService().BASE_URL);
+    const location = respuesta.headers.get('Location');
+    const url = location ? new URL(location, base) : null;
+    if (!url || url.origin !== base.origin || url.username || url.password || url.search || url.hash ||
+            !url.pathname.startsWith(base.pathname) || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(url.pathname.slice(base.pathname.length))) {
+        throw new Error('Orden creada sin una referencia válida. Reintenta para recuperar el registro sin repetir el envío.');
+    }
+    const orden = await (await leer(`orden_examen/${url.pathname.slice(base.pathname.length)}`)).json();
+    if (orden.idOrdenExamen !== url.pathname.slice(base.pathname.length) || orden.indicaciones !== indicaciones || textoOrdenExamen(paso, examen, orden) === null) {
+        throw new Error('La orden recuperada no corresponde al paso y examen seleccionados.');
+    }
+    return orden;
+}
+
 /** Carga solo relaciones de la consulta y las definiciones de sus procedimientos. */
 export async function cargarDetalleAtencion(idConsulta) {
     const [procedimientos, ordenes] = await Promise.all([
@@ -55,11 +145,28 @@ export async function cargarDetalleAtencion(idConsulta) {
         examenes: configuraciones.filter(c => c.idExamen?.activo === true), ordenes, resultados };
 }
 
+export const esPasoInvalido = paso => String(paso?.estado ?? '').trim().toUpperCase() === 'INVALIDO';
 const estadoPaso = paso => String(paso?.estado ?? '').trim().toUpperCase().replace(/\s+/g, '_');
 
 /** Estados que permiten editar contenido, sin ejecutar transiciones. */
 export function estadoEditableAtencion(paso) {
     return ['PENDIENTE', 'EN_PROCESO', 'COMPLETADO', 'FINALIZADO'].includes(estadoPaso(paso));
+}
+
+/** Conserva la cadena secuencial y revela una bifurcación solo al elegir su destino. */
+export function pasosDelCamino(flujo, elecciones = new Map()) {
+    const visibles = new Set();
+    const pendientes = [...flujo.anteriores].filter(([, anteriores]) => !anteriores.size).map(([id]) => id);
+    while (pendientes.length) {
+        const id = pendientes.pop();
+        if (visibles.has(id)) continue;
+        if (esPasoInvalido(flujo.porDefinicion?.get(id))) continue;
+        visibles.add(id);
+        const siguientes = new Set([...(flujo.siguientes.get(id) || [])].filter(destino => !esPasoInvalido(flujo.porDefinicion?.get(destino))));
+        if (siguientes.size < 2) pendientes.push(...siguientes);
+        else if (siguientes.has(elecciones.get(id))) pendientes.push(elecciones.get(id));
+    }
+    return visibles;
 }
 
 /** Orden topológico y relaciones del procedimiento. No fabrica ejecuciones faltantes. */
@@ -93,8 +200,19 @@ export function flujoDelProcedimiento(detalle, procedimiento, ejecuciones) {
         porDefinicion.set(id, p);
     });
     const pasos = orden.flatMap(d => porDefinicion.has(d.idProcedimientoPaso) ? [porDefinicion.get(d.idProcedimientoPaso)] : []);
-    const habilitado = paso => [...(anteriores.get(paso.idProcedimientoPaso?.idProcedimientoPaso) || [])]
-        .every(id => estadoPaso(porDefinicion.get(id)) === 'COMPLETADO');
+    const habilitado = paso => {
+        const previos = [...(anteriores.get(paso.idProcedimientoPaso?.idProcedimientoPaso) || [])];
+        if (!previos.every(id => ['COMPLETADO', 'INVALIDO'].includes(estadoPaso(porDefinicion.get(id))))) return false;
+        const visitados = new Set();
+        while (previos.length) {
+            const id = previos.pop();
+            if (visitados.has(id) || esPasoInvalido(porDefinicion.get(id))) continue;
+            visitados.add(id);
+            if ([...(siguientes.get(id) || [])].filter(destino => !esPasoInvalido(porDefinicion.get(destino))).length > 1) return false;
+            previos.push(...(anteriores.get(id) || []));
+        }
+        return true;
+    };
     return { pasos, anteriores, siguientes, porDefinicion, habilitado,
         faltantes: orden.filter(d => !porDefinicion.has(d.idProcedimientoPaso)),
         completo: paso => ['COMPLETADO', 'FINALIZADO'].includes(estadoPaso(paso)) };
@@ -150,6 +268,90 @@ export async function iniciarPasoProcedimiento() {
     throw new Error('Iniciar el paso requiere una operación validada por el backend.');
 }
 
+/** Atención y transición se confirman juntas; los originales permiten detectar conflictos. */
+export async function completarPasoAtencion(paso, valor, contexto, idConsulta, camino = null) {
+    if (!paso?.idConsultaProcedimientoPaso || !contexto?.idPersonaRol || !idConsulta || typeof valor !== 'string' || !valor.trim()) {
+        throw new Error('Registra la atención brindada para completar el paso.');
+    }
+    await validarRegistro('consulta_procedimiento_paso', paso, contexto, idConsulta);
+    const solicitud = { contexto: contexto.idPersonaRol, consulta: idConsulta, valor,
+        originales: { valor: paso.valor ?? null, estado: paso.estado ?? null } };
+    if (camino) solicitud.siguiente = camino.siguiente;
+    try {
+        const respuesta = await leer(`consulta_procedimiento_paso/${encodeURIComponent(paso.idConsultaProcedimientoPaso)}/completar`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(solicitud)
+        });
+        if (respuesta.status !== 200) throw new Error('El servidor no confirmó que el paso esté completado.');
+        const confirmacion = await respuesta.json();
+        const datos = camino ? confirmacion.paso : confirmacion;
+        if (!datos || datos.idConsultaProcedimientoPaso !== paso.idConsultaProcedimientoPaso || datos.valor !== valor ||
+                !['COMPLETADO', 'FINALIZADO'].includes(estadoPaso(datos)) || datos.idPersonaRol?.idPersonaRol !== contexto.idPersonaRol ||
+                !datos.fechaFin || !Number.isFinite(Date.parse(String(datos.fechaFin).replace(/\[.*\]$/, '')))) {
+            throw new Error('El servidor no devolvió una confirmación válida del paso completado.');
+        }
+        await validarRegistro('consulta_procedimiento_paso', datos, contexto, idConsulta);
+        if (camino) {
+            const esperados = new Set(camino.pasos.map(p => p.idConsultaProcedimientoPaso));
+            const confirmados = confirmacion.pasos;
+            if (!Array.isArray(confirmados) || confirmados.length !== esperados.size ||
+                    new Set(confirmados.map(p => p.idConsultaProcedimientoPaso)).size !== esperados.size ||
+                    confirmados.some(p => !esperados.has(p.idConsultaProcedimientoPaso) || p.idConsultaProcedimiento?.idConsultaProcedimiento !== paso.idConsultaProcedimiento?.idConsultaProcedimiento ||
+                        p.idConsultaProcedimiento?.idConsulta?.idConsulta !== idConsulta) ||
+                    !confirmados.some(p => p.idConsultaProcedimientoPaso === camino.siguiente && !esPasoInvalido(p))) {
+                throw new Error('El servidor no confirmó todos los pasos del camino. Recarga la atención.');
+            }
+            return { ...datos, _pasosConfirmados: confirmados };
+        }
+        return datos;
+    } catch (error) {
+        if (error.status === 409) error.message = 'El paso cambió o ya no permite completarse. Recarga la atención antes de continuar.';
+        throw error;
+    }
+}
+
+/** El responsable actual solicita reabrir el predecesor y reasignar ambos pasos. */
+export async function retrocederPasoAtencion(origen, destino, contexto, idConsulta) {
+    const procedimiento = destino?.idConsultaProcedimiento;
+    const rol = contexto?.idRol?.idRol, clinica = contexto?.idClinica?.idClinica;
+    if (!contexto?.idPersonaRol || !rol || !clinica || !idConsulta || !origen?.idConsultaProcedimientoPaso || !destino?.idConsultaProcedimientoPaso ||
+            origen.idConsultaProcedimientoPaso === destino.idConsultaProcedimientoPaso || !procedimiento?.idConsultaProcedimiento ||
+            origen.idConsultaProcedimiento?.idConsultaProcedimiento !== procedimiento.idConsultaProcedimiento ||
+            origen.idConsultaProcedimiento?.idConsulta?.idConsulta !== idConsulta || procedimiento.idConsulta?.idConsulta !== idConsulta ||
+            procedimiento.idConsulta.idPersonaRol?.idClinica?.idClinica !== clinica ||
+            !esResponsableDelPaso(origen, contexto)) {
+        throw new Error('El retroceso no corresponde al procedimiento, rol o clínica activos.');
+    }
+    if (['COMPLETADO', 'FINALIZADO'].includes(estadoPaso(origen))) {
+        throw new Error('El paso actual ya está completado. Solo el responsable del siguiente paso puede solicitar su reapertura.');
+    }
+    const originales = paso => ({ valor: paso.valor ?? null, estado: paso.estado ?? null,
+        responsable: paso.idPersonaRol?.idPersonaRol ?? null, fechaFin: paso.fechaFin ?? null });
+    const solicitud = { contexto: contexto.idPersonaRol, consulta: idConsulta, desde: origen.idConsultaProcedimientoPaso,
+        originales: originales(destino), originalesOrigen: originales(origen) };
+    try {
+        const respuesta = await leer(`consulta_procedimiento_paso/${encodeURIComponent(destino.idConsultaProcedimientoPaso)}/retroceder`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(solicitud)
+        });
+        if (respuesta.status !== 200) throw new Error('El servidor no confirmó la reapertura del paso anterior.');
+        const datos = await respuesta.json();
+        const corresponde = (actual, esperado) => actual?.idConsultaProcedimientoPaso === esperado.idConsultaProcedimientoPaso &&
+            (actual.valor ?? null) === (esperado.valor ?? null) && actual.idConsultaProcedimiento?.idConsultaProcedimiento === procedimiento.idConsultaProcedimiento &&
+            actual.idConsultaProcedimiento?.idConsulta?.idConsulta === idConsulta && actual.idConsultaProcedimiento?.idConsulta?.idPersonaRol?.idClinica?.idClinica === clinica &&
+            actual.idProcedimientoPaso?.idProcedimientoPaso === esperado.idProcedimientoPaso?.idProcedimientoPaso &&
+            !!actual.idPersonaRol?.idPersonaRol && actual.idPersonaRol.idClinica?.idClinica === clinica && actual.idPersonaRol.idRol?.idRol === esperado.idProcedimientoPaso?.idRol?.idRol;
+        const fecha = valor => valor == null ? null : Date.parse(String(valor).replace(/\[.*\]$/, ''));
+        if (!corresponde(datos?.destino, destino) || !corresponde(datos?.origen, origen) || estadoPaso(datos.destino) !== 'PENDIENTE' || datos.destino.fechaFin != null ||
+                datos.origen.estado !== origen.estado || fecha(datos.origen.fechaFin) !== fecha(origen.fechaFin)) {
+            throw new Error('El servidor no devolvió una confirmación válida de ambos pasos y sus responsables.');
+        }
+        return datos;
+    } catch (error) {
+        if (error.status === 403) error.message = 'Solo el responsable asignado al paso actual puede regresar. Recarga la atención para revisar la asignación.';
+        if (error.status === 409) error.message = 'El paso anterior cambió o no permite reabrirse. Recarga la atención antes de regresar.';
+        throw error;
+    }
+}
+
 const contratos = {
     consulta_procedimiento_paso: { id: 'idConsultaProcedimientoPaso', campos: ['valor'] },
     orden_examen: { id: 'idOrdenExamen', campos: ['indicaciones'] },
@@ -165,6 +367,9 @@ async function validarRegistro(recurso, actual, contexto, idConsulta) {
         (recurso !== 'consulta' && !pasoDelRol(paso, contexto)) ||
         (recurso === 'consulta' && !(await filtrarConsultasPorRol([consulta], contexto)).length)) {
         throw new Error('El registro no corresponde al rol o a la clínica activa.');
+    }
+    if (recurso !== 'consulta' && !esResponsableDelPaso(paso, contexto)) {
+        throw new Error('Solo el responsable asignado puede trabajar este paso.');
     }
 }
 

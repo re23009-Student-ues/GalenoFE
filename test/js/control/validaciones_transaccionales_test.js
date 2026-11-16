@@ -1,6 +1,6 @@
 import { assert } from '../lib/chai/index.js';
 import sinon from '../lib/sinon/sinon-esm.js';
-import { guardarCamposAtencion, registrarResultadoAtencion } from '../../../src/js/control/atencion_service.js';
+import { guardarCamposAtencion, registrarResultadoAtencion, completarPasoAtencion } from '../../../src/js/control/atencion_service.js';
 mocha.setup('tdd');
 suite('Paso 7: contrato transaccional de atención', () => {
     let sandbox, fetchStub, paso, orden, resultado;
@@ -8,7 +8,7 @@ suite('Paso 7: contrato transaccional de atención', () => {
     const response = dato => new Response(JSON.stringify(dato));
     setup(() => {
         sandbox = sinon.createSandbox(); fetchStub = sandbox.stub(window, 'fetch');
-        paso = { idConsultaProcedimientoPaso: 'paso', valor: 'Original', estado: 'PENDIENTE', fechaInicio: '2026-01-01',
+        paso = { idConsultaProcedimientoPaso: 'paso', valor: 'Original', idPersonaRol: usuario, estado: 'PENDIENTE', fechaInicio: '2026-01-01',
             idProcedimientoPaso: { idRol: usuario.idRol }, idConsultaProcedimiento: { idConsulta: { idConsulta: 'consulta', idPersonaRol: { idClinica: usuario.idClinica } } } };
         orden = { idOrdenExamen: 'orden', idConsultaProcedimientoPaso: paso, indicaciones: 'Antes' };
         resultado = { idExamenResultado: 'resultado', idOrdenExamen: orden, resultado: 'Antes', interpretacion: 'Nota', rutaAtestado: 'https://it/adjunto' };
@@ -76,6 +76,40 @@ suite('Paso 7: contrato transaccional de atención', () => {
             return new Response(null, { status: 201 });
         });
         assert.isTrue((await registrarResultadoAtencion(orden, { resultado: 'Nuevo', interpretacion: '' }, usuario, 'consulta'))._registrado);
+    });
+    const confirmado = (paso, valor = 'Atención nueva') => ({ ...paso, valor, estado: 'COMPLETADO', idPersonaRol: usuario, fechaFin: '2026-11-15T10:00:00Z' });
+    test('completar envía atención y originales al endpoint específico, sin mutar el borrador', async () => {
+        fetchStub.callsFake(async (url, opciones) => {
+            assert.isTrue(new URL(url).pathname.endsWith('/consulta_procedimiento_paso/paso/completar'));
+            assert.equal(opciones.method, 'PUT');
+            assert.deepEqual(JSON.parse(opciones.body), { contexto: 'empleado', consulta: 'consulta', valor: 'Atención nueva', originales: { valor: 'Original', estado: 'PENDIENTE' } });
+            return response(confirmado(paso));
+        });
+        const datos = await completarPasoAtencion(paso, 'Atención nueva', usuario, 'consulta');
+        assert.equal(datos.estado, 'COMPLETADO'); assert.equal(paso.estado, 'PENDIENTE'); assert.equal(paso.valor, 'Original');
+    });
+    test('completar exige atención y pertenencia antes de enviar', async () => {
+        await rejects(() => completarPasoAtencion(paso, ' ', usuario, 'consulta'), 'atención');
+        await rejects(() => completarPasoAtencion(paso, 'Texto', { ...usuario, idRol: { idRol: 'otro' } }, 'consulta'), 'rol');
+        await rejects(() => completarPasoAtencion(paso, 'Texto', { ...usuario, idPersonaRol: null }, 'consulta'));
+        sinon.assert.notCalled(fetchStub);
+    });
+    test('completar rechaza confirmaciones con estado, valor, responsable o fecha incorrectos', async () => {
+        for (const cambios of [{ estado: 'PENDIENTE' }, { valor: 'Ajeno' }, { idPersonaRol: { idPersonaRol: 'otro' } }, { fechaFin: null }, { idConsultaProcedimientoPaso: 'otro' }]) {
+            fetchStub.callsFake(async () => response({ ...confirmado(paso), ...cambios }));
+            await rejects(() => completarPasoAtencion(paso, 'Atención nueva', usuario, 'consulta'), 'confirmación');
+        }
+        assert.equal(paso.estado, 'PENDIENTE');
+    });
+    test('completar con 409 o red caída conserva originales para reintentar', async () => {
+        fetchStub.resolves(new Response('', { status: 409 }));
+        await rejects(() => completarPasoAtencion(paso, 'Atención nueva', usuario, 'consulta'), 'Recarga');
+        fetchStub.rejects(new Error('Respuesta perdida'));
+        await rejects(() => completarPasoAtencion(paso, 'Atención nueva', usuario, 'consulta'));
+        fetchStub.callsFake(async () => response(confirmado(paso)));
+        await completarPasoAtencion(paso, 'Atención nueva', usuario, 'consulta');
+        const cuerpos = fetchStub.getCalls().map(c => c.args[1].body);
+        assert.equal(new Set(cuerpos).size, 1); assert.equal(paso.estado, 'PENDIENTE');
     });
 });
 mocha.run();

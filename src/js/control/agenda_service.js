@@ -207,9 +207,10 @@ export async function cargarAgenda(contexto, desde, hasta) {
         const definiciones = catalogos.get(p.idProcedimiento.idProcedimiento);
         // El backend crea registros PENDIENTE antes de que se atiendan; fechaInicio no implica avance.
         const registros = ejecuciones.filter(e => e.idConsultaProcedimiento?.idConsultaProcedimiento === p.idConsultaProcedimiento);
-        const delRol = definiciones.filter(d => d.idRol?.idRol === contexto.idRol.idRol).map(d => ({
+        const pasos = definiciones.map(d => ({
             ...d, registros: registros.filter(e => e.idProcedimientoPaso?.idProcedimientoPaso === d.idProcedimientoPaso)
         }));
+        const delRol = pasos.filter(d => d.idRol?.idRol === contexto.idRol.idRol);
         const previos = new Set();
         const recorrer = id => {
             for (const s of secuencias.filter(s => s.idProcedimientoPasoReferencia?.idProcedimientoPaso === id)) {
@@ -218,6 +219,6 @@ export async function cargarAgenda(contexto, desde, hasta) {
             }
         };
         delRol.forEach(d => recorrer(d.idProcedimientoPaso));
-        return { ...p, pasosDelRol: delRol, pasosPrevios: registros.filter(e => previos.has(e.idProcedimientoPaso?.idProcedimientoPaso)), secuencias: secuencias.filter(s => definiciones.some(d => d.idProcedimientoPaso === s.idProcedimientoPaso?.idProcedimientoPaso)) };
+        return { ...p, pasos, pasosDelRol: delRol, pasosPrevios: registros.filter(e => previos.has(e.idProcedimientoPaso?.idProcedimientoPaso)), secuencias: secuencias.filter(s => definiciones.some(d => d.idProcedimientoPaso === s.idProcedimientoPaso?.idProcedimientoPaso)) };
     }).filter(p => p.pasosDelRol.length) })).filter(c => c.procedimientos.length);
 }

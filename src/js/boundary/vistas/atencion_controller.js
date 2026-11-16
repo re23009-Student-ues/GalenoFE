@@ -6,7 +6,7 @@ import { TextArea } from '../componentes/form/textarea/index.js';
 import { ConfirmDialog } from '../componentes/overlays/index.js';
 import { Toast } from '../componentes/feedback/index.js';
 import AtencionFlujo from './atencion_flujo.js';
-import { cargarDetalleAtencion, guardarCamposAtencion, documentoDelPaciente } from '../../control/atencion_service.js';
+import { cargarDetalleAtencion, guardarCamposAtencion, documentoDelPaciente, esResponsableDelPaso, esPasoInvalido } from '../../control/atencion_service.js';
 
 function crear(tag, className, text) {
     const node = document.createElement(tag);
@@ -74,8 +74,9 @@ export default class AtencionController extends HTMLElement {
     }
 
     async salir() {
-        if (!await this.confirmarDescarte()) return;
+        if (!await this.confirmarDescarte() || !this.isConnected) return false;
         this.dispatchEvent(new CustomEvent('volver-consultas', { bubbles: true }));
+        return true;
     }
 
     hayCambios() { return this.flujo?.hayCambios() || this.ediciones.some(dirty => dirty()); }
@@ -287,6 +288,15 @@ export default class AtencionController extends HTMLElement {
             this.selectorHost.append(crear('p', 'aviso', 'No hay procedimientos asignados con pasos para tu rol.'));
             return;
         }
+        const solicitado = this.parametros?.idPaso;
+        if (solicitado) {
+            const paso = this.pasosConsulta.find(p => p.idConsultaProcedimientoPaso === solicitado);
+            const procedimiento = procedimientos.find(p => p.idConsultaProcedimiento === paso?.idConsultaProcedimiento?.idConsultaProcedimiento);
+            if (!paso || !procedimiento || !esResponsableDelPaso(paso, this.usuario) || esPasoInvalido(paso)) {
+                this.selectorHost.append(crear('p', 'aviso aviso--error', 'El paso solicitado no está disponible o ya no está asignado a tu contexto.'));
+                return;
+            }
+        }
         if (procedimientos.length > 1) {
             const label = crear('label', '', 'Procedimiento a atender');
             const select = crear('select', 'atencion__elegir-procedimiento');
@@ -299,15 +309,21 @@ export default class AtencionController extends HTMLElement {
                 if (!this.seleccionarProcedimiento(select.value)) select.value = this.procedimientoSeleccionado || '';
             });
             label.append(select); this.selectorHost.append(label);
-        } else this.seleccionarProcedimiento(procedimientos[0].idConsultaProcedimiento);
+        }
+        if (solicitado) {
+            const paso = this.pasosConsulta.find(p => p.idConsultaProcedimientoPaso === solicitado);
+            const id = paso.idConsultaProcedimiento.idConsultaProcedimiento;
+            this.seleccionarProcedimiento(id, solicitado);
+            const selector = this.querySelector('.atencion__elegir-procedimiento'); if (selector) selector.value = id;
+        } else if (procedimientos.length === 1) this.seleccionarProcedimiento(procedimientos[0].idConsultaProcedimiento);
         this.observaciones.setReadOnly(true).setHelperText('Solo lectura: guardar observaciones requiere una operación del servidor que conserve los procedimientos y sus pasos.');
     }
 
-    seleccionarProcedimiento(id) {
+    seleccionarProcedimiento(id, idPaso = null) {
         if (!this.detalle || this.guardando || this.flujo?.ocupado) return false;
         const p = this.detalle.procedimientos.find(p => p.idConsultaProcedimiento === id);
         if (!p || !(this.detalle.definiciones.get(p.idProcedimiento?.idProcedimiento) || []).some(d => d.idRol?.idRol === this.usuario?.idRol?.idRol)) return false;
-        if (!this.flujo.abrir(p)) return false;
+        if (!this.flujo.abrir(p, idPaso)) return false;
         this.procedimientoSeleccionado = id;
         if (!this.observacionesProcedimiento) this.observacionesProcedimiento = this.texto(this.observacionesProcedimientoHost, 'Observaciones del procedimiento', p.observaciones);
         else this.observacionesProcedimiento.setValue(typeof p.observaciones === 'string' ? p.observaciones : '');

@@ -31,7 +31,7 @@
     ],
     "inputs": [
         {
-            "id": "matarBrowserSinc",
+            "id": "matarBrowserSync",
             "type": "command",
             "command": "workbench.action.tasks.terminate",
             "args": "terminateAll",

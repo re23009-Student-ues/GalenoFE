@@ -236,7 +236,7 @@ Recarga: `obtenerSesion()` → `rolesDePersona(idPersona)` → excluir Paciente 
 
 Errores REST: `DefaultError` (`mensaje`, `error`), salvo 404 de documento. `sessionStorage`: `sesionPersona` (JSON: **solo** `idPersona`, `nombres`, `apellidos`) y `sesionPersonaRol` (id del contexto, texto). No persiste clínica/rol completos ni pendiente.
 
-El paciente no inicia sesión; HU1 es pública y de solo lectura. `/citas` ofrece búsqueda pública con invalidación de filtros y respuestas tardías. El ticket PDF permanece deshabilitado porque no existe el endpoint backend. Ver `docs/hu1-hu3.md`.
+El paciente no inicia sesión; HU1 es pública y de solo lectura. `/citas` ofrece búsqueda pública con invalidación de filtros y respuestas tardías. La descarga PDF está habilitada y consume `GET consulta/{id}/ticket` de GalenoSV. Ver `docs/consulta-pdf.md`.
 
 `galeno-cerrar-sesion` solicita confirmación con ConfirmDialog. Permanecer, Escape,
 X u overlay conservan la sesión. Confirmar ejecuta `cerrarSesion()` y regresa a

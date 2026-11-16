@@ -101,9 +101,9 @@ test('Los módulos nuevos prevalecen sobre código obsoleto en caché', async ()
 test('Sin red usa caché exacta sin confundir parámetros de versión', async () => {
     const w = worker(); await w.lifecycle('install');
     const cache = [...w.stores.values()][0];
-    await cache.put(scope + 'js/main.js?v=22', new Response('main-v15'));
+    await cache.put(scope + 'js/main.js?v=23', new Response('main-v15'));
     w.setNetwork(async () => { throw new Error('offline'); });
-    assert.equal(await (await w.fetch('js/main.js?v=22')).text(), 'main-v15');
+    assert.equal(await (await w.fetch('js/main.js?v=23')).text(), 'main-v15');
     await assert.rejects(w.fetch('js/main.js?v=14'), /offline/);
 });
 

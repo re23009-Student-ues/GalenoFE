@@ -6,7 +6,7 @@ class TarjetaCita extends HTMLElement {
     connectedCallback() {
         this.version = (this.version || 0) + 1;
         const c = this.cita;
-        this.innerHTML = `<tarjeta-simple><span slot="titulo">${esc(fechaAgenda(c.fechaInicio))}</span><div slot="contenido"><p><strong>Clínica:</strong> ${esc(c.idPersonaRol?.idClinica?.nombre || 'Clínica sin nombre')}</p><p>Procedimientos: ${esc(c.procedimientos.map(p => p.idProcedimiento?.nombre || 'Procedimiento sin nombre').join(', ') || 'Sin procedimientos registrados')}</p></div><div slot="pie"><button type="button" ${TICKET_PDF_DISPONIBLE ? '' : 'disabled'}>Descargar ticket PDF</button><p role="status" aria-live="polite">${TICKET_PDF_DISPONIBLE ? '' : 'El ticket PDF todavía no está disponible.'}</p></div></tarjeta-simple>`;
+        this.innerHTML = `<tarjeta-simple><span slot="titulo">${esc(fechaAgenda(c.fechaInicio))}</span><div slot="contenido"><p><strong>Clínica:</strong> ${esc(c.idPersonaRol?.idClinica?.nombre || 'Clínica sin nombre')}</p><p>Procedimientos: ${esc(c.procedimientos.map(p => p.idProcedimiento?.nombre || 'Procedimiento sin nombre').join(', ') || 'Sin procedimientos registrados')}</p></div><div slot="pie"><button type="button" ${TICKET_PDF_DISPONIBLE ? '' : 'disabled'}>Descargar consulta PDF</button><p role="status" aria-live="polite">${TICKET_PDF_DISPONIBLE ? '' : 'El ticket PDF todavía no está disponible.'}</p></div></tarjeta-simple>`;
         this.alDescargar = () => this.descargar();
         this.querySelector('button').addEventListener('click', this.alDescargar);
     }
@@ -17,18 +17,18 @@ class TarjetaCita extends HTMLElement {
         boton.disabled = true;
         const version = this.version;
         const aviso = this.querySelector('[role="status"]');
-        aviso.textContent = 'Descargando ticket…';
+        aviso.textContent = 'Descargando consulta…';
         try {
             const blob = await ticketPDF(this.cita.idConsulta);
             if (!this.isConnected || version !== this.version) return;
             const url = URL.createObjectURL(blob);
             const enlace = document.createElement('a');
             enlace.href = url;
-            enlace.download = `ticket-${this.cita.idConsulta}.pdf`;
+            enlace.download = `consulta-${this.cita.idConsulta}.pdf`;
             this.append(enlace);
-            try { enlace.click(); aviso.textContent = 'Ticket descargado'; }
+            try { enlace.click(); aviso.textContent = 'Consulta descargada'; }
             finally { enlace.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
-        } catch (e) { if (this.isConnected && version === this.version) aviso.textContent = e.message || 'No se pudo descargar el ticket'; }
+        } catch (e) { if (this.isConnected && version === this.version) aviso.textContent = e.message || 'No se pudo descargar la consulta'; }
         finally { if (this.isConnected && version === this.version) boton.disabled = false; }
     }
 }

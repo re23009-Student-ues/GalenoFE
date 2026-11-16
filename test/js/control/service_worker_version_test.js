@@ -22,19 +22,19 @@ suite('Actualización HU4 y caché sensible', () => {
     async function lifecycle(type) {
         let completion; handlers.get(type)({ waitUntil(promise) { completion = promise; } }); await completion;
     }
-    test('precarga v27 y el mismo main actualizado que carga el HTML', async () => {
+    test('precarga v28 y el mismo main actualizado que carga el HTML', async () => {
         await lifecycle('install');
-        sinon.assert.calledWithExactly(cachesMock.open, 'galenosv-v27');
+        sinon.assert.calledWithExactly(cachesMock.open, 'galenosv-v28');
         const index = new DOMParser().parseFromString(html, 'text/html');
         const main = index.querySelector('script[type="module"]').getAttribute('src');
-        assert.equal(main, 'js/main.js?v=22');
+        assert.equal(main, 'js/main.js?v=23');
         const requests = cache.addAll.firstCall.args[0];
         assert.isTrue(requests.some(request => request.url === new URL(main, selfMock.registration.scope).href));
         assert.isTrue(requests.every(request => request.cache === 'reload'));
         sinon.assert.calledOnce(selfMock.skipWaiting);
     });
     test('activación elimina versiones del rollback y caché API anterior; conserva otras aplicaciones', async () => {
-        cachesMock.keys.resolves(['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galenosv-v27', 'galeno-api-v0', 'galeno-api-v1', 'otra-app']);
+        cachesMock.keys.resolves(['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galenosv-v28', 'galeno-api-v0', 'galeno-api-v1', 'otra-app']);
         await lifecycle('activate');
         assert.deepEqual(cachesMock.delete.getCalls().map(call => call.args[0]), ['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galeno-api-v0', 'galeno-api-v1']);
         sinon.assert.calledOnce(selfMock.clients.claim);

@@ -1,5 +1,5 @@
 // HU4: solo el responsable actual puede regresar y se reasignan ambos pasos.
-const CACHE = 'galenosv-v27';
+const CACHE = 'galenosv-v28';
 const POLITICA_API = 'sin-cache-rest-v1';
 const ARCHIVOS = [
   'js/boundary/componentes/data-display/Tree.js',
@@ -131,7 +131,7 @@ const ARCHIVOS = [
   'js/entity/default_error.js',
   'js/entity/default_response.js',
   'js/entity/persona_rol.js',
-  'js/main.js?v=22',
+  'js/main.js?v=23',
   'js/router.js'
 ];
 const RUTAS_ESTATICAS = new Set(ARCHIVOS.map(archivo => new URL(archivo, self.registration.scope).pathname));

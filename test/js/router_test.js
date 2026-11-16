@@ -159,15 +159,15 @@ suite('Router por hash', () => {
         assert.equal(window.location.hash, '#/login');
     });
 
-    test('citas se abre sin sesión y muestra el placeholder', async () => {
+    test('citas se abre sin sesión y monta la búsqueda pública', async () => {
         obtenerUsuario.returns(null);
         window.location.hash = '/citas';
         router.iniciar();
         await cambio();
         assert.equal(window.location.hash, '#/citas');
         assert.equal(tituloEl.textContent, 'Búsqueda de citas');
-        assert.equal(contenedor.firstChild.className, 'aviso');
-        assert.equal(contenedor.textContent, 'Esta pantalla está en construcción.');
+        assert.equal(contenedor.firstChild.tagName, 'GALENO-CITAS');
+        assert.isNotNull(contenedor.querySelector('galeno-citas'));
         sinon.assert.notCalled(alRequerirLogin);
         assert.equal(router.tomarPendiente('/dashboard'), '/dashboard');
     });
@@ -228,6 +228,28 @@ suite('Router por hash', () => {
         assert.isNull(contenedor.firstChild);
         router.iniciar();
         assert.equal(tituloEl.textContent, 'Agenda Médica');
+    });
+    test('atención recibe el id decodificado y requiere sesión', async () => {
+        router.manejarRuta('/atencion/abc%20def');
+        assert.equal(contenedor.firstChild.localName, 'atencion-controller');
+        assert.equal(contenedor.firstChild.idConsulta, 'abc def');
+        assert.deepEqual(contenedor.firstChild.parametros, { idConsulta: 'abc def' });
+        obtenerUsuario.returns(null);
+        router.manejarRuta('/atencion/42');
+        await cambio();
+        assert.equal(window.location.hash, '#/login');
+        assert.equal(router.tomarPendiente(), '/atencion/42');
+    });
+    test('seleccionar consulta navega a atención y permite volver a consultas', async () => {
+        window.history.replaceState({}, '', '#/consultas');
+        router.iniciar();
+        contenedor.firstChild.dispatchEvent(new CustomEvent('abrir-atencion', { detail: { idConsulta: 'id/42' } }));
+        await cambio();
+        assert.equal(window.location.hash, '#/atencion/id%2F42');
+        assert.equal(contenedor.firstChild.idConsulta, 'id/42');
+        contenedor.firstChild.dispatchEvent(new CustomEvent('volver-consultas'));
+        await cambio();
+        assert.equal(window.location.hash, '#/consultas');
     });
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

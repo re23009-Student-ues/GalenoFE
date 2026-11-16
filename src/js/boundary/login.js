@@ -1,4 +1,5 @@
 import { autenticarEmpleado, guardarSesion } from "../control/sesion_service.js";
+import { ejemploDocumento } from "../control/documento_formato.js";
 import TipoDocumentoService from "../control/tipoDocumento_service.js";
 
 const PLANTILLA = `
@@ -17,6 +18,7 @@ const PLANTILLA = `
         <p class="login-aviso" id="login-aviso" role="alert" aria-live="assertive" aria-atomic="true">Cargando…</p>
         <button type="button" id="login-reintentar" class="login-reintentar" hidden>Reintentar</button>
         <button type="submit" id="login-entrar" disabled>Entrar</button>
+        <button type="button" id="login-volver" class="login-reintentar">Volver a mis citas</button>
     </form>`;
 
 /** Llena un <select> con opciones (se usa Option: el texto nunca se interpreta como HTML). */
@@ -51,13 +53,18 @@ class GalenoLogin extends HTMLElement {
         const btnEntrar = pantalla.querySelector("#login-entrar");
         const btnReintentar = pantalla.querySelector("#login-reintentar");
 
+        pantalla.querySelector('#login-volver').addEventListener('click', () => {
+            escuchas.abort(); // Descarta también un ingreso que aún esté pendiente.
+            this.dispatchEvent(new CustomEvent('galeno-login-cancelado', { bubbles: true, composed: true }));
+        }, { signal });
+
         // 1. Traer los datos (con reintento si el servidor no responde)
         let lista;
         while (true) {
             aviso.textContent = "Cargando…";
             btnReintentar.hidden = true;
             try {
-                lista = (await new TipoDocumentoService().findAll()).filter(tipo => tipo.activo === true);
+                lista = (await new TipoDocumentoService({ activo: true }).findAll()).filter(tipo => tipo.activo === true);
                 if (!vigente()) return;
                 break;
             } catch (err) {
@@ -84,6 +91,8 @@ class GalenoLogin extends HTMLElement {
         const actualizar = () => {
             const tipo = lista.find(tipo => String(tipo.idTipoDocumento) === selTipo.value);
             indicaciones.textContent = tipo?.indicaciones ?? '';
+            const ejemplo = ejemploDocumento(tipo);
+            documento.placeholder = ejemplo ? `Ej.: ${ejemplo}` : '';
             btnEntrar.disabled = consultando || autenticado || !tipo || !documento.value.trim();
         };
         selTipo.addEventListener('change', actualizar, { signal });

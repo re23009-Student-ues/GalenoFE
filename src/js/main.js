@@ -1,11 +1,15 @@
 import { obtenerSesion, rolesDePersona, establecerContexto, obtenerContexto, cerrarSesion } from "./control/sesion_service.js";
 import { esPaciente } from "./control/roles.js";
 import { crearRouter } from "./router.js";
+import { ConfirmDialog } from "./boundary/componentes/overlays/index.js";
 import "./boundary/galeno_app.js";
 
 export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     let usuario = null;   // persona_rol de la sesión actual
     let detenido = false;
+    let versionContexto = 0;
+    let saliendo = false;
+    let confirmacionSalida = null;
 
     const router = crearRouter({
         contenedor: app.outlet,
@@ -16,9 +20,16 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     const alNavegar = evento => router.navegarA(evento.detail.ruta);
     const marcarActiva = () => app.marcarActiva(window.location.hash.slice(1));
     app.addEventListener('galeno-navegar', alNavegar);
+    const alCancelarLogin = () => {
+        app.ocultarLogin();
+        router.tomarPendiente('/dashboard');
+        router.navegarA('/citas');
+    };
+    app.addEventListener('galeno-login-cancelado', alCancelarLogin);
     window.addEventListener('hashchange', marcarActiva);
 
     function alLoginExitoso(evento) {
+        versionContexto++;
         const { personaRoles } = evento.detail;
         usuario = personaRoles[0];
         establecerContexto(usuario);
@@ -28,11 +39,69 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     }
     app.addEventListener('galeno-login-exitoso', alLoginExitoso);
 
+    // La selección es una propuesta: la inscripción se vuelve a verificar en REST.
+    const alContexto = async evento => {
+        if (detenido || saliendo || !usuario) return;
+        const version = ++versionContexto;
+        const rutaOrigen = window.location.hash;
+        const persona = obtenerSesion();
+        const id = evento.detail?.personaRol?.idPersonaRol;
+        if (!persona || !id) return;
+        try {
+            const roles = await rolesDePersona(persona.idPersona);
+            if (detenido || saliendo || version !== versionContexto || window.location.hash !== rutaOrigen || obtenerSesion()?.idPersona !== persona.idPersona) return;
+            const contexto = roles.find(r => r.idPersonaRol === id && r.idPersona?.idPersona === persona.idPersona && !esPaciente(r) && r.idClinica?.idClinica && r.idRol?.idRol);
+            if (!contexto) throw new Error('El contexto no pertenece al empleado');
+            establecerContexto(contexto);
+            usuario = contexto;
+            app.usuario = contexto;
+            router.navegarA('/dashboard');
+            marcarActiva();
+        } catch (error) {
+            if (detenido || saliendo || version !== versionContexto || window.location.hash !== rutaOrigen) return;
+            const selector = app.querySelector('galeno-selector-contexto');
+            if (selector && usuario) {
+                selector.querySelector('[name="clinica"]').value = usuario.idClinica.idClinica;
+                if (selector.contextos) selector.roles();
+            }
+            const aviso = selector?.querySelector('[role="status"]');
+            if (aviso) aviso.textContent = error.message || error.mensaje || 'No se pudo cambiar de contexto';
+        }
+    };
+    app.addEventListener('galeno-contexto-seleccionado', alContexto);
+
     // Cerrar sesión: vuelve al acceso público
     const alCerrarSesion = async () => {
-        await cerrarSesion();
-        router.navegarA('/citas');
-        entrar();
+        if (detenido || saliendo || !usuario) return;
+        saliendo = true;
+        versionContexto++;
+        const selector = app.querySelector('galeno-selector-contexto');
+        if (selector?.contextos) {
+            selector.querySelector('[name="clinica"]').value = usuario.idClinica.idClinica;
+            selector.roles();
+        }
+        try {
+            confirmacionSalida = new ConfirmDialog({
+                title: 'Cerrar sesión',
+                message: '¿Deseas cerrar tu sesión y volver al acceso público?',
+                type: 'warning',
+                confirmText: 'Cerrar sesión',
+                cancelText: 'Permanecer',
+                errorMessage: 'No fue posible cerrar la sesión. Intenta nuevamente.',
+                onConfirm: () => cerrarSesion()
+            });
+            confirmacionSalida.open();
+            const confirmado = await confirmacionSalida.result;
+            if (!confirmado || detenido) return;
+            usuario = null;
+            app.usuario = null;
+            router.navegarA('/citas');
+            await entrar();
+        } finally {
+            confirmacionSalida?.destroy();
+            confirmacionSalida = null;
+            saliendo = false;
+        }
     };
     app.addEventListener('galeno-cerrar-sesion', alCerrarSesion);
 
@@ -72,8 +141,12 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
 
     function detener() {
         detenido = true;
+        versionContexto++;
+        app.removeEventListener('galeno-contexto-seleccionado', alContexto);
+        confirmacionSalida?.destroy();
         router.detener();
         app.removeEventListener('galeno-navegar', alNavegar);
+        app.removeEventListener('galeno-login-cancelado', alCancelarLogin);
         app.removeEventListener('galeno-cerrar-sesion', alCerrarSesion);
         app.removeEventListener('galeno-login-exitoso', alLoginExitoso);
         window.removeEventListener('hashchange', marcarActiva);
@@ -83,4 +156,7 @@ export function iniciarAplicacion(app = document.querySelector('galeno-app')) {
     return { router, listo: entrar(), detener };
 }
 
-document.addEventListener("DOMContentLoaded", () => iniciarAplicacion());
+document.addEventListener("DOMContentLoaded", () => {
+    const app = document.querySelector('galeno-app');
+    if (app) iniciarAplicacion(app);
+});

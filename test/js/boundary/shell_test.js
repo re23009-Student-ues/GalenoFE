@@ -41,24 +41,13 @@ suite('Shell en Web Components', () => {
         sandbox.stub(app.outlet, 'replaceChildren'); // Sin conectar vistas ni iniciar sus consultas.
     }
 
-    test('sin red restaura desde la caché API y no llama a cerrarSesion', async () => {
+    test('sin red no restaura roles desde una caché clínica anterior', async () => {
         conectarConSesion();
         sandbox.stub(navigator, 'onLine').get(() => false);
-        // Simula fetch resuelto por el service worker desde su caché, sin red.
-        const respuestaCacheada = new Response(JSON.stringify([usuario]), { status: 200 });
-        const red = sandbox.stub(window, 'fetch').callsFake(async () => respuestaCacheada.clone());
-        const eliminarSesion = sandbox.spy(Storage.prototype, 'removeItem');
-        window.location.hash = '/dashboard';
-        aplicacion = iniciarAplicacion(app);
-        await aplicacion.listo;
-        sinon.assert.calledOnce(red);
-        sinon.assert.notCalled(window.caches.delete);
-        sinon.assert.notCalled(eliminarSesion); // cerrarSesion elimina ambas claves con removeItem.
-        assert.equal(obtenerSesion().idPersona, 'persona-1');
-        assert.equal(obtenerContexto(), usuario.idPersonaRol);
-        assert.equal(app.getAttribute('modo'), 'personal');
-        assert.isFalse(app.hasAttribute('restaurando'));
-        assert.isNull(app.querySelector('#login-form'));
+        const red = sandbox.stub(window, 'fetch').rejects(new TypeError('Sin red'));
+        window.location.hash = '/dashboard'; aplicacion = iniciarAplicacion(app); await aplicacion.listo;
+        assert.equal(red.getCalls().filter(c => c.args[0].includes('/persona_rol/persona/')).length, 1); assert.isNull(obtenerSesion()); assert.isNull(obtenerContexto());
+        assert.equal(app.getAttribute('modo'), 'publico'); assert.isFalse(app.hasAttribute('restaurando'));
     });
 
     test('con sesión se oculta al conectarse y se revela en modo personal al restaurar', async () => {
@@ -134,7 +123,7 @@ suite('Shell en Web Components', () => {
         estado.remove();
         app.querySelector('.contenido-principal').prepend(estado);
         assert.isFalse(estado.hidden);
-        assert.equal(estado.textContent, 'Sin conexión: se muestran datos guardados');
+        assert.equal(estado.textContent, 'Sin conexión: los datos visibles pueden estar desactualizados.');
         online = true;
         window.dispatchEvent(new Event('online'));
         assert.isTrue(estado.hidden);

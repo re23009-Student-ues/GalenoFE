@@ -14,7 +14,7 @@ class GalenoEstadoConexion extends HTMLElement {
 
     actualizar = () => {
         this.hidden = navigator.onLine !== false;
-        this.textContent = this.hidden ? '' : 'Sin conexión: se muestran datos guardados';
+        this.textContent = this.hidden ? '' : 'Sin conexión: los datos visibles pueden estar desactualizados.';
     };
 }
 customElements.define('galeno-estado-conexion', GalenoEstadoConexion);

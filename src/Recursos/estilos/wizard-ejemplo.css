@@ -1,0 +1,3 @@
+.wizard-demo__field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.wizard-demo__field input { padding: 10px; border: 1px solid #64748b; border-radius: 6px; font: inherit; }
+.wizard-demo__review { white-space: pre-line; }

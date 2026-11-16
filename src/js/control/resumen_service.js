@@ -1,5 +1,6 @@
 import ConsultaService from "./consulta_service.js";
 import { esPaciente } from "./roles.js";
+import { leer } from "./agenda_service.js";
 import { parseFecha } from "./fechas.js";
 
 // ---------- Consultas ----------
@@ -15,7 +16,8 @@ async function consultasVisibles(usuario) {
 
     // Se descartan duplicados por si el paginado repite registros
     const porId = new Map();
-    (await new ConsultaService().findAll()).forEach(c => porId.set(c.idConsulta, c));
+    const servicio = new ConsultaService({ clinica: idClinica, inscripcion: paciente ? usuario.idPersonaRol : null });
+    (await servicio.findAll()).forEach(c => porId.set(c.idConsulta, c));
 
     return [...porId.values()]
         .filter(c => !idClinica || c.idPersonaRol?.idClinica?.idClinica === idClinica)
@@ -32,63 +34,33 @@ export async function listarConsultas(usuario) {
         .sort((a, b) => parseFecha(b.fechaInicio) - parseFecha(a.fechaInicio));
 }
 
-/**
- * Calcula los datos del dashboard con las consultas reales.
- * @param {Object|null} usuario persona_rol de la sesión
- */
+/** Dashboard agregado por el servidor; solo adapta las diez fechas de las filas. */
 export async function cargarResumen(usuario) {
-    const ahora = new Date();
-
-    const consultas = (await consultasVisibles(usuario))
-        .map(c => ({ ...c, _inicio: parseFecha(c.fechaInicio) }))
-        .filter(c => !isNaN(c._inicio));
-
-    const delAnio = consultas.filter(c => c._inicio.getFullYear() === ahora.getFullYear());
-    const delMes = delAnio.filter(c => c._inicio.getMonth() === ahora.getMonth());
-    const deHoy = delMes.filter(c => c._inicio.getDate() === ahora.getDate());
-
-    const porMes = Array(12).fill(0);
-    delAnio.forEach(c => porMes[c._inicio.getMonth()]++);
-
-    // Mañana: antes de 12:00 · Tarde: 12:00 a 17:59 · Noche: desde 18:00
-    const porHorario = { manana: 0, tarde: 0, noche: 0 };
-    delAnio.forEach(c => {
-        const h = c._inicio.getHours();
-        if (h < 12) porHorario.manana++;
-        else if (h < 18) porHorario.tarde++;
-        else porHorario.noche++;
-    });
-
-    const pasadas = consultas.filter(c => c._inicio <= ahora);
-    const pacientes = new Set(
-        pasadas.map(c => c.idPersonaRol?.idPersona?.idPersona).filter(Boolean)
-    );
-
-    const aFila = c => ({
-        paciente: `${c.idPersonaRol?.idPersona?.nombres ?? ""} ${c.idPersonaRol?.idPersona?.apellidos ?? ""}`.trim() || "Sin nombre",
-        inicio: c._inicio,
-        observaciones: c.observaciones ?? ""
-    });
-
-    return {
-        // Se reutilizan las consultas ya filtradas para la agenda personal, sin otra petición.
-        consultas: consultas.map(({ _inicio, ...consulta }) => consulta),
-        anio: ahora.getFullYear(),
-        clinica: usuario?.idClinica?.nombre ?? "Todas las clínicas",
-        consultasAnio: delAnio.length,
-        consultasMes: delMes.length,
-        consultasHoy: deHoy.length,
-        pacientesAtendidos: pacientes.size,
-        porMes,
-        porHorario,
-        proximas: consultas
-            .filter(c => c._inicio > ahora)
-            .sort((a, b) => a._inicio - b._inicio)
-            .slice(0, 5)
-            .map(aFila),
-        recientes: pasadas
-            .sort((a, b) => b._inicio - a._inicio)
-            .slice(0, 5)
-            .map(aFila)
+    const clinica = usuario?.idClinica?.idClinica;
+    const paciente = esPaciente(usuario);
+    if (paciente && (!clinica || !usuario.idPersonaRol)) throw new Error('Contexto de paciente incompleto');
+    const filtros = new URLSearchParams();
+    if (clinica) filtros.set('clinica', clinica);
+    if (paciente) filtros.set('inscripcion', usuario.idPersonaRol);
+    const datos = await (await leer(`consulta/resumen${filtros.size ? '?' + filtros : ''}`)).json();
+    const contador = valor => Number.isSafeInteger(valor) && valor >= 0;
+    if (!datos || datos.zona !== 'America/El_Salvador' || !Number.isInteger(datos.anio) || datos.anio < 1 ||
+            !Number.isFinite(Date.parse(datos.evaluadoEn)) ||
+            !['consultasAnio', 'consultasMes', 'consultasHoy', 'pacientesAtendidos'].every(c => contador(datos[c])) ||
+            !Array.isArray(datos.porMes) || datos.porMes.length !== 12 || !datos.porMes.every(contador) ||
+            !['manana', 'tarde', 'noche'].every(c => contador(datos.porHorario?.[c])) ||
+            datos.porMes.reduce((a, b) => a + b, 0) !== datos.consultasAnio ||
+            ['manana', 'tarde', 'noche'].reduce((a, c) => a + datos.porHorario[c], 0) !== datos.consultasAnio) {
+        throw new Error('El servidor devolvió un resumen inválido');
+    }
+    const adaptar = filas => {
+        if (!Array.isArray(filas) || filas.length > 5) throw new Error('Listado de resumen inválido');
+        return filas.map(fila => {
+            if (!fila || typeof fila.paciente !== 'string' || typeof fila.observaciones !== 'string' ||
+                    typeof fila.inicio !== 'string' || !Number.isFinite(Date.parse(fila.inicio))) throw new Error('Fecha o fila de resumen inválida');
+            return { ...fila, inicio: new Date(fila.inicio) };
+        });
     };
+    return { ...datos, clinica: usuario?.idClinica?.nombre ?? 'Todas las clínicas',
+        proximas: adaptar(datos.proximas), recientes: adaptar(datos.recientes) };
 }

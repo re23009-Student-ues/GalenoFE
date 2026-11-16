@@ -190,6 +190,11 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
         window.location.hash = '/dashboard';
         aplicacion = iniciarAplicacion(); await aplicacion.listo; await pausa();
         fixture.querySelector('#btn-salir').click(); await pausa();
+        // El cierre existente requiere ConfirmDialog; confirmar también en la prueba.
+        const confirmar = document.querySelector('.confirm-dialog__confirm');
+        assert.exists(confirmar); confirmar.click();
+        for (let i = 0; i < 50 && obtenerSesion(); i++) await pausa();
+        await pausa();
         assert.isNull(obtenerSesion()); assert.isNull(obtenerContexto());
         assert.equal(window.location.hash, '#/citas');
         assert.isNull(fixture.querySelector('#login-form'));
@@ -234,5 +239,29 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
         await aplicacion.listo;
         sinon.assert.notCalled(iniciar);
     });
+    test('el acceso muestra el ejemplo y permite volver sin iniciar sesión', async () => {
+        aplicacion = iniciarAplicacion(); await aplicacion.listo; await pausa();
+        assert.equal(fixture.querySelector('#login-documento').placeholder, 'Ej.: 00000000-0');
+        fixture.querySelector('#login-volver').click(); await pausa();
+        assert.equal(window.location.hash, '#/citas');
+        assert.isTrue(fixture.querySelector('#pantalla-login').hidden);
+        assert.isNull(fixture.querySelector('#login-form'));
+        assert.isNull(obtenerSesion());
+    });
+
+    test('volver descarta un ingreso pendiente y limpia la ruta protegida anterior', async () => {
+        window.location.hash = '/atencion/consulta-1';
+        aplicacion = iniciarAplicacion(); await aplicacion.listo; await pausa();
+        let resolver;
+        fetchStub.withArgs(sinon.match(/documento\/buscar/)).returns(new Promise(r => resolver = r));
+        enviar();
+        fixture.querySelector('#login-volver').click();
+        resolver(json({idPersona:persona})); await pausa();
+        assert.isNull(obtenerSesion());
+        assert.equal(window.location.hash, '#/citas');
+        assert.equal(aplicacion.router.tomarPendiente('/dashboard'), '/dashboard');
+        sinon.assert.notCalled(exitoso);
+    });
+
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

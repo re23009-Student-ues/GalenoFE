@@ -1,0 +1,269 @@
+{
+  "step": 6,
+  "backendUnit": {
+    "tests": 251,
+    "passed": 251,
+    "failed": 0,
+    "offline": true,
+    "temporaryBuild": true
+  },
+  "frontend": {
+    "tests": 214,
+    "passed": 214,
+    "failed": 0,
+    "realRestBlocked": true,
+    "suites": [
+      {
+        "passes": "12",
+        "failures": "0",
+        "errors": [],
+        "page": "resultados_location_test"
+      },
+      {
+        "passes": "13",
+        "failures": "0",
+        "errors": [],
+        "page": "resumen_agregado_test"
+      },
+      {
+        "passes": "13",
+        "failures": "0",
+        "errors": [],
+        "page": "relaciones_conjuntos_test"
+      },
+      {
+        "passes": "10",
+        "failures": "0",
+        "errors": [],
+        "page": "citas_agenda_por_rol_test"
+      },
+      {
+        "passes": "27",
+        "failures": "0",
+        "errors": [],
+        "page": "agenda_test"
+      },
+      {
+        "passes": "14",
+        "failures": "0",
+        "errors": [],
+        "page": "personal_test"
+      },
+      {
+        "passes": "9",
+        "failures": "0",
+        "errors": [],
+        "page": "filtros_consulta_catalogo_test"
+      },
+      {
+        "passes": "63",
+        "failures": "0",
+        "errors": [],
+        "page": "atencion_test"
+      },
+      {
+        "passes": "18",
+        "failures": "0",
+        "errors": [],
+        "page": "login_test"
+      },
+      {
+        "passes": "16",
+        "failures": "0",
+        "errors": [],
+        "page": "sesion_autenticar_test"
+      },
+      {
+        "passes": "7",
+        "failures": "0",
+        "errors": [],
+        "page": "logout_test"
+      },
+      {
+        "passes": "12",
+        "failures": "0",
+        "errors": [],
+        "page": "shell_test"
+      }
+    ]
+  },
+  "worker": {
+    "node": {
+      "tests": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "browser": {
+      "tests": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "restIntegration": {
+    "tests": 25,
+    "passed": 25,
+    "failed": 0,
+    "checks": [
+      {
+        "name": "POST 201 Location y GET exacto con fecha del servidor",
+        "passed": true
+      },
+      {
+        "name": "reintento tras respuesta perdida recupera mismo UUID sin duplicar",
+        "passed": true
+      },
+      {
+        "name": "clave reutilizada con otro contenido devuelve 409",
+        "passed": true
+      },
+      {
+        "name": "clave reutilizada con otra orden devuelve 409",
+        "passed": true
+      },
+      {
+        "name": "otra clave para orden ya registrada devuelve 409",
+        "passed": true
+      },
+      {
+        "name": "orden con 123 resultados historicos no admite otro",
+        "passed": true
+      },
+      {
+        "name": "orden inexistente devuelve 404",
+        "passed": true
+      },
+      {
+        "name": "entrada invalida None",
+        "passed": true
+      },
+      {
+        "name": "entrada invalida {}",
+        "passed": true
+      },
+      {
+        "name": "entrada invalida {'resultado': 'contenido'}",
+        "passed": true
+      },
+      {
+        "name": "entrada invalida {'idOrdenExamen': {'idOrdenExamen': 'f0000000",
+        "passed": true
+      },
+      {
+        "name": "clave invalida ''",
+        "passed": true
+      },
+      {
+        "name": "clave invalida 'x'",
+        "passed": true
+      },
+      {
+        "name": "clave invalida '1-1-1-1-1'",
+        "passed": true
+      },
+      {
+        "name": "12 POST simultaneos con claves distintas crean exactamente un resultado",
+        "passed": true
+      },
+      {
+        "name": "12 POST simultaneos con la misma clave comparten identidad",
+        "passed": true
+      },
+      {
+        "name": "clave simultanea en ordenes diferentes no sobrescribe y devuelve 409",
+        "passed": true
+      },
+      {
+        "name": "POST sin clave conserva 201 Location y aplica regla de orden",
+        "passed": true
+      },
+      {
+        "name": "preflight CORS permite clave y expone Location",
+        "passed": true
+      },
+      {
+        "name": "GET de UUID inexistente conserva 404",
+        "passed": true
+      },
+      {
+        "name": "contrato de lectura previo consulta/estados?consultas=50000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "contrato de lectura previo consulta/resumen?clinica=10000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "contrato de lectura previo examen_resultado?ordenes=f0000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "19 tablas y todos los resultados preexistentes sinteticos permanecen intactos",
+        "passed": true
+      },
+      {
+        "name": "solo se insertaron UUID confirmados por POST 201",
+        "passed": true
+      }
+    ],
+    "existingDataUnchanged": true,
+    "insertedResultIds": [
+      "0b2ccbb0-3fcd-433c-93b8-cca49a18d62a",
+      "525b6991-9d6e-4215-bbbe-7ba0eaf0b812",
+      "656aa9e5-a4a7-4b33-b75b-8740a7b62986",
+      "80396c30-0612-401e-86a5-5618b2369d79",
+      "8628415a-bbe3-4d86-b83f-39984e40ad4a"
+    ],
+    "tablesBefore": {
+      "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+      "consulta": "123:89e866513732346e90e298cb5c015a08",
+      "consulta_procedimiento": "124:5790f1d01247dd9258a51a13ead5c00c",
+      "consulta_procedimiento_paso": "124:a3e80db5c8bdcc7b0f9f73eb6cd12004",
+      "documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "examen": "123:9059aac03b8590f8fdabba329492dfee",
+      "examen_resultado": "124:80f8fca04a9724e470e24dd172b61ccb",
+      "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "orden_examen": "164:6161540df0657072fb33558220f2d41c",
+      "persona": "260:57418f14012b6f8dd5400d0077173cbb",
+      "persona_rol": "260:7508426f340e89b97772a104fd66e151",
+      "procedimiento": "130:df8a85ea8858470011b27eccc46c3605",
+      "procedimiento_paso": "124:591600f320c3cd8504773dacd8c1fd1b",
+      "procedimiento_paso_examen": "124:74c8c3c7b0ab65ade28b2ecab1780d59",
+      "procedimiento_paso_secuencia": "127:09682bc13b62476d87abd456f8b65581",
+      "rol": "2:1ac162db769fc54285609e57edbded91",
+      "tipo_documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "tablesAfter": {
+      "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+      "consulta": "123:89e866513732346e90e298cb5c015a08",
+      "consulta_procedimiento": "124:5790f1d01247dd9258a51a13ead5c00c",
+      "consulta_procedimiento_paso": "124:a3e80db5c8bdcc7b0f9f73eb6cd12004",
+      "documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "examen": "123:9059aac03b8590f8fdabba329492dfee",
+      "examen_resultado": "129:024bf879f840a95b7d912adec23d2404",
+      "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "orden_examen": "164:6161540df0657072fb33558220f2d41c",
+      "persona": "260:57418f14012b6f8dd5400d0077173cbb",
+      "persona_rol": "260:7508426f340e89b97772a104fd66e151",
+      "procedimiento": "130:df8a85ea8858470011b27eccc46c3605",
+      "procedimiento_paso": "124:591600f320c3cd8504773dacd8c1fd1b",
+      "procedimiento_paso_examen": "124:74c8c3c7b0ab65ade28b2ecab1780d59",
+      "procedimiento_paso_secuencia": "127:09682bc13b62476d87abd456f8b65581",
+      "rol": "2:1ac162db769fc54285609e57edbded91",
+      "tipo_documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "base": "http://127.0.0.1:50203/GalenoSV-1.0-SNAPSHOT/resources/v1/",
+    "container": "galeno-pagination-it-p4rcVq"
+  },
+  "limitations": [
+    "Frontend simulado y REST real independientes; no integración completa navegador-backend.",
+    "Solo inserciones sintéticas nuevas en PostgreSQL desechable; datos existentes sin cambios.",
+    "Serialización de creación en POST; PUT/DELETE y otros escritores no modificados.",
+    "Sin despliegue, migración ni paso 7."
+  ]
+}

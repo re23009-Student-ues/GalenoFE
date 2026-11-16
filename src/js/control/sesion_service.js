@@ -1,3 +1,4 @@
+import { solicitarREST, mensajeTransporte, invalidarContextoREST, limpiarCachesAPI } from './transporte_rest.js';
 import DefaultService from "./default_service.js";
 import DefaultError from "../entity/default_error.js";
 import { esPaciente } from "./roles.js";
@@ -10,11 +11,13 @@ export function guardarSesion(persona) {
     const { idPersona, nombres, apellidos } = persona;
     sessionStorage.setItem(CLAVE_PERSONA, JSON.stringify({ idPersona, nombres, apellidos }));
     sessionStorage.removeItem(CLAVE_SESION);
+    invalidarContextoREST(); void limpiarCachesAPI();
 }
 
 /** Contexto de clínica y rol elegido por el empleado (HU3). */
 export function establecerContexto(personaRol) {
     sessionStorage.setItem(CLAVE_SESION, personaRol.idPersonaRol);
+    invalidarContextoREST(); void limpiarCachesAPI();
 }
 
 export function obtenerContexto() {
@@ -36,7 +39,7 @@ export function obtenerSesion() {
 export async function cerrarSesion() {
     sessionStorage.removeItem(CLAVE_SESION);
     sessionStorage.removeItem(CLAVE_PERSONA);
-    try { await globalThis.caches?.delete('galeno-api-v1'); } catch { /* El cierre local sigue siendo válido. */ }
+    invalidarContextoREST(); await limpiarCachesAPI();
 }
 
 function errorSesion(mensaje, error = null) {
@@ -50,11 +53,9 @@ async function consultar(ruta, permitirNoEncontrado = false) {
     const url = `${new DefaultService().BASE_URL}${ruta}`;
     let respuesta;
     try {
-        respuesta = await fetch(url, { method: 'GET' });
+        respuesta = await solicitarREST(url, { method: 'GET' });
     } catch (error) {
-        throw errorSesion(navigator.onLine === false
-            ? 'Sin conexión y sin datos guardados para esta pantalla'
-            : 'Error al acceder al repositorio', error);
+        throw errorSesion(mensajeTransporte(error, 'Error al acceder al repositorio'), error);
     }
     if (permitirNoEncontrado && respuesta.status === 404) return null;
     if (respuesta.status !== 200) {
@@ -64,7 +65,7 @@ async function consultar(ruta, permitirNoEncontrado = false) {
     try {
         datos = await respuesta.json();
     } catch (error) {
-        throw errorSesion('Error al procesar los datos de respuesta', error);
+        throw errorSesion(error?.codigo ? error.message : 'Error al procesar los datos de respuesta', error);
     }
     return datos;
 }

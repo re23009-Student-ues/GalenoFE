@@ -9,24 +9,34 @@
     <link rel="stylesheet" href="Recursos/estilos/shell.css" />
     <link rel="stylesheet" href="Recursos/estilos/login.css" />
     <link rel="stylesheet" href="Recursos/estilos/resumen.css" />
+    <link rel="stylesheet" href="Recursos/estilos/agenda.css" />
     <link rel="stylesheet" href="Recursos/estilos/charts.css" />
     <link rel="stylesheet" href="Recursos/estilos/consultas.css" />
     <link rel="manifest" href="manifest.json" />
     <link rel="stylesheet" href="Recursos/estilos/calendar.css" />
     <link rel="stylesheet" href="Recursos/estilos/dataTable.css" />
+    <link rel="stylesheet" href="Recursos/estilos/toast.css" />
+    <link rel="stylesheet" href="Recursos/estilos/modal.css" />
+    <link rel="stylesheet" href="Recursos/estilos/wizard.css" />
+    <link rel="stylesheet" href="Recursos/estilos/textarea.css" />
+    <link rel="stylesheet" href="Recursos/estilos/checkbox.css" />
   </head>
   <body>
     <galeno-app></galeno-app>
 
     <!-- Script principal con parámetro para evitar caché -->
-    <script src="js/main.js?v=8" type="module" defer></script>
+    <script src="js/main.js?v=22" type="module" defer></script>
 
     <script>
       if ('serviceWorker' in navigator) {
         // Una pestaña controlada por la versión anterior debe cargar los módulos nuevos.
-        const teniaControlador = Boolean(navigator.serviceWorker.controller);
+        let teniaControlador = Boolean(navigator.serviceWorker.controller);
         let recargando = false;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (!teniaControlador) {
+            teniaControlador = Boolean(navigator.serviceWorker.controller);
+            return;
+          }
           if (teniaControlador && !recargando) {
             recargando = true;
             window.location.reload();

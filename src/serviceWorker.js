@@ -1,13 +1,71 @@
-const CACHE = 'galenosv-v5';
-const CACHE_API = 'galeno-api-v1';
+// HU4: solo el responsable actual puede regresar y se reasignan ambos pasos.
+const CACHE = 'galenosv-v27';
+const POLITICA_API = 'sin-cache-rest-v1';
 const ARCHIVOS = [
+  'js/boundary/componentes/data-display/Tree.js',
+  'js/boundary/componentes/data-display/tree_model.js',
+  'Recursos/estilos/tree.css',
+  'ejemplos/tree.html',
+  'ejemplos/tree.js',
+  'js/boundary/componentes/data-display/treeTable.js',
+  'js/boundary/componentes/data-display/tree_table_model.js',
+  'Recursos/estilos/treeTable.css',
+  'ejemplos/tree-table.html',
+  'ejemplos/tree-table.js',
   './',
+  'js/boundary/componentes/form/checkbox/Checkbox.js',
+  'js/boundary/componentes/form/checkbox/index.js',
+  'js/boundary/componentes/form/checkbox/README.md',
+  'Recursos/estilos/checkbox.css',
+  'ejemplos/checkbox.html',
+  'ejemplos/checkbox.js',
+  'js/control/agenda_service.js',
+  'js/control/documento_formato.js',
+  'js/control/atencion_service.js',
+  'js/boundary/vistas/citas_controller.js',
+  'js/boundary/componentes/tarjeta_cita.js',
+  'js/boundary/componentes/selector_contexto.js',
+  'js/boundary/componentes/agenda.js',
+  'Recursos/estilos/agenda.css',
   'index.html',
   'manifest.json',
+  'ejemplos/index.html',
+  'ejemplos/ejemplos.css',
+  'ejemplos/bar-chart.html',
+  'ejemplos/bar-chart.js',
+  'ejemplos/pie-chart.html',
+  'ejemplos/pie-chart.js',
+  'ejemplos/data-table.html',
+  'ejemplos/data-table.js',
+  'ejemplos/calendar.html',
+  'ejemplos/calendar.js',
+  'ejemplos/wizard.html',
+  'ejemplos/wizard.js',
+  'ejemplos/textarea.html',
+  'ejemplos/textarea.js',
+  'ejemplos/toast.html',
+  'ejemplos/toast.js',
+  'ejemplos/modal.html',
+  'ejemplos/modal.js',
+  'ejemplos/confirm-dialog.html',
+  'ejemplos/confirm-dialog.js',
+  'ejemplos/tarjeta-simple.html',
+  'ejemplos/tarjeta-simple.js',
+  'ejemplos/tarjeta-consulta.html',
+  'ejemplos/tarjeta-consulta.js',
+  'ejemplos/instalador-app.html',
+  'ejemplos/instalador-app.js',
   'Recursos/estilos/calendar.css',
+  'Recursos/estilos/calendar-ejemplo.css',
   'Recursos/estilos/charts.css',
   'Recursos/estilos/consultas.css',
   'Recursos/estilos/dataTable.css',
+  'Recursos/estilos/toast.css',
+  'Recursos/estilos/modal.css',
+  'Recursos/estilos/wizard.css',
+  'Recursos/estilos/textarea.css',
+  'Recursos/estilos/textarea-ejemplo.css',
+  'Recursos/estilos/wizard-ejemplo.css',
   'Recursos/estilos/login.css',
   'Recursos/estilos/notificacion.css',
   'Recursos/estilos/principal.css',
@@ -33,6 +91,17 @@ const ARCHIVOS = [
   'js/boundary/componentes/data-display/dataTable.js',
   'js/boundary/componentes/data-display/data_table_model.js',
   'js/boundary/componentes/data-display/index.js',
+  'js/boundary/componentes/feedback/Toast.js',
+  'js/boundary/componentes/feedback/index.js',
+  'js/boundary/componentes/overlays/Modal.js',
+  'js/boundary/componentes/overlays/ConfirmDialog.js',
+  'js/boundary/componentes/overlays/index.js',
+  'js/boundary/componentes/navigation/wizard/Wizard.js',
+  'js/boundary/componentes/navigation/wizard/index.js',
+  'js/boundary/componentes/form/textarea/TextArea.js',
+  'js/boundary/componentes/form/textarea/index.js',
+  'js/boundary/componentes/form/textarea/README.md',
+  'js/boundary/componentes/navigation/wizard/README.md',
   'js/boundary/componentes/instalador_app.js',
   'js/boundary/componentes/tarjeta_consulta.js',
   'js/boundary/componentes/tarjeta_simple.js',
@@ -44,10 +113,13 @@ const ARCHIVOS = [
   'js/boundary/topbar.js',
   'js/boundary/util_html.js',
   'js/boundary/vistas/consulta_controller.js',
+  'js/boundary/vistas/atencion_controller.js',
+  'js/boundary/vistas/atencion_flujo.js',
   'js/boundary/vistas/resumen_controller.js',
   'js/control/consultaProcedimientoPaso_service.js',
   'js/control/consulta_service.js',
   'js/control/default_service.js',
+  'js/control/transporte_rest.js',
   'js/control/fechas.js',
   'js/control/personaRol_service.js',
   'js/control/resumen_service.js',
@@ -59,7 +131,7 @@ const ARCHIVOS = [
   'js/entity/default_error.js',
   'js/entity/default_response.js',
   'js/entity/persona_rol.js',
-  'js/main.js?v=8',
+  'js/main.js?v=22',
   'js/router.js'
 ];
 const RUTAS_ESTATICAS = new Set(ARCHIVOS.map(archivo => new URL(archivo, self.registration.scope).pathname));
@@ -78,7 +150,7 @@ self.addEventListener('activate', event => {
     const nombres = await caches.keys();
     await Promise.all(nombres.filter(nombre =>
       (nombre.startsWith('galenosv-') && nombre !== CACHE) ||
-      (nombre.startsWith('galeno-api-') && nombre !== CACHE_API)
+      nombre.startsWith('galeno-api-')
     ).map(nombre => caches.delete(nombre)));
     await self.clients.claim();
   })());
@@ -87,34 +159,24 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (event.request.method !== 'GET') return;
-  // Incluye el origen REST del puerto 9080 y el prefijo de despliegue, si existe.
-  if (url.pathname.includes('/resources/v1/')) {
+  // API de Galeno: solo red, incluso ante timeout, no-store o cachés históricas existentes.
+  const origen = new URL(self.registration.scope);
+  if (url.hostname === origen.hostname && ['http:', 'https:'].includes(url.protocol) &&
+      url.pathname.startsWith('/GalenoSV-1.0-SNAPSHOT/resources/v1/')) {
     event.respondWith((async () => {
-      let cache;
-      try { cache = await caches.open(CACHE_API); } catch (error) { console.warn('Caché API no disponible:', error); }
       const controller = new AbortController();
       let temporizador;
       try {
-        const timeout = new Promise((resolve, reject) => {
-          temporizador = setTimeout(() => {
-            controller.abort();
-            reject(new Error('Tiempo de espera de API agotado'));
-          }, 3000);
-        });
-        const response = await Promise.race([
-          fetch(event.request, { cache: 'no-cache', signal: controller.signal }), timeout
+        return await Promise.race([
+          fetch(event.request, { cache: 'no-store', signal: controller.signal }),
+          new Promise((resolve, reject) => {
+            temporizador = setTimeout(() => {
+              reject(new Error('Tiempo de espera de API agotado; se requiere conexión.'));
+              controller.abort();
+            }, 10000);
+          })
         ]);
-        if (response.status === 200 && ['cors', 'basic'].includes(response.type)) {
-          try { await cache?.put(event.request, response.clone()); } catch (error) { console.warn('No se pudo guardar la respuesta API:', error); }
-        }
-        return response;
-      } catch (error) {
-        const cached = await cache?.match(event.request);
-        if (cached) return cached;
-        throw error;
-      } finally {
-        clearTimeout(temporizador);
-      }
+      } finally { clearTimeout(temporizador); }
     })());
     return;
   }
@@ -137,4 +199,9 @@ self.addEventListener('fetch', event => {
       throw error;
     }
   })());
+});
+
+// Un cliente actualizado nunca debe aceptar el fallback REST de un worker anterior.
+self.addEventListener('message', event => {
+  if (event.data?.tipo === 'galeno-politica-rest') event.ports?.[0]?.postMessage({ politica: POLITICA_API });
 });

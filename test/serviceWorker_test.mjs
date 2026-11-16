@@ -43,9 +43,10 @@ function worker() {
         async timeout() {
             for (let i = 0; !timers.size && i < 10; i++) await Promise.resolve();
             assert.ok(timers.size);
-            for (const { fn, delay } of timers.values()) { assert.equal(delay, 3000); fn(); }
+            for (const { fn, delay } of timers.values()) { assert.equal(delay, 10000); fn(); }
         },
         async lifecycle(type) { let promise; handlers.get(type)({waitUntil(value) { promise = value; }}); await promise; },
+        message(data) { const replies = []; handlers.get('message')({ data, ports: [{ postMessage: value => replies.push(value) }] }); return replies; },
         fetch(path, init) { let result; handlers.get('fetch')({request: new Request(new URL(path, scope), init), respondWith(value) { result = value; }}); return result; }
     };
 }
@@ -79,10 +80,10 @@ test('Precarga completa: archivos existentes y módulos importados de la aplicac
 });
 
 test('Actualización elimina solo cachés anteriores de Galeno y toma control', async () => {
-    const w = worker(); w.store('galenosv-v1'); w.store('galenosv-v3'); w.store('galenosv-v4'); w.store('galeno-api-v0'); w.store('galeno-api-v1'); w.store('otra-app');
+    const w = worker(); w.store('galenosv-v1'); w.store('galenosv-v3'); w.store('galenosv-v4'); w.store('galenosv-v13'); w.store('galenosv-v14'); w.store('galenosv-v15'); w.store('galenosv-v16'); w.store('galenosv-v17'); w.store('galenosv-v18'); w.store('galenosv-v19'); w.store('galeno-api-v0'); w.store('galeno-api-v1'); w.store('otra-app');
     await w.lifecycle('install'); await w.lifecycle('activate');
-    assert.deepEqual(w.deleted, ['galenosv-v1', 'galenosv-v3', 'galenosv-v4', 'galeno-api-v0']);
-    assert.ok(w.stores.has('galeno-api-v1'));
+    assert.deepEqual(w.deleted, ['galenosv-v1', 'galenosv-v3', 'galenosv-v4', 'galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galeno-api-v0', 'galeno-api-v1']);
+    assert.ok(!w.stores.has('galeno-api-v1'));
     assert.ok(w.stores.has('otra-app')); assert.equal(w.claimed, 1);
 });
 
@@ -100,10 +101,10 @@ test('Los módulos nuevos prevalecen sobre código obsoleto en caché', async ()
 test('Sin red usa caché exacta sin confundir parámetros de versión', async () => {
     const w = worker(); await w.lifecycle('install');
     const cache = [...w.stores.values()][0];
-    await cache.put(scope + 'js/main.js?v=8', new Response('main-v8'));
+    await cache.put(scope + 'js/main.js?v=22', new Response('main-v15'));
     w.setNetwork(async () => { throw new Error('offline'); });
-    assert.equal(await (await w.fetch('js/main.js?v=8')).text(), 'main-v8');
-    await assert.rejects(w.fetch('js/main.js?v=9'), /offline/);
+    assert.equal(await (await w.fetch('js/main.js?v=22')).text(), 'main-v15');
+    await assert.rejects(w.fetch('js/main.js?v=14'), /offline/);
 });
 
 test('No intercepta escrituras ni recursos ajenos a estáticos y API', () => {
@@ -122,56 +123,62 @@ function respuestaApi(datos, type = 'cors', status = 200) {
     return respuesta;
 }
 
-test('API de otro origen: red 200 cors se guarda con cuerpo y headers', async () => {
+const API = 'http://localhost:9080/GalenoSV-1.0-SNAPSHOT/resources/v1/';
+
+test('REST usa no-store y no abre ninguna caché API', async () => {
     const w = worker();
-    const ruta = 'http://otro-servidor:9080/GalenoSV-1.0-SNAPSHOT/resources/v1/consulta?first=0&max=50';
-    w.setNetwork(async () => respuestaApi([{ idConsulta: 'c1' }]));
-    const respuesta = await w.fetch(ruta);
-    assert.equal(respuesta.headers.get('Total-registros'), '7');
-    const guardada = await w.store('galeno-api-v1').match(ruta);
-    assert.equal(guardada.headers.get('Total-registros'), '7');
-    assert.deepEqual(await guardada.json(), [{ idConsulta: 'c1' }]);
-    assert.ok(!w.stores.has('galenosv-v5'));
+    w.setNetwork(async (request, options) => { assert.equal(options.cache, 'no-store'); return respuestaApi([{ idConsulta: 'actual' }]); });
+    const response = await w.fetch(API + 'consulta?first=0&max=50');
+    assert.equal(response.headers.get('Total-registros'), '7'); assert.deepEqual(await response.json(), [{ idConsulta: 'actual' }]);
+    assert.equal(w.stores.size, 0);
 });
 
-test('API sin red usa caché por URL exacta, incluyendo parámetros', async () => {
-    const w = worker(), ruta = 'http://localhost:9080/resources/v1/consulta?first=0&max=50';
-    w.setNetwork(async () => respuestaApi([{ idConsulta: 'guardada' }], 'basic'));
-    await w.fetch(ruta);
+test('REST offline nunca devuelve una respuesta clínica histórica, tampoco con no-store', async () => {
+    const w = worker(), ruta = API + 'consulta/1';
+    await w.store('galeno-api-v1').put(ruta, respuestaApi(['antiguo']));
+    w.store('galeno-api-v1').match = async () => { throw new Error('No debe leerse caché API'); };
     w.setNetwork(async () => { throw new Error('offline'); });
-    assert.deepEqual(await (await w.fetch(ruta)).json(), [{ idConsulta: 'guardada' }]);
-    await assert.rejects(w.fetch(ruta.replace('first=0', 'first=50')), /offline/);
+    await assert.rejects(w.fetch(ruta), /offline/);
+    await assert.rejects(w.fetch(ruta, { cache: 'no-store' }), /offline/);
 });
 
-test('API supera 3 segundos: aborta red y entrega caché sin guardar respuesta tardía', async () => {
-    const w = worker(), ruta = 'http://localhost:9080/resources/v1/persona_rol/persona/1';
-    await w.store('galeno-api-v1').put(ruta, respuestaApi(['guardado']));
-    let signal, terminar;
+test('REST timeout a diez segundos aborta y no guarda respuestas tardías', async () => {
+    const w = worker(); let signal, terminar;
     w.setNetwork((request, opciones) => { signal = opciones.signal; return new Promise(resolve => { terminar = resolve; }); });
-    const pendiente = w.fetch(ruta);
-    await w.timeout();
-    assert.deepEqual(await (await pendiente).json(), ['guardado']);
-    assert.ok(signal.aborted);
-    terminar(respuestaApi(['tardío']));
-    await Promise.resolve();
-    assert.deepEqual(await (await w.store('galeno-api-v1').match(ruta)).json(), ['guardado']);
+    const pendiente = w.fetch(API + 'persona_rol/persona/1');
+    const rejected = assert.rejects(pendiente, /Tiempo de espera/); await w.timeout(); await rejected;
+    assert.ok(signal.aborted); terminar(respuestaApi(['tardío'])); await Promise.resolve(); assert.equal(w.stores.size, 0);
 });
 
-test('API no guarda respuestas no 200, opacas ni de tipo default', async () => {
-    const w = worker(), ruta = 'http://localhost:9080/resources/v1/documento/buscar?tipo=1&valor=2';
-    for (const [type, status] of [['cors', 404], ['basic', 500], ['opaque', 200], ['default', 200]]) {
-        w.setNetwork(async () => respuestaApi(null, type, status));
-        const respuesta = await w.fetch(ruta);
-        assert.equal(respuesta.status, status);
-        assert.equal(await w.store('galeno-api-v1').match(ruta), undefined);
+test('REST conserva errores HTTP sin sustituirlos por datos guardados', async () => {
+    const w = worker(), ruta = API + 'examen_resultado/1';
+    await w.store('galeno-api-v1').put(ruta, respuestaApi(['antiguo']));
+    for (const status of [404,409,422,500]) {
+        w.setNetwork(async () => respuestaApi({error:true}, 'cors', status));
+        assert.equal((await w.fetch(ruta)).status, status);
     }
+    assert.deepEqual(await (await w.store('galeno-api-v1').match(ruta)).json(), ['antiguo']);
 });
 
-test('API mantiene la respuesta 200 si falla escribir caché', async () => {
+test('Dos contextos y una escritura intermedia nunca reutilizan lecturas REST', async () => {
+    const w = worker(), ruta = API + 'consulta/resumen'; let count = 0;
+    w.setNetwork(async () => respuestaApi({revision: ++count}));
+    assert.equal((await (await w.fetch(ruta, {headers:{'X-Contexto-Persona-Rol':'A'}})).json()).revision, 1);
+    assert.equal(w.fetch(API + 'consulta/1/atencion', {method:'PUT'}), undefined);
+    assert.equal((await (await w.fetch(ruta, {headers:{'X-Contexto-Persona-Rol':'B'}})).json()).revision, 2);
+    assert.equal((await (await w.fetch(ruta)).json()).revision, 3); assert.equal(w.stores.size, 0);
+});
+
+test('Worker reconoce únicamente el protocolo actual de caché sin datos personales', () => {
+    const w = worker(); assert.deepEqual(w.message({tipo:'otro'}), []);
+    assert.equal(w.message({tipo:'galeno-politica-rest'})[0].politica, 'sin-cache-rest-v1');
+});
+
+test('No intercepta API de otros hosts o despliegues', () => {
     const w = worker();
-    w.store('galeno-api-v1').put = async () => { throw new Error('quota'); };
-    w.setNetwork(async () => respuestaApi(['vigente']));
-    assert.deepEqual(await (await w.fetch('http://otro:9080/resources/v1/tipo_documento')).json(), ['vigente']);
+    assert.equal(w.fetch('http://otro-servidor:9080/GalenoSV-1.0-SNAPSHOT/resources/v1/consulta'), undefined);
+    assert.equal(w.fetch('http://localhost:9080/otro/resources/v1/consulta'), undefined);
+    assert.equal(w.fetch('http://localhost:9080/GalenoSV-1.0-SNAPSHOT/resources/v10/consulta'), undefined);
 });
 
 test('Un fallo al guardar caché no reemplaza una respuesta válida por código antiguo', async () => {

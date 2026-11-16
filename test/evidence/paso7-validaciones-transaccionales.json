@@ -1,0 +1,524 @@
+{
+  "step": 7,
+  "backendUnit": {
+    "tests": 264,
+    "passed": 264,
+    "failed": 0,
+    "offline": true,
+    "temporaryBuild": true
+  },
+  "frontend": {
+    "tests": 224,
+    "passed": 224,
+    "failed": 0,
+    "realRestBlocked": true,
+    "suites": [
+      {
+        "passes": "9",
+        "failures": "0",
+        "errors": [],
+        "page": "validaciones_transaccionales_test"
+      },
+      {
+        "passes": "12",
+        "failures": "0",
+        "errors": [],
+        "page": "resultados_location_test"
+      },
+      {
+        "passes": "13",
+        "failures": "0",
+        "errors": [],
+        "page": "resumen_agregado_test"
+      },
+      {
+        "passes": "13",
+        "failures": "0",
+        "errors": [],
+        "page": "relaciones_conjuntos_test"
+      },
+      {
+        "passes": "10",
+        "failures": "0",
+        "errors": [],
+        "page": "citas_agenda_por_rol_test"
+      },
+      {
+        "passes": "27",
+        "failures": "0",
+        "errors": [],
+        "page": "agenda_test"
+      },
+      {
+        "passes": "14",
+        "failures": "0",
+        "errors": [],
+        "page": "personal_test"
+      },
+      {
+        "passes": "9",
+        "failures": "0",
+        "errors": [],
+        "page": "filtros_consulta_catalogo_test"
+      },
+      {
+        "passes": "64",
+        "failures": "0",
+        "errors": [],
+        "page": "atencion_test"
+      },
+      {
+        "passes": "18",
+        "failures": "0",
+        "errors": [],
+        "page": "login_test"
+      },
+      {
+        "passes": "16",
+        "failures": "0",
+        "errors": [],
+        "page": "sesion_autenticar_test"
+      },
+      {
+        "passes": "7",
+        "failures": "0",
+        "errors": [],
+        "page": "logout_test"
+      },
+      {
+        "passes": "12",
+        "failures": "0",
+        "errors": [],
+        "page": "shell_test"
+      }
+    ]
+  },
+  "worker": {
+    "node": {
+      "tests": 11,
+      "passed": 11,
+      "failed": 0
+    },
+    "browser": {
+      "tests": 3,
+      "passed": 3,
+      "failed": 0
+    }
+  },
+  "restIntegration": {
+    "tests": 71,
+    "passed": 71,
+    "failed": 0,
+    "validations": {
+      "tests": 46,
+      "passed": 46,
+      "failed": 0,
+      "checks": [
+        {
+          "name": "edita solo escalares paso",
+          "passed": true
+        },
+        {
+          "name": "edita solo escalares orden",
+          "passed": true
+        },
+        {
+          "name": "edita solo escalares resultado",
+          "passed": true
+        },
+        {
+          "name": "rechaza cerrado",
+          "passed": true
+        },
+        {
+          "name": "rechaza cancelado",
+          "passed": true
+        },
+        {
+          "name": "rechaza estado desconocido",
+          "passed": true
+        },
+        {
+          "name": "rechaza sin estado",
+          "passed": true
+        },
+        {
+          "name": "rechaza definicion ajena",
+          "passed": true
+        },
+        {
+          "name": "rechaza relacion incompleta",
+          "passed": true
+        },
+        {
+          "name": "rechaza paciente sin clinica",
+          "passed": true
+        },
+        {
+          "name": "rechaza rol diferente",
+          "passed": true
+        },
+        {
+          "name": "rechaza predecesor no COMPLETADO",
+          "passed": true
+        },
+        {
+          "name": "rechaza ciclo y enlace externo",
+          "passed": true
+        },
+        {
+          "name": "rechaza enlace externo",
+          "passed": true
+        },
+        {
+          "name": "rechaza ejecucion duplicada",
+          "passed": true
+        },
+        {
+          "name": "permite rol propio/predecesor completo/finalizado 9",
+          "passed": true
+        },
+        {
+          "name": "permite rol propio/predecesor completo/finalizado 11",
+          "passed": true
+        },
+        {
+          "name": "permite rol propio/predecesor completo/finalizado 15",
+          "passed": true
+        },
+        {
+          "name": "rechaza clinica ajena",
+          "passed": true
+        },
+        {
+          "name": "rechaza contexto inexistente",
+          "passed": true
+        },
+        {
+          "name": "rechaza consulta ajena",
+          "passed": true
+        },
+        {
+          "name": "rechaza entidad completa sin contrato",
+          "passed": true
+        },
+        {
+          "name": "rechaza campo raiz extra",
+          "passed": true
+        },
+        {
+          "name": "rechaza transicion generica",
+          "passed": true
+        },
+        {
+          "name": "rechaza nuevo nulo",
+          "passed": true
+        },
+        {
+          "name": "rechaza sin originales",
+          "passed": true
+        },
+        {
+          "name": "original obsoleto no sobrescribe",
+          "passed": true
+        },
+        {
+          "name": "registro inexistente devuelve 404",
+          "passed": true
+        },
+        {
+          "name": "dos campos fallan juntos sin actualización parcial",
+          "passed": true
+        },
+        {
+          "name": "JSON null, arrays y escalares se rechazan sin tocar datos",
+          "passed": true
+        },
+        {
+          "name": "PUT generico no puede sobrescribir arboles clinicos",
+          "passed": true
+        },
+        {
+          "name": "replay de PUT confirmado conserva 200",
+          "passed": true
+        },
+        {
+          "name": "dos editores del mismo campo: uno guarda y otro recibe 409",
+          "passed": true
+        },
+        {
+          "name": "campos distintos concurrentes se conservan sin merge de arbol",
+          "passed": true
+        },
+        {
+          "name": "POST validado conserva 201 Location",
+          "passed": true
+        },
+        {
+          "name": "replay con contexto conserva 200",
+          "passed": true
+        },
+        {
+          "name": "POST rechaza cerrado",
+          "passed": true
+        },
+        {
+          "name": "POST rechaza cancelado",
+          "passed": true
+        },
+        {
+          "name": "POST rechaza rol ajeno",
+          "passed": true
+        },
+        {
+          "name": "POST rechaza campo no permitido",
+          "passed": true
+        },
+        {
+          "name": "POST exige contexto",
+          "passed": true
+        },
+        {
+          "name": "replay confirmado funciona aunque se haya cerrado el procedimiento",
+          "passed": true
+        },
+        {
+          "name": "POST concurrente validado False",
+          "passed": true
+        },
+        {
+          "name": "POST concurrente validado True",
+          "passed": true
+        },
+        {
+          "name": "misma clave en consultas distintas conserva 201/409 sin sobrescribir",
+          "passed": true
+        },
+        {
+          "name": "solo cambian escalares permitidos y nuevos UUID confirmados",
+          "passed": true
+        }
+      ],
+      "protectedDataUnchanged": true,
+      "insertedResultIds": [
+        "2a2abcfd-636c-42f0-b312-d096dc585fe7",
+        "a7e0ae8c-19ab-4d1f-8083-7811d3d89fc4",
+        "d5097184-2176-412c-a345-d446fcd5aa40",
+        "e5290c0d-f7d6-4baa-8273-42c8fa26aa20"
+      ],
+      "tablesBefore": {
+        "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+        "consulta": "123:89e866513732346e90e298cb5c015a08",
+        "consulta_procedimiento": "146:6196d80197003053e1283dab9b27a466",
+        "consulta_procedimiento_paso": "149:52903135b82afb6334d463b9dc8ae82c",
+        "documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "examen": "123:9059aac03b8590f8fdabba329492dfee",
+        "examen_resultado": "141:84254abe97b0a57079497dfeb8788195",
+        "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "orden_examen": "146:9efd2fbe325537d663029dd45846e5b2",
+        "persona": "260:90ec49140126f0c3f3a3c50e43e638dd",
+        "persona_rol": "261:39bdaa188ae5ab8100cde8d2ed7807db",
+        "procedimiento": "152:5de8436237a6220c2395538505c7d5aa",
+        "procedimiento_paso": "148:1350801bc3b86057af312ed4e4b573f5",
+        "procedimiento_paso_examen": "124:e50214a120e76b77cd88ab6debbc3eda",
+        "procedimiento_paso_secuencia": "131:12d3d5985e1a12c9d39cb8da2d550d7d",
+        "rol": "3:97f8505c15f0344d7272bfad458f7048",
+        "tipo_documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "tablesAfter": {
+        "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+        "consulta": "123:89e866513732346e90e298cb5c015a08",
+        "consulta_procedimiento": "146:6196d80197003053e1283dab9b27a466",
+        "consulta_procedimiento_paso": "149:352a7732f6b337afa185a43e6aa205e8",
+        "documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "examen": "123:9059aac03b8590f8fdabba329492dfee",
+        "examen_resultado": "145:b2f511cd449a1f52734cc214b37c1252",
+        "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "orden_examen": "146:bc70ecb7450a71d3e9617c7ee1b897b6",
+        "persona": "260:90ec49140126f0c3f3a3c50e43e638dd",
+        "persona_rol": "261:39bdaa188ae5ab8100cde8d2ed7807db",
+        "procedimiento": "152:5de8436237a6220c2395538505c7d5aa",
+        "procedimiento_paso": "148:1350801bc3b86057af312ed4e4b573f5",
+        "procedimiento_paso_examen": "124:e50214a120e76b77cd88ab6debbc3eda",
+        "procedimiento_paso_secuencia": "131:12d3d5985e1a12c9d39cb8da2d550d7d",
+        "rol": "3:97f8505c15f0344d7272bfad458f7048",
+        "tipo_documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "base": "http://127.0.0.1:45585/GalenoSV-1.0-SNAPSHOT/resources/v1/",
+      "container": "galeno-pagination-it-EgOHaL"
+    },
+    "resultsRegression": {
+      "tests": 25,
+      "passed": 25,
+      "failed": 0,
+      "checks": [
+        {
+          "name": "POST 201 Location y GET exacto con fecha del servidor",
+          "passed": true
+        },
+        {
+          "name": "reintento tras respuesta perdida recupera mismo UUID sin duplicar",
+          "passed": true
+        },
+        {
+          "name": "clave reutilizada con otro contenido devuelve 409",
+          "passed": true
+        },
+        {
+          "name": "clave reutilizada con otra orden devuelve 409",
+          "passed": true
+        },
+        {
+          "name": "otra clave para orden ya registrada devuelve 409",
+          "passed": true
+        },
+        {
+          "name": "orden con 123 resultados historicos no admite otro",
+          "passed": true
+        },
+        {
+          "name": "orden inexistente devuelve 404",
+          "passed": true
+        },
+        {
+          "name": "entrada invalida None",
+          "passed": true
+        },
+        {
+          "name": "entrada invalida {}",
+          "passed": true
+        },
+        {
+          "name": "entrada invalida {'resultado': 'contenido'}",
+          "passed": true
+        },
+        {
+          "name": "entrada invalida {'idOrdenExamen': {'idOrdenExamen': 'f0000000",
+          "passed": true
+        },
+        {
+          "name": "clave invalida ''",
+          "passed": true
+        },
+        {
+          "name": "clave invalida 'x'",
+          "passed": true
+        },
+        {
+          "name": "clave invalida '1-1-1-1-1'",
+          "passed": true
+        },
+        {
+          "name": "12 POST simultaneos con claves distintas crean exactamente un resultado",
+          "passed": true
+        },
+        {
+          "name": "12 POST simultaneos con la misma clave comparten identidad",
+          "passed": true
+        },
+        {
+          "name": "clave simultanea en ordenes diferentes no sobrescribe y devuelve 409",
+          "passed": true
+        },
+        {
+          "name": "POST sin clave conserva 201 Location y aplica regla de orden",
+          "passed": true
+        },
+        {
+          "name": "preflight CORS permite clave y expone Location",
+          "passed": true
+        },
+        {
+          "name": "GET de UUID inexistente conserva 404",
+          "passed": true
+        },
+        {
+          "name": "contrato de lectura previo consulta/estados?consultas=50000000-0000-0000-0000-000000000001",
+          "passed": true
+        },
+        {
+          "name": "contrato de lectura previo consulta/resumen?clinica=10000000-0000-0000-0000-000000000001",
+          "passed": true
+        },
+        {
+          "name": "contrato de lectura previo examen_resultado?ordenes=f0000000-0000-0000-0000-000000000001",
+          "passed": true
+        },
+        {
+          "name": "19 tablas y todos los resultados preexistentes sinteticos permanecen intactos",
+          "passed": true
+        },
+        {
+          "name": "solo se insertaron UUID confirmados por POST 201",
+          "passed": true
+        }
+      ],
+      "existingDataUnchanged": true,
+      "insertedResultIds": [
+        "31357237-01dd-4bd9-8cfb-6dfe66513d36",
+        "49fa64fa-f9a4-42e5-9aa3-bb46833ae168",
+        "5d537ea4-d715-481c-bd78-d32d507f83d0",
+        "6bb02ba5-bbce-4c4d-9488-f192212feb20",
+        "73ed961b-3ba9-4475-8589-e7d4fafaf484"
+      ],
+      "tablesBefore": {
+        "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+        "consulta": "123:89e866513732346e90e298cb5c015a08",
+        "consulta_procedimiento": "125:6a916cccd5435aae0e1c9bb286a9993f",
+        "consulta_procedimiento_paso": "125:3100c125f9138d26ccff178c2687b448",
+        "documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "examen": "123:9059aac03b8590f8fdabba329492dfee",
+        "examen_resultado": "124:6cbd3358be4fff03ac825a463a962b08",
+        "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "orden_examen": "164:754dad4872f0824cbd34a2198dee663e",
+        "persona": "260:a59ad7ee176617e5b83c467c595c6465",
+        "persona_rol": "260:7508426f340e89b97772a104fd66e151",
+        "procedimiento": "131:398325e0b255a42568dd95a40e7a4f21",
+        "procedimiento_paso": "125:a6864468289aac07cf77b009c0101b3c",
+        "procedimiento_paso_examen": "124:a95e24ae013cbb1fea0f0f91395ae897",
+        "procedimiento_paso_secuencia": "127:09682bc13b62476d87abd456f8b65581",
+        "rol": "2:1ac162db769fc54285609e57edbded91",
+        "tipo_documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "tablesAfter": {
+        "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+        "consulta": "123:89e866513732346e90e298cb5c015a08",
+        "consulta_procedimiento": "125:6a916cccd5435aae0e1c9bb286a9993f",
+        "consulta_procedimiento_paso": "125:3100c125f9138d26ccff178c2687b448",
+        "documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "examen": "123:9059aac03b8590f8fdabba329492dfee",
+        "examen_resultado": "129:5aeca6c2d1a758f5f1829e5ad675065d",
+        "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "orden_examen": "164:754dad4872f0824cbd34a2198dee663e",
+        "persona": "260:a59ad7ee176617e5b83c467c595c6465",
+        "persona_rol": "260:7508426f340e89b97772a104fd66e151",
+        "procedimiento": "131:398325e0b255a42568dd95a40e7a4f21",
+        "procedimiento_paso": "125:a6864468289aac07cf77b009c0101b3c",
+        "procedimiento_paso_examen": "124:a95e24ae013cbb1fea0f0f91395ae897",
+        "procedimiento_paso_secuencia": "127:09682bc13b62476d87abd456f8b65581",
+        "rol": "2:1ac162db769fc54285609e57edbded91",
+        "tipo_documento": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+        "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "base": "http://127.0.0.1:58501/GalenoSV-1.0-SNAPSHOT/resources/v1/",
+      "container": "galeno-pagination-it-rKuQmf"
+    }
+  },
+  "limitations": [
+    "Pruebas frontend simuladas y REST real independientes; no integración completa navegador-backend.",
+    "Solo escrituras sobre semillas sintéticas en contenedores desechables, sin datos reales existentes.",
+    "Protocolo transaccional para escrituras de atención descritas; otros escritores y autenticación fuera de alcance.",
+    "Sin migraciones, instalaciones, commits, despliegue ni paso 8."
+  ]
+}

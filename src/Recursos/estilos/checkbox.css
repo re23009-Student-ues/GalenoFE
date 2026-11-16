@@ -1,0 +1,21 @@
+galeno-checkbox {
+    --checkbox-text: var(--texto, CanvasText);
+    --checkbox-accent: var(--marino, Highlight);
+    --checkbox-error: var(--textarea-error, #b91c1c);
+    --checkbox-spacing: var(--textarea-spacing, 8px);
+    display: block;
+    min-width: 0;
+    color: var(--checkbox-text);
+    font: inherit;
+}
+galeno-checkbox .checkbox__label { display: inline-flex; align-items: flex-start; gap: var(--checkbox-spacing); padding-block: 6px; cursor: pointer; line-height: 1.5; overflow-wrap: anywhere; }
+galeno-checkbox .checkbox__control { flex: 0 0 auto; width: 1.15em; height: 1.15em; margin: .175em 0 0; accent-color: var(--checkbox-accent); cursor: inherit; transition: outline-offset .12s ease; }
+galeno-checkbox .checkbox__control:hover:not(:disabled) { outline: 1px solid var(--checkbox-accent); outline-offset: 2px; }
+galeno-checkbox .checkbox__control:focus-visible { outline: 3px solid var(--checkbox-accent); outline-offset: 3px; }
+galeno-checkbox .checkbox__control:disabled { cursor: not-allowed; }
+galeno-checkbox .checkbox__label:has(:disabled) { color: var(--texto-suave, GrayText); cursor: not-allowed; }
+galeno-checkbox .checkbox__control[aria-invalid="true"] { outline: 2px solid var(--checkbox-error); outline-offset: 2px; }
+galeno-checkbox .checkbox__control[aria-invalid="true"]:focus-visible { outline-width: 3px; outline-offset: 3px; }
+galeno-checkbox .checkbox__error { margin: var(--checkbox-spacing) 0 0; color: var(--checkbox-error); font-size: .9rem; white-space: pre-line; overflow-wrap: anywhere; }
+galeno-checkbox .checkbox__error:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { galeno-checkbox .checkbox__control { transition: none; } }

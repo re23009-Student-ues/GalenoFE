@@ -1,0 +1,33 @@
+.textarea {
+    --textarea-text: #334155;
+    --textarea-muted: #526173;
+    --textarea-background: #fff;
+    --textarea-border: #94a3b8;
+    --textarea-focus: #1f3a5f;
+    --textarea-error: #b91c1c;
+    --textarea-disabled: #f1f5f9;
+    --textarea-readonly: #f8fafc;
+    --textarea-radius: 6px;
+    --textarea-spacing: 8px;
+    display: block;
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+    color: var(--textarea-text);
+    font-family: inherit;
+}
+.textarea__label { display: block; margin-bottom: var(--textarea-spacing); font-weight: 600; overflow-wrap: anywhere; }
+.textarea__required { color: var(--textarea-error); }
+.textarea__control { display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--textarea-border); border-radius: var(--textarea-radius); background: var(--textarea-background); color: var(--textarea-text); font: inherit; line-height: 1.5; }
+.textarea__control:hover:not(:disabled):not(:focus):not([aria-invalid="true"]) { border-color: var(--textarea-focus); }
+.textarea__control:focus-visible { outline: 3px solid var(--textarea-focus); outline-offset: 2px; }
+.textarea--focused .textarea__control { border-color: var(--textarea-focus); }
+.textarea--auto .textarea__control { resize: none; }
+.textarea__control:disabled { background: var(--textarea-disabled); color: var(--textarea-muted); cursor: not-allowed; }
+.textarea__control:read-only:not(:disabled) { background: var(--textarea-readonly); }
+.textarea--invalid .textarea__control { border-color: var(--textarea-error); }
+.textarea__footer { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin-top: var(--textarea-spacing); }
+.textarea__helper { flex: 1 1 160px; margin: 0; color: var(--textarea-muted); font-size: .85rem; overflow-wrap: anywhere; }
+.textarea__counter { margin-left: auto; color: var(--textarea-muted); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.textarea__error { margin: var(--textarea-spacing) 0 0; color: var(--textarea-error); font-size: .9rem; overflow-wrap: anywhere; white-space: pre-line; }
+.textarea__error:empty, .textarea [hidden] { display: none !important; }

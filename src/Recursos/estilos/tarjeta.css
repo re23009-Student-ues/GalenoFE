@@ -5,7 +5,8 @@
 :host {
     display: block;
     background: #fff;
-    border-radius: 14px;
+    border-radius: var(--tarjeta-radio, 14px);
+    border: var(--tarjeta-borde, 0);
     overflow: hidden;
     font-size: 14px;
     color: var(--texto, #26313f);
@@ -17,17 +18,17 @@
 }
 
 .header {
-    background: var(--cielo, #d6e9f8);
+    background: var(--tarjeta-cabecera, var(--cielo, #d6e9f8));
     color: var(--marino, #1f3a5f);
     font-weight: bold;
-    padding: 14px 16px;
+    padding: var(--tarjeta-espacio, 14px 16px);
 }
 
 .body {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    padding: 12px 16px;
+    padding: var(--tarjeta-espacio, 12px 16px);
 }
 
 .footer {
@@ -42,6 +43,11 @@
 
 ::slotted(.obs) {
     color: var(--texto-suave, #6f7b8a);
+}
+
+::slotted(p[slot="contenido"]:not(.obs)) {
+    font-size: var(--tarjeta-paciente-tamano, inherit);
+    font-weight: var(--tarjeta-paciente-peso, inherit);
 }
 
 /* Insignia de estado (la consulta la manda al pie) */

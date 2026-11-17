@@ -63,3 +63,293 @@ atencion-controller { display: block; color: var(--texto, #26313f); }
 .atencion__estado[data-estado="Programada"] { background: #dbeafe; color: #1e40af; }
 .atencion__estado[data-estado="En curso"] { background: #fef3c7; color: #92400e; }
 .atencion__estado[data-estado="Finalizada"] { background: #dcfce7; color: #166534; }
+
+/* Presentación de agenda y atención. No modifica el flujo ni los estados clínicos. */
+consulta-controller,
+atencion-controller {
+    max-width: 1280px;
+    margin-inline: auto;
+}
+
+consulta-controller {
+    --tarjeta-radio: 18px;
+    --tarjeta-borde: 1px solid #dce6ef;
+    --tarjeta-cabecera: #f2f7fc;
+    --tarjeta-espacio: 18px 20px;
+    --tarjeta-paciente-tamano: 16px;
+    --tarjeta-paciente-peso: 700;
+}
+
+.lista-consultas {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: 22px;
+}
+
+.consulta__seleccionar {
+    border-radius: 18px;
+    box-shadow: 0 3px 12px #1f3a5f08;
+    transition: box-shadow .18s ease, transform .18s ease;
+}
+
+.consulta__seleccionar:hover {
+    box-shadow: 0 8px 24px #1f3a5f18;
+    transform: translateY(-2px);
+}
+
+atencion-controller {
+    line-height: 1.6;
+    --atencion-borde: #dce6ef;
+    --atencion-azul: #226aa5;
+}
+
+.atencion__boton {
+    min-height: 42px;
+    padding: 10px 18px;
+    border-color: #ccdce9;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    transition: background-color .15s ease, border-color .15s ease;
+}
+
+.atencion__boton:hover:not(:disabled) {
+    background: #edf5fc;
+    border-color: #80aacb;
+}
+
+.atencion__paciente {
+    gap: 20px;
+    padding: 24px 28px;
+    border: 1px solid var(--atencion-borde);
+    border-left: 4px solid var(--atencion-azul);
+    border-radius: 18px;
+    background: linear-gradient(110deg, #f2f8fe, #fff 70%);
+}
+
+.atencion__paciente-avatar {
+    flex-basis: 58px;
+    width: 58px;
+    height: 58px;
+    font-size: 20px;
+    background: #e1eefb;
+    color: #245785;
+    border: 1px solid #c8def1;
+}
+
+.atencion__paciente-nombre {
+    font-size: clamp(20px, 2.4vw, 25px);
+    line-height: 1.3;
+    letter-spacing: -.4px;
+    color: var(--marino, #1f3a5f);
+}
+
+.atencion__paciente-edad,
+.atencion__paciente-documento {
+    font-size: 13px;
+    color: #52677c;
+}
+
+.atencion__registro,
+.atencion__pasos,
+.atencion__selector-procedimiento,
+.atencion__detalles-generales {
+    padding: 24px 28px;
+    border: 1px solid var(--atencion-borde);
+    border-radius: 16px;
+    box-shadow: 0 2px 8px #1f3a5f04;
+}
+
+.atencion__registro h2 {
+    font-size: 17px;
+    color: var(--marino, #1f3a5f);
+    padding-bottom: 14px;
+    border-bottom: 1px solid #edf1f6;
+}
+
+.atencion__datos {
+    gap: 22px 28px;
+}
+
+.atencion__datos dt {
+    font-size: 12px;
+    color: #60758a;
+    font-weight: 500;
+}
+
+.atencion__datos dd {
+    font-size: 14px;
+    color: #263e54;
+}
+
+.atencion__estado,
+.atencion__estado-paso {
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.atencion__selector-procedimiento:empty {
+    display: none;
+}
+
+.atencion__detalles-generales summary {
+    color: #375873;
+    font-size: 14px;
+}
+
+.atencion__selector-procedimiento select,
+.atencion__sucesor select,
+.atencion__predecesor select {
+    min-height: 44px;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border: 1px solid #cbdbe9;
+    border-radius: 10px;
+    color: #263e54;
+}
+
+.atencion__flujo .wizard {
+    --wizard-primary: #226aa5;
+    --wizard-border: #dce6ef;
+    --wizard-radius: 18px;
+    --wizard-spacing: 26px;
+    --wizard-muted: #596e82;
+    margin-top: 24px;
+    box-shadow: 0 4px 18px #1f3a5f08;
+}
+
+.atencion__flujo .wizard__header {
+    background: #f8fbfe;
+    border-radius: 18px 18px 0 0;
+}
+
+.atencion__flujo .wizard__step-button {
+    padding: 12px 10px;
+    border-radius: 10px;
+}
+
+.atencion__flujo .wizard__step--active .wizard__step-button {
+    background: #e7f1fb;
+    color: #1c5685;
+}
+
+.atencion__flujo .wizard__step-number {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.atencion__flujo .wizard__status {
+    font-size: 12px;
+}
+
+.atencion__flujo .wizard__panel-title {
+    color: var(--marino, #1f3a5f);
+    font-size: 20px;
+    letter-spacing: -.3px;
+}
+
+.atencion__paso-medico > .atencion__estado-paso {
+    display: inline-block;
+    margin: 0 0 12px;
+    padding: 5px 10px;
+    background: #eff5fb;
+    color: #375873;
+}
+
+.atencion__paso-medico > p:not([class]) {
+    margin: 0 0 22px;
+    color: #596e82;
+    font-size: 13px;
+}
+
+.atencion__flujo .textarea {
+    --textarea-border: #c8d7e5;
+    --textarea-focus: #226aa5;
+    --textarea-radius: 10px;
+    margin-bottom: 18px;
+}
+
+.atencion__flujo .textarea__label {
+    font-size: 14px;
+    color: #29465e;
+}
+
+.atencion__flujo .textarea__control {
+    padding: 14px 16px;
+    line-height: 1.7;
+}
+
+.atencion__flujo .textarea__helper,
+.atencion__flujo .textarea__counter {
+    font-size: 12px;
+}
+
+.atencion__examen-opcion,
+.atencion__resultado-paso,
+.atencion__item {
+    margin-top: 14px;
+    padding: 18px;
+    border: 1px solid #e0e8f0;
+    border-radius: 12px;
+    background: #fbfcfe;
+}
+
+.atencion__examenes-paso h4,
+.atencion__resultado-paso summary {
+    color: #29465e;
+    font-size: 14px;
+}
+
+.atencion__flujo .wizard__footer {
+    background: #f8fbfe;
+    border-radius: 0 0 18px 18px;
+}
+
+.atencion__flujo .wizard__actions button {
+    min-height: 44px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.atencion__flujo .wizard__next:not(:disabled) {
+    box-shadow: 0 3px 8px #226aa523;
+}
+
+@media (max-width: 600px) {
+    .lista-consultas { gap: 16px; }
+    .atencion__paciente { padding: 20px 16px; gap: 14px; }
+    .atencion__paciente-avatar { flex-basis: 46px; width: 46px; height: 46px; font-size: 16px; }
+    .atencion__registro, .atencion__pasos,
+    .atencion__selector-procedimiento, .atencion__detalles-generales { padding: 20px 16px; }
+    .atencion__datos { grid-template-columns: 1fr; gap: 16px; }
+    .atencion__flujo .wizard { --wizard-spacing: 18px; }
+    .atencion__examen-opcion, .atencion__resultado-paso, .atencion__item { padding: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .consulta__seleccionar { transition: none; }
+    .consulta__seleccionar:hover { transform: none; }
+}
+
+@media (min-width: 1100px) {
+    atencion-controller {
+        display: grid;
+        grid-template-columns: minmax(230px, 1fr) minmax(0, 2.4fr);
+        gap: 20px;
+    }
+    atencion-controller > * { grid-column: 1 / -1; min-width: 0; margin-top: 0; }
+    atencion-controller > :is(.atencion__paciente, .atencion__registro,
+        .atencion__selector-procedimiento, .atencion__detalles-generales) { margin-top: 0; }
+    atencion-controller > .atencion__boton { justify-self: start; }
+    atencion-controller > .atencion__paciente {
+        grid-column: 1;
+        flex-direction: column;
+        align-items: flex-start;
+        justify-content: center;
+    }
+    atencion-controller > .atencion__registro { grid-column: 2; }
+    .atencion__datos { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+    .atencion__flujo .wizard { margin-top: 0; }
+    .atencion__wizard { margin-top: 0; }
+}

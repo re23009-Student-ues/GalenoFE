@@ -22,9 +22,9 @@ suite('Actualización HU4 y caché sensible', () => {
     async function lifecycle(type) {
         let completion; handlers.get(type)({ waitUntil(promise) { completion = promise; } }); await completion;
     }
-    test('precarga v49 y el mismo main actualizado que carga el HTML', async () => {
+    test('precarga v50 y el mismo main actualizado que carga el HTML', async () => {
         await lifecycle('install');
-        sinon.assert.calledWithExactly(cachesMock.open, 'galenosv-v49');
+        sinon.assert.calledWithExactly(cachesMock.open, 'galenosv-v50');
         const index = new DOMParser().parseFromString(html, 'text/html');
         const main = index.querySelector('script[type="module"]').getAttribute('src');
         assert.equal(main, 'js/main.js?v=23');
@@ -34,18 +34,22 @@ suite('Actualización HU4 y caché sensible', () => {
         sinon.assert.calledOnce(selfMock.skipWaiting);
     });
     test('activación elimina versiones del rollback y caché API anterior; conserva otras aplicaciones', async () => {
-        cachesMock.keys.resolves(['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galenosv-v48', 'galenosv-v49', 'galeno-api-v0', 'galeno-api-v1', 'otra-app']);
+        cachesMock.keys.resolves(['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galenosv-v48', 'galenosv-v49', 'galenosv-v50', 'galeno-api-v0', 'galeno-api-v1', 'otra-app']);
         await lifecycle('activate');
-        assert.deepEqual(cachesMock.delete.getCalls().map(call => call.args[0]), ['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galenosv-v48', 'galeno-api-v0', 'galeno-api-v1']);
+        assert.deepEqual(cachesMock.delete.getCalls().map(call => call.args[0]), ['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galenosv-v48', 'galenosv-v49', 'galeno-api-v0', 'galeno-api-v1']);
         sinon.assert.calledOnce(selfMock.clients.claim);
     });
-    test('precarga conserva Wizard, Checkbox y atención previos sin el cliente retirado', async () => {
+    test('precarga conserva Wizard, Checkbox y Atención y excluye recursos retirados', async () => {
         await lifecycle('install');
         const paths = cache.addAll.firstCall.args[0].map(request => new URL(request.url).pathname);
         for (const file of ['js/boundary/componentes/navigation/wizard/Wizard.js', 'js/boundary/componentes/form/checkbox/Checkbox.js', 'js/boundary/vistas/atencion_flujo.js', 'js/control/transporte_rest.js']) {
             assert.include(paths, new URL(file, selfMock.registration.scope).pathname);
         }
-        assert.notInclude(paths, new URL('js/control/api_client.js', selfMock.registration.scope).pathname);
+        assert.isFalse(paths.some(path => path.startsWith(new URL('ejemplos/', selfMock.registration.scope).pathname)));
+        for (const file of ['js/control/api_client.js', 'js/control/personaRol_service.js', 'Recursos/estilos/calendar-ejemplo.css',
+            'Recursos/estilos/textarea-ejemplo.css', 'Recursos/estilos/wizard-ejemplo.css', 'Recursos/estilos/notificacion.css']) {
+            assert.notInclude(paths, new URL(file, selfMock.registration.scope).pathname);
+        }
     });
     test('la primera toma de control no recarga, pero la actualización siguiente sí y solo una vez', () => {
         const index = new DOMParser().parseFromString(html, 'text/html');

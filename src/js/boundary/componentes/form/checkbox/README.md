@@ -41,5 +41,5 @@ fields.forEach(f => f.destroy());
 
 Wizard y Modal mueven los nodos sin recrear inputs; la selección se conserva y
 los listeners de reset se reconectan al formulario actual. Sin HTTP ni persistencia.
-Ejemplo ejecutable: `src/ejemplos/checkbox.html`. Suite: `test/checkbox_test.html`.
+Suite: `test/checkbox_test.html`.
 Tab y Espacio utilizan el comportamiento nativo; no hay manejadores de teclado propios.

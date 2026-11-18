@@ -1,10 +1,10 @@
 # GalenoFE
 
-## Ejemplos de componentes
+## Componentes reutilizables
 
-El catálogo está en [src/ejemplos/index.html](src/ejemplos/index.html). Incluye las
-doce demostraciones de componentes reutilizables, con recursos y datos de ejemplo
-locales. Consultar [las instrucciones e inventario](src/ejemplos/README.md).
+Calendar, BarChart, PieChart, DataTable y TreeTable tienen suites independientes
+en `test/`. El catálogo de demostraciones se retiró en la versión de caché
+`galenosv-v50`.
 
 ## Consulta y atención (SPA)
 

@@ -3,8 +3,7 @@
 `galeno-tree-table` es un Web Component en light DOM. Importar el módulo o el
 barrel `data-display/index.js` y cargar `Recursos/estilos/treeTable.css` (importa
 los estilos propios del DataTable). No necesita registro en main para usarse en
-un módulo. La demostración está en `src/ejemplos/tree-table.html`, enlazada desde
-el catálogo existente.
+un módulo. Ejecutar la suite en `test/treeTable_test.html`.
 
 ```javascript
 import { TreeTable } from './js/boundary/componentes/data-display/index.js';

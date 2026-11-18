@@ -220,8 +220,6 @@ en espacios menores), envuelve títulos largos y desplaza solo su área. Sin car
 habilitado conserva el apilado móvil original. Respeta movimiento reducido en el
 carrusel y el indicador de carga.
 
-Ejemplo local: `src/ejemplos/wizard.html`, con dos instancias, formularios,
-validación y finalización asíncronas simuladas y Modal. No usa backend.
 Suite: `test/wizard_test.html`, con Mocha, Chai y Sinon locales.
 
 Requiere un navegador moderno con ES Modules, custom elements y structuredClone;

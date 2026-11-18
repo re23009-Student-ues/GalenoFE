@@ -277,8 +277,8 @@ valida callbacks síncronos/asíncronos y vuelve a revisar los pasos obligatorio
 antes de finalizar. No serializa formularios, persiste datos ni conoce REST. La
 página sincroniza sus controles con `setData()` y destruye la instancia al salir;
 destruir restaura los nodos originales e ignora resultados tardíos. Documentación
-del contrato en `componentes/navigation/wizard/README.md`, ejemplo local en
-`ejemplos/wizard.html` y pruebas en `test/wizard_test.html`.
+del contrato en `componentes/navigation/wizard/README.md` y pruebas en
+`test/wizard_test.html`.
 El indicador usa carrusel por desbordamiento real y ResizeObserver, con opciones
 `stepCarousel: { enabled, autoScroll, showArrows, smoothScroll }` (todas `true`
 por defecto). Las flechas desplazan sin navegar pasos; los métodos existentes
@@ -292,7 +292,7 @@ funcionando. Puede envolver un textarea existente sin reemplazarlo o crear uno e
 un contenedor. El ajuste automático usa ResizeObserver y requestAnimationFrame y
 se reactiva al mostrar pasos ocultos de Wizard o abrir Modal. Los validadores son
 síncronos y setValue no emite eventos artificiales. Estilos en
-`Recursos/estilos/textarea.css`, ejemplo en `ejemplos/textarea.html`, contrato en
+`Recursos/estilos/textarea.css`, contrato en
 `componentes/form/textarea/README.md` y pruebas en `test/textarea_test.html`.
 
 - Archivo nuevo en `src`: añadir su ruta relativa a `ARCHIVOS` de `src/serviceWorker.js` (estáticos). El worker usa solo red para GET de la API Galeno en el mismo hostname y prefijo de despliegue. Únicamente conserva estáticos propios; nunca guarda respuestas REST. `activate` elimina versiones anteriores de sus cachés.

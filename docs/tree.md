@@ -157,10 +157,6 @@ un fallo de onError se contiene para evitar bucles.
 
 ## Organización y pruebas
 
-Demo: `src/ejemplos/tree.html`, enlazada desde el catálogo. Incluye selección
-simple/multiple, tres niveles, iconos, temas, altas/bajas y carga simulada con
-fallo inicial y reintento. No solicita backend.
-
 Pruebas Mocha/Chai/Sinon: `test/tree_test.html` y
 `test/js/data-display/tree_test.js`. Incluye modelo de 5.000 niveles, teclado,
 propagación, filtros, mutaciones, cargas concurrentes y respuestas obsoletas.

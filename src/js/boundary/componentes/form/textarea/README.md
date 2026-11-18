@@ -160,7 +160,7 @@ Variables `.textarea`: `--textarea-text`, `--textarea-muted`, `--textarea-backgr
 `--textarea-border`, `--textarea-focus`, `--textarea-error`, `--textarea-disabled`,
 `--textarea-readonly`, `--textarea-radius`, `--textarea-spacing`.
 
-Ejemplo: `src/ejemplos/textarea.html`. Suite: `test/textarea_test.html` con Mocha,
+Suite: `test/textarea_test.html` con Mocha,
 Chai y Sinon existentes. Requiere ES Modules, custom elements y requestAnimationFrame.
 Mantener la pestaña de pruebas en primer plano: los navegadores pausan los frames
 de las mediciones de altura en segundo plano.

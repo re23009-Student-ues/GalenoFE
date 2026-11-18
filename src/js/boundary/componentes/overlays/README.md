@@ -154,8 +154,7 @@ Variables CSS de `.modal`: `--modal-background`, `--modal-text`, `--modal-border
 Sobrescribirlas en reglas posteriores al CSS. Elegir colores con contraste adecuado.
 El fondo usa `::backdrop`, sin un overlay DOM duplicado.
 
-Ejemplos interactivos: `src/ejemplos/modal.html` y
-`src/ejemplos/confirm-dialog.html`, enlazados desde el catálogo. Suite local:
+Suite local:
 `test/overlays_test.html` (Mocha/Chai/Sinon existentes).
 
 Las transiciones de cierre usan `display` y `overlay` con `allow-discrete` y

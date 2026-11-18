@@ -46,6 +46,7 @@ class GalenoCitas extends HTMLElement {
         </section>
         <section class="citas-grid" data-lista hidden aria-label="Citas encontradas"></section>`;
         this.alCambio = e => this.cambiar(e);
+        this.alCambiarClinica = e => { if (e.target.name === 'clinica') this.filtrar(); };
         this.alClick = e => {
             if (e.target.closest('[data-reintentar]')) this.catalogo();
             if (e.target.closest('[data-limpiar]')) {
@@ -59,6 +60,7 @@ class GalenoCitas extends HTMLElement {
             else this.buscar();
         };
         this.addEventListener('input', this.alCambio);
+        this.addEventListener('change', this.alCambiarClinica);
         this.addEventListener('click', this.alClick);
         this.addEventListener('submit', this.alSubmit);
         this.catalogo();
@@ -66,6 +68,7 @@ class GalenoCitas extends HTMLElement {
     disconnectedCallback() {
         this.version++;
         this.removeEventListener('input', this.alCambio);
+        this.removeEventListener('change', this.alCambiarClinica);
         this.removeEventListener('click', this.alClick);
         this.removeEventListener('submit', this.alSubmit);
     }
@@ -74,7 +77,7 @@ class GalenoCitas extends HTMLElement {
     vigente(version) { return this.isConnected && this.version === version; }
     tipoSeleccionado() { return this.tipos?.find(t => t.idTipoDocumento === this.campo('tipo').value); }
     cambiar(e) {
-        if (['desde', 'hasta', 'clinica'].includes(e.target.name)) {
+        if (['desde', 'hasta'].includes(e.target.name)) {
             this.version++;
             this.ocupado = false;
             this.citas = [];

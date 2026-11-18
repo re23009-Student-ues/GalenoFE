@@ -473,7 +473,8 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   const vista=await citasBuscadas();
   assert.lengthOf(vista.campo('clinica').options,3);
   assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'),2);
-  vista.campo('clinica').value='norte';vista.campo('desde').value='2026-11-12';await vista.filtrar();
+  vista.campo('desde').value='2026-11-12';vista.campo('clinica').value='norte';
+  vista.campo('clinica').dispatchEvent(new Event('change',{bubbles:true}));await settle();
   assert.lengthOf(vista.citas,1);assert.equal(vista.citas[0].idConsulta,'c2');
   const url=new URL(fetchStub.getCalls().filter(c=>new URL(c.args[0]).pathname.endsWith('/consulta')).at(-1).args[0]);
   assert.equal(url.searchParams.get('desde'),'2026-11-12');

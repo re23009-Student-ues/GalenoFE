@@ -654,3 +654,7 @@ solo se registran al introducir contenido explícito. Caché `galenosv-v47`.
 El dashboard ahora exige un paso propio PENDIENTE/EN_PROCESO. Cuando solo quedan
 pasos propios completados o invalidados, oculta la consulta; Consultas conserva
 su historial de asignaciones completadas. Caché `galenosv-v48`.
+
+### Estabilidad visual de la búsqueda pública
+
+El formulario data-busqueda de galeno-citas usa columnas de ancho proporcional con minmax(0, ...) y alineación superior. Las indicaciones y errores reservan una línea; al crecer permanecen debajo del documento sin mover los campos ni estirar el selector. El control select ocupa solo el ancho de su columna, independientemente del texto elegido. En tablet se mantienen dos columnas y en móvil una. El ajuste está limitado a la búsqueda pública; no cambia validación, servicios ni estilos de la agenda laboral. Caché galenosv-v49. Revisión estática, sin ejecutar pruebas.

@@ -66,3 +66,36 @@ galeno-agenda .agenda__paso { display: flex; align-items: baseline; gap: 12px; m
 galeno-agenda .agenda__paso > :first-child { min-width: 0; }
 galeno-agenda .agenda__paso--propio:hover > :first-child { color: var(--azul-fuerte, #1a73e8); text-decoration: underline; }
 galeno-agenda .agenda__paso-estado { margin-inline-start: auto; flex-shrink: 0; color: #166534; font-size: .8em; }
+
+/* Los mensajes no participan en la alineación de los campos de búsqueda. */
+galeno-citas [data-busqueda] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+    align-items: start;
+    line-height: 1.25;
+}
+galeno-citas [data-busqueda] > label,
+galeno-citas [data-busqueda] .citas-documento { min-width: 0; }
+galeno-citas [data-busqueda] input,
+galeno-citas [data-busqueda] select {
+    box-sizing: border-box;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+}
+galeno-citas [data-busqueda] select { text-overflow: ellipsis; }
+galeno-citas [data-busqueda] > button { margin-top: calc(1.25em + 8px); }
+galeno-citas .citas-documento p,
+galeno-citas [data-estado] {
+    min-height: 1.5em;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+@media(max-width: 900px) {
+    galeno-citas [data-busqueda] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    galeno-citas [data-busqueda] > button { grid-column: 1 / -1; justify-self: start; margin-top: 0; }
+}
+@media(max-width: 600px) {
+    galeno-citas [data-busqueda] { grid-template-columns: minmax(0, 1fr); }
+    galeno-citas [data-busqueda] > button { justify-self: stretch; }
+}

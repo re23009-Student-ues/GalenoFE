@@ -96,3 +96,4 @@ GalenoFE/
 ├── .gitignore
 └── repomix-output.xml            ← volcado del repo para IA; se ignora en git, no editar
 ```
+merge

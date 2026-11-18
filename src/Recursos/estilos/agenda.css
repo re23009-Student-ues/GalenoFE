@@ -99,3 +99,14 @@ galeno-citas [data-estado] {
     galeno-citas [data-busqueda] { grid-template-columns: minmax(0, 1fr); }
     galeno-citas [data-busqueda] > button { justify-self: stretch; }
 }
+
+/* Clínica a la izquierda y rango con acciones a la derecha. */
+galeno-citas [data-filtros] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+galeno-citas [data-filtros] input, galeno-citas [data-filtros] select { box-sizing: border-box; }
+galeno-citas .citas-filtro-rango { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+galeno-citas .citas-filtro-botones { grid-column: 1 / -1; display: flex; gap: 16px; }
+galeno-citas .citas-filtro-botones button { flex: 1; min-width: 0; }
+@media(max-width: 600px) {
+    galeno-citas [data-filtros] { grid-template-columns: minmax(0, 1fr); }
+    galeno-citas .citas-filtro-botones { flex-wrap: wrap; }
+}

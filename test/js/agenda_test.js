@@ -431,7 +431,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
  });
  test('HU1 muestra fechas después de buscar y consulta el backend al filtrar o mostrar todas', async () => {
   const vista=document.createElement('galeno-citas');fixture.append(vista);await settle();
-  assert.isNull(vista.campo('clinica'));
+  assert.isNotNull(vista.campo('clinica'));
   assert.isNull(vista.querySelector('[data-validar]'));
   assert.isTrue(vista.querySelector('[data-resultados]').hidden);
   vista.campo('tipo').value='dui';vista.campo('tipo').dispatchEvent(new Event('input',{bubbles:true}));
@@ -442,6 +442,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   assert.equal(vista.campo('numero').getAttribute('aria-invalid'),'false');
   await vista.buscar();
   assert.isFalse(vista.querySelector('[data-resultados]').hidden);
+  assert.equal(vista.campo('clinica').options[1].textContent, 'Central');
   assert.equal(vista.campo('desde').value,'');assert.equal(vista.campo('hasta').value,'');
   assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'),1);
   assert.include(vista.querySelector('galeno-tarjeta-cita').textContent,'Central');
@@ -464,6 +465,21 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   vista.campo('numero').value='00000000-0';vista.campo('numero').dispatchEvent(new Event('input',{bubbles:true}));
   await vista.buscar();return vista;
  }
+ test('HU1 combina clínica y rango y permite volver a todas las clínicas', async () => {
+  const norte={...paciente,idPersonaRol:'pac-norte',idClinica:{idClinica:'norte',nombre:'Norte'}};
+  const citaNorte={...consulta,idConsulta:'c2',idPersonaRol:norte};
+  fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/persona_rol/persona/persona'))).resolves(respuesta([paciente,norte]));
+  fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/consulta'))).callsFake(async url=>respuestaRelacionesFixture(url,[consulta,citaNorte]));
+  const vista=await citasBuscadas();
+  assert.lengthOf(vista.campo('clinica').options,3);
+  assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'),2);
+  vista.campo('clinica').value='norte';vista.campo('desde').value='2026-11-12';await vista.filtrar();
+  assert.lengthOf(vista.citas,1);assert.equal(vista.citas[0].idConsulta,'c2');
+  const url=new URL(fetchStub.getCalls().filter(c=>new URL(c.args[0]).pathname.endsWith('/consulta')).at(-1).args[0]);
+  assert.equal(url.searchParams.get('desde'),'2026-11-12');
+  vista.querySelector('[data-limpiar]').click();await settle();
+  assert.equal(vista.campo('clinica').value,'');assert.lengthOf(vista.citas,2);
+ });
  test('HU1 no consulta rangos invertidos ni muestra tarjetas anteriores', async () => {
   const vista=await citasBuscadas();const llamadas=fetchStub.callCount;
   vista.campo('desde').value='2026-11-13';vista.campo('hasta').value='2026-11-12';await vista.filtrar();

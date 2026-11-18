@@ -29,10 +29,17 @@ class GalenoCitas extends HTMLElement {
             <section data-resultados hidden aria-label="Resultados de citas">
                 <h3>Mis citas</h3>
                 <form class="agenda-form" data-filtros>
-                    <label>Desde<input name="desde" type="date"></label>
-                    <label>Hasta<input name="hasta" type="date"></label>
-                    <button type="submit">Filtrar</button>
-                    <button type="button" data-limpiar>Mostrar todas</button>
+                    <label class="citas-filtro-clinica">Clínica
+                        <select name="clinica"><option value="">Todas las clínicas</option></select>
+                    </label>
+                    <div class="citas-filtro-rango">
+                        <label>Desde<input name="desde" type="date"></label>
+                        <label>Hasta<input name="hasta" type="date"></label>
+                        <div class="citas-filtro-botones">
+                            <button type="submit">Filtrar</button>
+                            <button type="button" data-limpiar>Mostrar todas</button>
+                        </div>
+                    </div>
                 </form>
                 <p role="status" aria-live="polite" data-resumen></p>
             </section>
@@ -67,13 +74,13 @@ class GalenoCitas extends HTMLElement {
     vigente(version) { return this.isConnected && this.version === version; }
     tipoSeleccionado() { return this.tipos?.find(t => t.idTipoDocumento === this.campo('tipo').value); }
     cambiar(e) {
-        if (['desde', 'hasta'].includes(e.target.name)) {
+        if (['desde', 'hasta', 'clinica'].includes(e.target.name)) {
             this.version++;
             this.ocupado = false;
             this.citas = [];
             this.querySelector('[data-lista]').replaceChildren();
             this.querySelector('[data-lista]').hidden = true;
-            this.querySelector('[data-resumen]').textContent = 'Aplica el filtro para consultar las fechas seleccionadas';
+            this.querySelector('[data-resumen]').textContent = 'Aplica el filtro para consultar la selección';
             this.sincronizar();
             return;
         }
@@ -107,6 +114,7 @@ class GalenoCitas extends HTMLElement {
     limpiarResultados() {
         this.citas = [];
         this.contextos = null;
+        this.campo('clinica').innerHTML = '<option value="">Todas las clínicas</option>';
         this.querySelector('[data-resultados]').hidden = true;
         this.querySelector('[data-filtros]').reset();
         this.querySelector('[data-lista]').replaceChildren();
@@ -141,6 +149,10 @@ class GalenoCitas extends HTMLElement {
             const citas = await buscarCitas(paciente.contextos);
             if (!this.vigente(version)) return;
             this.contextos = paciente.contextos;
+            const clinicas = new Map(paciente.contextos.filter(c => c.idClinica?.idClinica)
+                .map(c => [c.idClinica.idClinica, c.idClinica]));
+            this.campo('clinica').innerHTML = '<option value="">Todas las clínicas</option>'
+                + [...clinicas.values()].map(c => `<option value="${esc(c.idClinica)}">${esc(c.nombre || 'Clínica sin nombre')}</option>`).join('');
             this.citas = citas;
             this.querySelector('[data-resultados]').hidden = false;
             this.estado('');
@@ -161,7 +173,9 @@ class GalenoCitas extends HTMLElement {
         try {
             if (desde || hasta) validarRango(desde || hasta, hasta || desde);
             resumen.textContent = 'Buscando citas…';
-            const citas = await buscarCitas(this.contextos, desde, hasta);
+            const clinica = this.campo('clinica').value;
+            const contextos = clinica ? this.contextos.filter(c => c.idClinica?.idClinica === clinica) : this.contextos;
+            const citas = await buscarCitas(contextos, desde, hasta);
             if (!this.vigente(version)) return;
             this.citas = citas;
             this.mostrarCitas();
@@ -179,6 +193,7 @@ class GalenoCitas extends HTMLElement {
         this.querySelector('[data-lista]').hidden = !tarjetas.length;
         this.querySelector('[data-resumen]').textContent = citas.length
             ? `${citas.length} ${citas.length === 1 ? 'cita encontrada asociada' : 'citas encontradas asociadas'} al documento`
+            : this.campo('clinica').value ? 'No hay citas para los filtros seleccionados'
             : this.campo('desde').value || this.campo('hasta').value ? 'No hay citas en el rango seleccionado' : 'No se encontraron citas asociadas al documento';
     }
 }

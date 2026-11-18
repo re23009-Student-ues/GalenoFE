@@ -1,4 +1,4 @@
-import { listarCompleto, validarPaciente, buscarCitas, filtrarCitas, validarFormatoDocumento } from '../../control/agenda_service.js';
+import { listarCompleto, validarPaciente, buscarCitas, validarFormatoDocumento, validarRango } from '../../control/agenda_service.js';
 import { ejemploDocumento } from '../../control/documento_formato.js';
 import { esc } from '../util_html.js';
 import '../componentes/tarjeta_cita.js';
@@ -7,6 +7,7 @@ class GalenoCitas extends HTMLElement {
     connectedCallback() {
         this.version = (this.version || 0) + 1;
         this.citas = [];
+        this.contextos = null;
         this.ocupado = false;
         this.innerHTML = `<section class="agenda-panel">
             <h2>Buscar mis citas</h2>
@@ -66,6 +67,16 @@ class GalenoCitas extends HTMLElement {
     vigente(version) { return this.isConnected && this.version === version; }
     tipoSeleccionado() { return this.tipos?.find(t => t.idTipoDocumento === this.campo('tipo').value); }
     cambiar(e) {
+        if (['desde', 'hasta'].includes(e.target.name)) {
+            this.version++;
+            this.ocupado = false;
+            this.citas = [];
+            this.querySelector('[data-lista]').replaceChildren();
+            this.querySelector('[data-lista]').hidden = true;
+            this.querySelector('[data-resumen]').textContent = 'Aplica el filtro para consultar las fechas seleccionadas';
+            this.sincronizar();
+            return;
+        }
         if (!['tipo', 'numero'].includes(e.target.name)) return;
         this.version++;
         this.ocupado = false;
@@ -95,6 +106,7 @@ class GalenoCitas extends HTMLElement {
     }
     limpiarResultados() {
         this.citas = [];
+        this.contextos = null;
         this.querySelector('[data-resultados]').hidden = true;
         this.querySelector('[data-filtros]').reset();
         this.querySelector('[data-lista]').replaceChildren();
@@ -128,28 +140,46 @@ class GalenoCitas extends HTMLElement {
             if (!this.vigente(version)) return;
             const citas = await buscarCitas(paciente.contextos);
             if (!this.vigente(version)) return;
+            this.contextos = paciente.contextos;
             this.citas = citas;
             this.querySelector('[data-resultados]').hidden = false;
             this.estado('');
-            this.filtrar();
+            this.mostrarCitas();
         } catch (e) { if (this.vigente(version)) { this.estado(e.message || e.mensaje); this.campo('numero').focus(); } }
         finally { if (this.vigente(version)) { this.ocupado = false; this.sincronizar(); } }
     }
-    filtrar() {
+    async filtrar() {
+        if (!this.contextos) return;
+        const version = ++this.version;
+        const desde = this.campo('desde').value, hasta = this.campo('hasta').value;
         const resumen = this.querySelector('[data-resumen]');
+        this.citas = [];
+        this.querySelector('[data-lista]').replaceChildren();
+        this.querySelector('[data-lista]').hidden = true;
+        this.ocupado = true;
+        this.sincronizar();
         try {
-            const citas = filtrarCitas(this.citas, this.campo('desde').value, this.campo('hasta').value);
-            const tarjetas = citas.map(cita => {
-                const tarjeta = document.createElement('galeno-tarjeta-cita');
-                tarjeta.cita = cita;
-                return tarjeta;
-            });
-            this.querySelector('[data-lista]').replaceChildren(...tarjetas);
-            this.querySelector('[data-lista]').hidden = !tarjetas.length;
-            resumen.textContent = citas.length
-                ? `${citas.length} ${citas.length === 1 ? 'cita encontrada asociada' : 'citas encontradas asociadas'} al documento`
-                : this.citas.length ? 'No hay citas en el rango seleccionado' : 'No se encontraron citas asociadas al documento';
-        } catch (e) { resumen.textContent = e.message; }
+            if (desde || hasta) validarRango(desde || hasta, hasta || desde);
+            resumen.textContent = 'Buscando citas…';
+            const citas = await buscarCitas(this.contextos, desde, hasta);
+            if (!this.vigente(version)) return;
+            this.citas = citas;
+            this.mostrarCitas();
+        } catch (e) { if (this.vigente(version)) resumen.textContent = e.message || e.mensaje; }
+        finally { if (this.vigente(version)) { this.ocupado = false; this.sincronizar(); } }
+    }
+    mostrarCitas() {
+        const citas = this.citas;
+        const tarjetas = citas.map(cita => {
+            const tarjeta = document.createElement('galeno-tarjeta-cita');
+            tarjeta.cita = cita;
+            return tarjeta;
+        });
+        this.querySelector('[data-lista]').replaceChildren(...tarjetas);
+        this.querySelector('[data-lista]').hidden = !tarjetas.length;
+        this.querySelector('[data-resumen]').textContent = citas.length
+            ? `${citas.length} ${citas.length === 1 ? 'cita encontrada asociada' : 'citas encontradas asociadas'} al documento`
+            : this.campo('desde').value || this.campo('hasta').value ? 'No hay citas en el rango seleccionado' : 'No se encontraron citas asociadas al documento';
     }
 }
 customElements.define('galeno-citas', GalenoCitas);

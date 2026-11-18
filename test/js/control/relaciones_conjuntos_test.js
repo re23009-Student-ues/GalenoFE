@@ -83,17 +83,59 @@ suite('Paso 4: relaciones por conjuntos', () => {
             const url = new URL(raw), recurso = url.pathname.split('/').pop();
             const rows = { consulta_procedimiento: [cp], procedimiento_paso: [def], orden_examen: [orden], procedimiento_paso_examen: [config], procedimiento_paso_secuencia: [], examen_resultado: [result] };
             assert.property(rows, recurso); assert.isFalse(url.searchParams.has('first') && url.searchParams.size === 2);
-            if (recurso === 'procedimiento_paso_examen') { assert.equal(url.searchParams.get('activo'), 'true'); assert.equal(url.searchParams.get('pasos'), 'paso'); }
+            if (recurso === 'procedimiento_paso_examen') { assert.equal(url.searchParams.get('activo'), 'true'); assert.equal(url.searchParams.get('examenActivo'), 'true'); assert.equal(url.searchParams.get('pasos'), 'paso'); }
             return response(rows[recurso]);
         });
         const detalle = await cargarDetalleAtencion('consulta'); assert.deepEqual(detalle.examenes, [config]); assert.deepEqual(detalle.resultados, [result]);
         assert.deepEqual(detalle.definiciones.get('proc'), [def]);
     });
+    test('atención conserva ambos filtros de activos al paginar las configuraciones', async () => {
+        const configs = Array.from({ length: 123 }, (_, i) => ({ idProcedimientoPasoExamen: 'config-' + i,
+            idProcedimientoPaso: def, activo: true, idExamen: { idExamen: 'examen-' + i, activo: true } }));
+        fetchStub.callsFake(async raw => {
+            const url = new URL(raw), recurso = url.pathname.split('/').pop();
+            if (recurso === 'procedimiento_paso_examen') {
+                assert.equal(url.searchParams.get('pasos'), 'paso');
+                assert.equal(url.searchParams.get('activo'), 'true');assert.equal(url.searchParams.get('examenActivo'), 'true');
+                const first = Number(url.searchParams.get('first'));return response(configs.slice(first, first + 50), configs.length);
+            }
+            return response(({ consulta_procedimiento: [cp], procedimiento_paso: [def], orden_examen: [], procedimiento_paso_secuencia: [] })[recurso]);
+        });
+        assert.deepEqual((await cargarDetalleAtencion('consulta')).examenes, configs);
+        assert.deepEqual(fetchStub.getCalls().map(c => new URL(c.args[0])).filter(u => u.pathname.endsWith('/procedimiento_paso_examen'))
+            .map(u => u.searchParams.get('first')), ['0', '50', '100']);
+    });
+    test('frontend descarta exámenes inactivos, nulos o ausentes aunque el servidor los envíe y conserva históricos', async () => {
+        const config = { idProcedimientoPasoExamen: 'config', idProcedimientoPaso: def, activo: true, idExamen: { idExamen: 'examen', activo: true } };
+        const configs = [config, ...[false, null, undefined].map((activo, i) => ({ ...config, idProcedimientoPasoExamen: 'inactivo-' + i, idExamen: { activo } })),
+            { ...config, idProcedimientoPasoExamen: 'sin-examen', idExamen: null }];
+        const orden = { idOrdenExamen: 'historica', idConsultaProcedimientoPaso: ejecucion, indicaciones: '[Paso] [Examen inactivo]' };
+        const resultado = { idExamenResultado: 'historico', idOrdenExamen: orden, resultado: 'Contenido existente' };
+        fetchStub.callsFake(async raw => {
+            const recurso = new URL(raw).pathname.split('/').pop();
+            return response(({ consulta_procedimiento: [cp], procedimiento_paso: [def], orden_examen: [orden],
+                procedimiento_paso_examen: configs, procedimiento_paso_secuencia: [], examen_resultado: [resultado] })[recurso]);
+        });
+        const detalle = await cargarDetalleAtencion('consulta');assert.deepEqual(detalle.examenes, [config]);
+        assert.deepEqual(detalle.ordenes, [orden]);assert.deepEqual(detalle.resultados, [resultado]);
+    });
+    test('un fallo al paginar exámenes activos rechaza la carga completa', async () => {
+        fetchStub.callsFake(async raw => {
+            const url = new URL(raw), recurso = url.pathname.split('/').pop();
+            if (recurso === 'procedimiento_paso_examen') {
+                if (url.searchParams.get('first') === '50') return new Response('', { status: 500 });
+                return response(Array.from({ length: 50 }, (_, i) => ({ idProcedimientoPasoExamen: String(i), idProcedimientoPaso: def,
+                    activo: true, idExamen: { activo: true } })), 51);
+            }
+            return response(({ consulta_procedimiento: [cp], procedimiento_paso: [def], orden_examen: [], procedimiento_paso_secuencia: [] })[recurso]);
+        });
+        await rejects(() => cargarDetalleAtencion('consulta'), '500');
+    });
     test('sin procedimientos ni órdenes no descarga catálogos, configuraciones ni resultados', async () => {
         fetchStub.callsFake(async () => response([])); const detalle = await cargarDetalleAtencion('consulta');
         assert.isEmpty(detalle.pasosDefinidos); assert.equal(fetchStub.callCount, 2);
     });
-    test('agenda mantiene definiciones del rol sin ejecución y usa relaciones filtradas', async () => {
+    test('agenda usa relaciones filtradas y oculta consultas sin ejecución asignada', async () => {
         const contexto = { idPersonaRol: 'empleado', idClinica: { idClinica: 'clinica' }, idRol: { idRol: 'doctor', nombre: 'Doctor' } };
         const consulta = { ...c, idPersonaRol: { idClinica: contexto.idClinica } };
         fetchStub.callsFake(async raw => {
@@ -103,7 +145,7 @@ suite('Paso 4: relaciones por conjuntos', () => {
             return response(rows[recurso]);
         });
         const agenda = await cargarAgenda(contexto, '2026-01-01', '2026-01-01');
-        assert.deepEqual(agenda[0].procedimientos[0].pasosDelRol[0].registros, []);
+        assert.deepEqual(agenda, []);
     });
 });
 mocha.run();

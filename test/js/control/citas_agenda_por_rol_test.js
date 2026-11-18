@@ -19,6 +19,33 @@ suite('Paso 3: citas y agenda por rol paginadas',()=>{
         const rowsRead=await buscarCitas([patient]);assert.lengthOf(rowsRead,124);assert.isNull(rowsRead[123].fechaInicio);
         assert.deepEqual(fetchStub.getCalls().filter(c=>new URL(c.args[0]).pathname.endsWith('/consulta')).map(c=>new URL(c.args[0]).searchParams.get('first')),['0','50','100']);
     });
+    test('124 citas con rango conservan persona y fechas en cada página',async()=>{
+        const rows=Array.from({length:124},(_,i)=>consulta(String(i)));
+        fetchStub.callsFake(async raw=>{const url=new URL(raw);if(!url.pathname.endsWith('/consulta')) return response([]);
+            assert.equal(url.searchParams.get('persona'),patient.idPersona.idPersona);
+            assert.equal(url.searchParams.get('desde'),'2026-01-01');assert.equal(url.searchParams.get('hasta'),'2026-01-01');
+            const first=Number(url.searchParams.get('first'));return response(rows.slice(first,first+50),124);
+        });
+        assert.lengthOf(await buscarCitas([patient],'2026-01-01','2026-01-01'),124);
+        assert.equal(fetchStub.getCalls().filter(c=>new URL(c.args[0]).pathname.endsWith('/consulta')).length,3);
+    });
+    test('fechas opcionales se envían sin inventar el límite ausente',async()=>{
+        fetchStub.callsFake(async()=>response([]));
+        for(const rango of [['2026-01-01',''],['','2026-01-01'],['','']]){
+            await buscarCitas([patient],...rango);const url=new URL(fetchStub.lastCall.args[0]);
+            assert.equal(url.searchParams.get('desde'),rango[0]||null);assert.equal(url.searchParams.get('hasta'),rango[1]||null);
+        }
+    });
+    test('rango de citas inválido no inicia ninguna petición',async()=>{
+        await rejects(()=>buscarCitas([patient],'2026-02-30',''),'fechas');
+        await rejects(()=>buscarCitas([patient],'2026-01-02','2026-01-01'),'Desde');sinon.assert.notCalled(fetchStub);
+    });
+    test('no recorta localmente ni descarga procedimientos fuera del rango devuelto',async()=>{
+        fetchStub.callsFake(async raw=>{const url=new URL(raw);if(url.pathname.endsWith('/consulta')) return response([consulta('unica')]);
+            assert.equal(url.searchParams.get('consultas'),'unica');return response([]);
+        });
+        assert.lengthOf(await buscarCitas([patient],'2026-03-01',''),1);
+    });
     test('citas de dos clínicas usan una consulta por persona, no una por inscripción',async()=>{
         const other={...patient,idPersonaRol:'otra-inscripcion',idClinica:{idClinica:'norte'}};
         fetchStub.callsFake(async raw=>new URL(raw).pathname.endsWith('/consulta')?response([consulta('a'),{...consulta('b'),idPersonaRol:other}]):response([]));
@@ -48,7 +75,7 @@ suite('Paso 3: citas y agenda por rol paginadas',()=>{
         const result=await filtrarConsultasPorRol([first,second],worker);assert.lengthOf(result,1);assert.strictEqual(result[0],second);
         sinon.assert.calledOnce(fetchStub);assert.isTrue(new URL(fetchStub.firstCall.args[0]).pathname.endsWith('/consulta'));
     });
-    test('agenda presenta una definición del rol aunque todavía no exista ejecución',async()=>{
+    test('agenda oculta una consulta del rol cuando todavía no existe ejecución asignada',async()=>{
         const c=consulta('a'),cp={idConsultaProcedimiento:'cp',idConsulta:c,idProcedimiento:{idProcedimiento:'proc'}};
         const def={idProcedimientoPaso:'paso',idRol:worker.idRol,idProcedimiento:{idProcedimiento:'proc'}};
         fetchStub.callsFake(async raw=>{const url=new URL(raw);const path=url.pathname.split('/resources/v1/')[1];
@@ -56,7 +83,26 @@ suite('Paso 3: citas y agenda por rol paginadas',()=>{
             if(path==='consulta'){assert.equal(url.searchParams.get('rol'),'doctor');assert.equal(url.searchParams.get('desde'),'2026-01-01');}
             assert.property(rows,path);return response(rows[path]);});
         const agenda=await cargarAgenda(worker,'2026-01-01','2026-01-01');
-        assert.lengthOf(agenda,1);assert.lengthOf(agenda[0].procedimientos[0].pasosDelRol,1);assert.deepEqual(agenda[0].procedimientos[0].pasosDelRol[0].registros,[]);
+        assert.deepEqual(agenda,[]);
+    });
+    test('agenda exige pendientes del contexto exacto y oculta completados o reasignados',async()=>{
+        const c=consulta('a'),cp={idConsultaProcedimiento:'cp',idConsulta:c,idProcedimiento:{idProcedimiento:'proc'}};
+        const def={idProcedimientoPaso:'paso',idRol:worker.idRol,idProcedimiento:{idProcedimiento:'proc'}};
+        const registro={idConsultaProcedimientoPaso:'ejecucion',idConsultaProcedimiento:cp,idProcedimientoPaso:def,idPersonaRol:worker,estado:'PENDIENTE'};
+        fetchStub.callsFake(async raw=>{
+            const path=new URL(raw).pathname.split('/resources/v1/')[1];
+            return response({consulta:[c],consulta_procedimiento:[cp],consulta_procedimiento_paso:[registro],procedimiento_paso:[def],procedimiento_paso_secuencia:[]}[path]);
+        });
+        for(const estado of ['PENDIENTE','EN_PROCESO']) {
+            registro.estado=estado;assert.lengthOf(await cargarAgenda(worker,'2026-01-01','2026-01-01'),1);
+        }
+        for(const estado of ['COMPLETADO','FINALIZADO']) {
+            registro.estado=estado;assert.deepEqual(await cargarAgenda(worker,'2026-01-01','2026-01-01'),[]);
+        }
+        registro.estado=' INVALIDO ';assert.deepEqual(await cargarAgenda(worker,'2026-01-01','2026-01-01'),[]);
+        registro.estado='PENDIENTE';registro.idPersonaRol={...worker,idPersonaRol:'otro-contexto'};
+        assert.deepEqual(await cargarAgenda(worker,'2026-01-01','2026-01-01'),[]);
+        registro.idPersonaRol=null;assert.deepEqual(await cargarAgenda(worker,'2026-01-01','2026-01-01'),[]);
     });
     test('error o página incompleta impide devolver citas parciales',async()=>{
         fetchStub.resolves(new Response('',{status:500}));await rejects(()=>buscarCitas([patient]),'500');

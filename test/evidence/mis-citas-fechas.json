@@ -1,0 +1,585 @@
+{
+  "backendUnit": {
+    "tests": 308,
+    "failures": 0,
+    "errors": 0
+  },
+  "frontendMocha": {
+    "agenda": 52,
+    "citasAgendaContratos": 14,
+    "workerVersion": 4,
+    "login": 18,
+    "autenticacionSimulada": 16,
+    "failures": 0
+  },
+  "serviceWorkerNode": {
+    "tests": 13,
+    "failures": 0
+  },
+  "integrationREST": {
+    "tests": 128,
+    "passed": 128,
+    "failed": 0,
+    "checks": [
+      {
+        "name": "citas persona en dos clinicas pagina 0",
+        "passed": true
+      },
+      {
+        "name": "citas persona en dos clinicas pagina 50",
+        "passed": true
+      },
+      {
+        "name": "citas persona en dos clinicas pagina 100",
+        "passed": true
+      },
+      {
+        "name": "citas persona en dos clinicas pagina 150",
+        "passed": true
+      },
+      {
+        "name": "citas persona en dos clinicas recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "citas conservan fecha nula al final",
+        "passed": true
+      },
+      {
+        "name": "citas incluyen segunda clinica sin filtrar por ejecucion",
+        "passed": true
+      },
+      {
+        "name": "citas dia completo El Salvador pagina 0",
+        "passed": true
+      },
+      {
+        "name": "citas dia completo El Salvador pagina 50",
+        "passed": true
+      },
+      {
+        "name": "citas dia completo El Salvador pagina 100",
+        "passed": true
+      },
+      {
+        "name": "citas dia completo El Salvador pagina 150",
+        "passed": true
+      },
+      {
+        "name": "citas dia completo El Salvador recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "citas incluyen medianoche y ultimo microsegundo sin dia siguiente ni fecha nula",
+        "passed": true
+      },
+      {
+        "name": "citas solo desde pagina 0",
+        "passed": true
+      },
+      {
+        "name": "citas solo desde pagina 50",
+        "passed": true
+      },
+      {
+        "name": "citas solo desde pagina 100",
+        "passed": true
+      },
+      {
+        "name": "citas solo desde pagina 150",
+        "passed": true
+      },
+      {
+        "name": "citas solo desde recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "citas solo hasta pagina 0",
+        "passed": true
+      },
+      {
+        "name": "citas solo hasta pagina 50",
+        "passed": true
+      },
+      {
+        "name": "citas solo hasta pagina 100",
+        "passed": true
+      },
+      {
+        "name": "citas solo hasta pagina 150",
+        "passed": true
+      },
+      {
+        "name": "citas solo hasta recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "citas rango sin coincidencias pagina 0",
+        "passed": true
+      },
+      {
+        "name": "citas rango sin coincidencias pagina 50",
+        "passed": true
+      },
+      {
+        "name": "citas rango sin coincidencias pagina 100",
+        "passed": true
+      },
+      {
+        "name": "citas rango sin coincidencias pagina 150",
+        "passed": true
+      },
+      {
+        "name": "citas rango sin coincidencias recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "citas ultimo dia del anio pagina 0",
+        "passed": true
+      },
+      {
+        "name": "citas ultimo dia del anio pagina 50",
+        "passed": true
+      },
+      {
+        "name": "citas ultimo dia del anio pagina 100",
+        "passed": true
+      },
+      {
+        "name": "citas ultimo dia del anio pagina 150",
+        "passed": true
+      },
+      {
+        "name": "citas ultimo dia del anio recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "citas dia bisiesto valido sin coincidencias pagina 0",
+        "passed": true
+      },
+      {
+        "name": "citas dia bisiesto valido sin coincidencias pagina 50",
+        "passed": true
+      },
+      {
+        "name": "citas dia bisiesto valido sin coincidencias pagina 100",
+        "passed": true
+      },
+      {
+        "name": "citas dia bisiesto valido sin coincidencias pagina 150",
+        "passed": true
+      },
+      {
+        "name": "citas dia bisiesto valido sin coincidencias recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "citas rechazan desde=",
+        "passed": true
+      },
+      {
+        "name": "citas rechazan hasta=",
+        "passed": true
+      },
+      {
+        "name": "citas rechazan desde=2026-02-29",
+        "passed": true
+      },
+      {
+        "name": "citas rechazan desde=0000-01-01",
+        "passed": true
+      },
+      {
+        "name": "citas rechazan desde=2026-1-01",
+        "passed": true
+      },
+      {
+        "name": "citas rechazan desde=2026-01-02&hasta=2026-01-01",
+        "passed": true
+      },
+      {
+        "name": "persona sin inscripcion paciente 30000000-0000-0000-0000-000000000124 pagina 0",
+        "passed": true
+      },
+      {
+        "name": "persona sin inscripcion paciente 30000000-0000-0000-0000-000000000124 pagina 50",
+        "passed": true
+      },
+      {
+        "name": "persona sin inscripcion paciente 30000000-0000-0000-0000-000000000124 pagina 100",
+        "passed": true
+      },
+      {
+        "name": "persona sin inscripcion paciente 30000000-0000-0000-0000-000000000124 pagina 150",
+        "passed": true
+      },
+      {
+        "name": "persona sin inscripcion paciente 30000000-0000-0000-0000-000000000124 recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "persona sin inscripcion paciente 30000000-0000-0000-0000-000000000999 pagina 0",
+        "passed": true
+      },
+      {
+        "name": "persona sin inscripcion paciente 30000000-0000-0000-0000-000000000999 pagina 50",
+        "passed": true
+      },
+      {
+        "name": "persona sin inscripcion paciente 30000000-0000-0000-0000-000000000999 pagina 100",
+        "passed": true
+      },
+      {
+        "name": "persona sin inscripcion paciente 30000000-0000-0000-0000-000000000999 pagina 150",
+        "passed": true
+      },
+      {
+        "name": "persona sin inscripcion paciente 30000000-0000-0000-0000-000000000999 recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "agenda Doctor A sin fechas pagina 0",
+        "passed": true
+      },
+      {
+        "name": "agenda Doctor A sin fechas pagina 50",
+        "passed": true
+      },
+      {
+        "name": "agenda Doctor A sin fechas pagina 100",
+        "passed": true
+      },
+      {
+        "name": "agenda Doctor A sin fechas pagina 150",
+        "passed": true
+      },
+      {
+        "name": "agenda Doctor A sin fechas recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "incluye paso sin ejecucion",
+        "passed": true
+      },
+      {
+        "name": "no exige responsable ni estado pendiente",
+        "passed": true
+      },
+      {
+        "name": "excluye procedimiento sin pasos y paso de otro rol",
+        "passed": true
+      },
+      {
+        "name": "fixture tiene ejecucion unica y 123 definiciones Doctor repetidas por procedimiento",
+        "passed": true
+      },
+      {
+        "name": "agenda dia completo El Salvador pagina 0",
+        "passed": true
+      },
+      {
+        "name": "agenda dia completo El Salvador pagina 50",
+        "passed": true
+      },
+      {
+        "name": "agenda dia completo El Salvador pagina 100",
+        "passed": true
+      },
+      {
+        "name": "agenda dia completo El Salvador pagina 150",
+        "passed": true
+      },
+      {
+        "name": "agenda dia completo El Salvador recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "limites incluyen inicio y ultimo microsegundo, excluyen dia siguiente",
+        "passed": true
+      },
+      {
+        "name": "solo desde pagina 0",
+        "passed": true
+      },
+      {
+        "name": "solo desde pagina 50",
+        "passed": true
+      },
+      {
+        "name": "solo desde pagina 100",
+        "passed": true
+      },
+      {
+        "name": "solo desde pagina 150",
+        "passed": true
+      },
+      {
+        "name": "solo desde recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "solo hasta pagina 0",
+        "passed": true
+      },
+      {
+        "name": "solo hasta pagina 50",
+        "passed": true
+      },
+      {
+        "name": "solo hasta pagina 100",
+        "passed": true
+      },
+      {
+        "name": "solo hasta pagina 150",
+        "passed": true
+      },
+      {
+        "name": "solo hasta recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "agenda otro rol pagina 0",
+        "passed": true
+      },
+      {
+        "name": "agenda otro rol pagina 50",
+        "passed": true
+      },
+      {
+        "name": "agenda otro rol pagina 100",
+        "passed": true
+      },
+      {
+        "name": "agenda otro rol pagina 150",
+        "passed": true
+      },
+      {
+        "name": "agenda otro rol recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "agenda otra clinica pagina 0",
+        "passed": true
+      },
+      {
+        "name": "agenda otra clinica pagina 50",
+        "passed": true
+      },
+      {
+        "name": "agenda otra clinica pagina 100",
+        "passed": true
+      },
+      {
+        "name": "agenda otra clinica pagina 150",
+        "passed": true
+      },
+      {
+        "name": "agenda otra clinica recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "agenda rol sin pasos pagina 0",
+        "passed": true
+      },
+      {
+        "name": "agenda rol sin pasos pagina 50",
+        "passed": true
+      },
+      {
+        "name": "agenda rol sin pasos pagina 100",
+        "passed": true
+      },
+      {
+        "name": "agenda rol sin pasos pagina 150",
+        "passed": true
+      },
+      {
+        "name": "agenda rol sin pasos recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "agenda clinica inexistente pagina 0",
+        "passed": true
+      },
+      {
+        "name": "agenda clinica inexistente pagina 50",
+        "passed": true
+      },
+      {
+        "name": "agenda clinica inexistente pagina 100",
+        "passed": true
+      },
+      {
+        "name": "agenda clinica inexistente pagina 150",
+        "passed": true
+      },
+      {
+        "name": "agenda clinica inexistente recorrido completo sin duplicados",
+        "passed": true
+      },
+      {
+        "name": "rechaza persona=",
+        "passed": true
+      },
+      {
+        "name": "rechaza persona=x",
+        "passed": true
+      },
+      {
+        "name": "rechaza rol=20000000-0000-0000-0000-000000000002",
+        "passed": true
+      },
+      {
+        "name": "rechaza clinica=10000000-0000-0000-0000-000000000001&rol=",
+        "passed": true
+      },
+      {
+        "name": "rechaza persona=30000000-0000-0000-0000-000000000001&clinica=10000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "rechaza persona=30000000-0000-0000-0000-000000000001&rol=20000000-0000-0000-0000-000000000002",
+        "passed": true
+      },
+      {
+        "name": "rechaza clinica=10000000-0000-0000-0000-000000000001&rol=20000000-0000-0000-0000-000000000002&inscripcion=40000000-0000-0000-0000-000000000001",
+        "passed": true
+      },
+      {
+        "name": "rechaza desde=2026-01-01",
+        "passed": true
+      },
+      {
+        "name": "rechaza clinica=10000000-0000-0000-0000-000000000001&hasta=2026-01-01",
+        "passed": true
+      },
+      {
+        "name": "rechaza clinica=10000000-0000-0000-0000-000000000001&rol=20000000-0000-0000-0000-000000000002&desde=2026-02-30",
+        "passed": true
+      },
+      {
+        "name": "rechaza clinica=10000000-0000-0000-0000-000000000001&rol=20000000-0000-0000-0000-000000000002&desde=2026-1-01",
+        "passed": true
+      },
+      {
+        "name": "rechaza clinica=10000000-0000-0000-0000-000000000001&rol=20000000-0000-0000-0000-000000000002&desde=2026-01-02&hasta=2026-01-01",
+        "passed": true
+      },
+      {
+        "name": "rechaza clinica=10000000-0000-0000-0000-000000000001&rol=20000000-0000-0000-0000-000000000002&hasta=",
+        "passed": true
+      },
+      {
+        "name": "rechaza clinica=10000000-0000-0000-0000-000000000001&rol=20000000-0000-0000-0000-000000000002&desde=0000-01-01",
+        "passed": true
+      },
+      {
+        "name": "paginacion invalida persona=30000000-0000-0000-0000-000000000001&first=-1&max=50",
+        "passed": true
+      },
+      {
+        "name": "paginacion invalida persona=30000000-0000-0000-0000-000000000001&first=0&max=0",
+        "passed": true
+      },
+      {
+        "name": "paginacion invalida persona=30000000-0000-0000-0000-000000000001&first=0&max=51",
+        "passed": true
+      },
+      {
+        "name": "paginacion invalida clinica=10000000-0000-0000-0000-000000000001&rol=20000000-0000-0000-0000-000000000002&first=-1&max=50",
+        "passed": true
+      },
+      {
+        "name": "paginacion invalida clinica=10000000-0000-0000-0000-000000000001&rol=20000000-0000-0000-0000-000000000002&first=0&max=0",
+        "passed": true
+      },
+      {
+        "name": "paginacion invalida clinica=10000000-0000-0000-0000-000000000001&rol=20000000-0000-0000-0000-000000000002&first=0&max=51",
+        "passed": true
+      },
+      {
+        "name": "contrato anterior ''",
+        "passed": true
+      },
+      {
+        "name": "contrato anterior 'clinica=10000000-0000-0000-0000-000000000001'",
+        "passed": true
+      },
+      {
+        "name": "contrato anterior 'inscripcion=40000000-0000-0000-0000-000000000001'",
+        "passed": true
+      },
+      {
+        "name": "contrato anterior 'clinica=10000000-0000-0000-0000-000000000002&inscripcion=40000000-0000-0000-0000-000000000001'",
+        "passed": true
+      },
+      {
+        "name": "GET consulta individual del paso 1",
+        "passed": true
+      },
+      {
+        "name": "catalogo activo del paso 2",
+        "passed": true
+      },
+      {
+        "name": "documento filtrado del paso 1",
+        "passed": true
+      },
+      {
+        "name": "buscar documento conserva ingreso simulado",
+        "passed": true
+      },
+      {
+        "name": "todas las tablas sinteticas permanecen intactas",
+        "passed": true
+      }
+    ],
+    "databaseUnchanged": true,
+    "tablesBefore": {
+      "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+      "consulta": "255:dd1a9994dae90d3ef883063d70087319",
+      "consulta_procedimiento": "133:e129813c7c19ac0dbdbfb13b273a3a0d",
+      "consulta_procedimiento_paso": "1:9d3e716b1760905acb89340ec9a914e8",
+      "documento": "2:c00e30d778135e16c495e3e81ebf44d9",
+      "examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "examen_resultado": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "orden_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "persona": "261:b7c99508254e9c168fbfa5ff9c5a266b",
+      "persona_rol": "264:a04ef5d410582948fe0d9dd2ae4f85d9",
+      "procedimiento": "132:d7b8e30582e63be5a190fe2526638554",
+      "procedimiento_paso": "125:944328930feb9a0df8ea613d88f7cdbd",
+      "procedimiento_paso_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "procedimiento_paso_secuencia": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "rol": "3:81f4da2a40906a2a398b79a405f39eef",
+      "tipo_documento": "131:f20d7a81ad26ca7582220696fc99ed93",
+      "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "tablesAfter": {
+      "clinica": "2:6e4fc20405458b07ac1f6ac7855cabb2",
+      "consulta": "255:dd1a9994dae90d3ef883063d70087319",
+      "consulta_procedimiento": "133:e129813c7c19ac0dbdbfb13b273a3a0d",
+      "consulta_procedimiento_paso": "1:9d3e716b1760905acb89340ec9a914e8",
+      "documento": "2:c00e30d778135e16c495e3e81ebf44d9",
+      "examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "examen_resultado": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "examen_tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "orden_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "persona": "261:b7c99508254e9c168fbfa5ff9c5a266b",
+      "persona_rol": "264:a04ef5d410582948fe0d9dd2ae4f85d9",
+      "procedimiento": "132:d7b8e30582e63be5a190fe2526638554",
+      "procedimiento_paso": "125:944328930feb9a0df8ea613d88f7cdbd",
+      "procedimiento_paso_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "procedimiento_paso_secuencia": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "rol": "3:81f4da2a40906a2a398b79a405f39eef",
+      "tipo_documento": "131:f20d7a81ad26ca7582220696fc99ed93",
+      "tipo_examen": "0:d41d8cd98f00b204e9800998ecf8427e",
+      "tipo_medio_contacto": "0:d41d8cd98f00b204e9800998ecf8427e"
+    },
+    "base": "http://127.0.0.1:53449/GalenoSV-1.0-SNAPSHOT/resources/v1/",
+    "container": "galeno-pagination-it-HDtzBQ"
+  }
+}

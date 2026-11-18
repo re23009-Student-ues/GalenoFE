@@ -41,6 +41,10 @@
     color: var(--texto-suave, #6f7b8a);
 }
 
+:host(.agenda__consulta) { display: flex; flex-direction: column; }
+:host(.agenda__consulta) .body { flex: 1; }
+:host(.agenda__consulta) .footer { justify-content: center; margin-top: auto; }
+
 ::slotted(.obs) {
     color: var(--texto-suave, #6f7b8a);
 }

@@ -7,20 +7,34 @@ class Agenda extends HTMLElement {
     connectedCallback() {
         this.version = (this.version || 0) + 1;
         const hoy = diaAgenda();
-        this.innerHTML = `<section class="agenda-panel"><h2>Consultas por rol</h2><p>Tus pasos se indican con «-responsable».</p><form class="agenda-form"><label>Desde<input name="desde" type="date" value="${hoy}" required></label><label>Hasta<input name="hasta" type="date" value="${hoy}" required></label><button type="submit">Aplicar</button><button type="button" data-hoy>Hoy</button></form><p role="status" aria-live="polite"></p><div data-lista></div></section>`;
+        this.innerHTML = `<section class="agenda-panel"><h2>Consultas por rol</h2><p>Tus pasos se indican con «-responsable».</p><form class="agenda-form"><label>Buscar por nombre<input name="nombre" type="search" placeholder="Nombre o apellido (mínimo 3 caracteres)"></label><label>Desde<input name="desde" type="date" value="${hoy}" required></label><label>Hasta<input name="hasta" type="date" value="${hoy}" required></label><button type="button" data-hoy>Hoy</button></form><p role="status" aria-live="polite"></p><div data-lista></div></section>`;
         this.alSubmit = e => { e.preventDefault(); this.cargar(); };
-        this.alInput = e => { if (!e.target.closest('.agenda-form')) return; this.version++; this.destruirArboles(); this.querySelector('[data-lista]').replaceChildren(); this.querySelector('[role="status"]').textContent = 'Aplica el rango seleccionado'; this.querySelector('[type="submit"]').disabled = false; };
+        this.agenda = null;
+        this.alInput = e => {
+            if (!e.target.matches('.agenda-form [name="nombre"]')) return;
+            clearTimeout(this.esperaNombre);
+            this.esperaNombre = null;
+            if (e.target.value.trim().length < 3) { this.filtrarNombre(); return; }
+            this.esperaNombre = setTimeout(() => {
+                this.esperaNombre = null;
+                if (this.isConnected) this.filtrarNombre();
+            }, 300);
+        };
+        this.alChange = e => {
+            if (e.target.matches('.agenda-form input[type="date"]')) this.cargar();
+        };
         this.alClick = e => {
-            if (e.target.closest('[data-hoy]')) { this.querySelectorAll('.agenda-form input').forEach(i => i.value = diaAgenda()); this.cargar(); }
+            if (e.target.closest('[data-hoy]')) { this.querySelectorAll('.agenda-form input[type="date"]').forEach(i => i.value = diaAgenda()); this.cargar(); }
             const abrir = e.target.closest('[data-consulta]');
             if (abrir) this.dispatchEvent(new CustomEvent('galeno-navegar', { detail: { ruta: '/atencion/' + encodeURIComponent(abrir.dataset.consulta) }, bubbles: true, composed: true }));
         };
         this.addEventListener('submit', this.alSubmit);
         this.addEventListener('input', this.alInput);
+        this.addEventListener('change', this.alChange);
         this.addEventListener('click', this.alClick);
         this.cargar();
     }
-    disconnectedCallback() { this.version++; this.destruirArboles(); this.removeEventListener('submit', this.alSubmit); this.removeEventListener('input', this.alInput); this.removeEventListener('click', this.alClick); }
+    disconnectedCallback() { clearTimeout(this.esperaNombre); this.esperaNombre = null; this.version++; this.destruirArboles(); this.removeEventListener('submit', this.alSubmit); this.removeEventListener('input', this.alInput); this.removeEventListener('change', this.alChange); this.agenda = null; this.removeEventListener('click', this.alClick); }
     destruirArboles() {
         this.arboles?.forEach(arbol => arbol.destroy());
         this.arboles = [];
@@ -124,7 +138,13 @@ class Agenda extends HTMLElement {
                 hora.textContent = new Intl.DateTimeFormat('es-SV', { timeZone: ZONA_AGENDA, timeStyle: 'short' }).format(fecha);
             } else { dia.textContent = c.fechaInicio ? 'Fecha no válida' : 'Sin fecha'; hora.hidden = true; }
             inicio.append(dia, hora);
-            inicio.setAttribute('aria-label', `Fecha de la consulta: ${dia.textContent}${hora.hidden ? '' : `, ${hora.textContent}`}`);
+            const finalizado = c.procedimientos.some(procedimiento => (procedimiento.pasos || []).some(paso =>
+                paso.indicaFin === true && (paso.registros || []).some(registro =>
+                    ['COMPLETADO', 'FINALIZADO'].includes(String(registro.estado ?? '').trim().toUpperCase()))));
+            const estado = document.createElement('span'); estado.className = 'agenda__consulta-estado';
+            estado.dataset.estado = finalizado ? 'finalizado' : 'en-curso';
+            estado.textContent = finalizado ? 'Finalizado' : 'En curso'; inicio.append(estado);
+            inicio.setAttribute('aria-label', `Fecha de la consulta: ${dia.textContent}${hora.hidden ? '' : `, ${hora.textContent}`}, ${estado.textContent}`);
             titulo.append(inicio);
             const arbol = new Tree(); arbol.slot = 'contenido';
             const data = this.datosProcedimientos(c.procedimientos);
@@ -170,21 +190,38 @@ class Agenda extends HTMLElement {
         }
     }
 
+    filtrarNombre() {
+        if (!this.agenda) return;
+        const normalizar = valor => valor.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim().replace(/\s+/g, ' ');
+        const texto = normalizar(this.querySelector('[name="nombre"]').value);
+        const nombre = texto.length >= 3 ? texto : '';
+        if (nombre === this.nombreAplicado) return;
+        this.nombreAplicado = nombre;
+        const consultas = this.agenda.filter(c => {
+            const persona = c.idPersonaRol?.idPersona;
+            return normalizar([persona?.nombres, persona?.apellidos].filter(Boolean).join(' ')).includes(nombre);
+        });
+        this.destruirArboles();
+        this.querySelector('[role="status"]').textContent = consultas.length ? `${consultas.length} ${consultas.length === 1 ? 'consulta con pasos asignados' : 'consultas con pasos asignados'} a tu contexto activo` : nombre ? 'No hay consultas que coincidan con el nombre y el rango seleccionados' : 'No hay consultas con pasos asignados a tu contexto activo en este rango';
+        this.montarConsultas(consultas);
+    }
+
     async cargar() {
+        clearTimeout(this.esperaNombre);
+        this.esperaNombre = null;
         const version = ++this.version;
-        const boton = this.querySelector('[type="submit"]');
-        boton.disabled = true;
+        this.agenda = null;
+        this.nombreAplicado = undefined;
         const estado = this.querySelector('[role="status"]');
         estado.textContent = 'Cargando agenda…';
         this.destruirArboles();
         this.querySelector('[data-lista]').replaceChildren();
         try {
-            const consultas = await cargarAgenda(this.usuario, this.querySelector('[name="desde"]').value, this.querySelector('[name="hasta"]').value);
+            const agenda = await cargarAgenda(this.usuario, this.querySelector('[name="desde"]').value, this.querySelector('[name="hasta"]').value);
             if (!this.isConnected || version !== this.version) return;
-            estado.textContent = consultas.length ? `${consultas.length} ${consultas.length === 1 ? 'consulta con pasos' : 'consultas con pasos'} de tu rol` : 'No hay consultas con pasos de tu rol en este rango';
-            this.montarConsultas(consultas);
+            this.agenda = agenda;
+            if (!this.esperaNombre) this.filtrarNombre();
         } catch (e) { if (this.isConnected && version === this.version) estado.textContent = e.message || e.mensaje; }
-        finally { if (this.isConnected && version === this.version) boton.disabled = false; }
     }
 }
 customElements.define('galeno-agenda', Agenda);

@@ -33,6 +33,12 @@ Navegación: `#/ruta`, `navegarA(ruta)` y `hashchange`. Hash vacío: sin sesión
 
 No existe portal ni mapa de rutas del paciente. El menú lateral del personal contiene solo **Inicio** (`/dashboard`) y **Agenda Médica** (`/consultas`). HU2 mantiene la exclusión de Paciente en autenticación y restauración.
 
+Mis citas envía las fechas opcionales al backend mediante
+`GET consulta?persona=…&desde=…&hasta=…`; Filtrar y Mostrar todas vuelven a consultar
+el servidor. Los días y el conteo se resuelven antes de paginar en
+America/El_Salvador. Se conserva el login simulado. Contrato, pruebas y publicación:
+[mis-citas-fechas-backend.md](mis-citas-fechas-backend.md). Caché: `galenosv-v35`.
+
 Agregar ruta: añadir `{ publica, titulo, tag }` al mapa en `router.js`. Reemplazar placeholder: asignar `tag` e importar su módulo registrado. Sin tag: «Esta pantalla está en construcción.», salvo `/login`. Enlaces: `data-route` en `menu_lateral.js`, dentro de `<galeno-menu>`. El router monta las vistas en `<galeno-outlet>`; no reemplazar este elemento al cambiar de modo.
 
 Antes de conectar, el router asigna **propiedades JavaScript**: `usuario` (persona_rol del contexto), `parametros` (parámetros decodificados, como `{ idConsulta: '42' }`). `/consulta/:idConsulta` conserva el controlador de consultas, obtiene por GET la consulta indicada y verifica su clínica; mantiene tarjetas con pasos reales y el evento `abrir-atencion`. El detalle está en `/atencion/:idConsulta`.
@@ -47,8 +53,11 @@ y ruta pendiente al iniciar sesión.
 Agenda Médica conserva solo consultas de la clínica activa con algún paso definido
 para `usuario.idRol.idRol`. Consulta `GET consulta?clinica=…&rol=…`; el backend
 usa EXISTS sobre procedimientos y definiciones de pasos, sin exigir ejecución ni
-responsable asignado. También se comprueba la participación por rol al acceder a
-`/consulta/:idConsulta`. Las páginas deben completarse antes de mostrar resultados;
+responsable asignado. Después, Consultas filtra las ejecuciones REST por
+`idPersonaRol` del contexto activo y exige al menos una asignación no INVALIDO.
+Los pasos propios completados conservan la consulta visible; compartir persona
+o rol, o ser el paciente, no sustituye esa asignación. La misma comprobación
+se aplica a `/consulta/:idConsulta`. El dashboard aplica la misma exigencia de asignación al contexto activo. Las páginas deben completarse antes de mostrar resultados;
 un fallo no se presenta como lista parcial.
 
 Las tarjetas de Agenda Médica consultan las ejecuciones reales mediante
@@ -105,6 +114,12 @@ contenido explícitamente; no se crean resultados vacíos. Los enlaces de adjunt
 solo admiten http/https; otras rutas se muestran como referencias, sin inventar
 un endpoint de descarga o subida.
 
+Atención solicita configuraciones con `activo=true&examenActivo=true`: el backend
+filtra tanto la configuración como el examen asociado antes de paginar y contar.
+El frontend conserva la comprobación de examen activo. Las órdenes y resultados
+históricos se mantienen. Contrato y pruebas:
+[examenes-activos-backend.md](examenes-activos-backend.md). Caché: `galenosv-v36`.
+
 Guardar envía cambios escalares y originales a los PUT `/{id}/atencion` de
 consulta_procedimiento_paso, orden_examen y examen_resultado. El backend verifica
 contexto, relaciones persistidas, rol, estado y grafo bajo bloqueo; compara antes
@@ -115,8 +130,8 @@ estable; recuperan el UUID desde Location canónico, sin búsqueda por contenido
 
 Un fallo parcial conserva lo pendiente y lo ya confirmado. Un conflicto 409 no
 hace avanzar ni sobrescribe datos; pide recargar. No hay transacción que abarque
-todos los CRUD del Wizard. Cambiar de paso con el indicador no altera estados; los pasos completados quedan
-bloqueados en el indicador y su contenido permanece en solo lectura;
+todos los CRUD del Wizard. Cambiar de paso con el indicador no altera estados; los pasos anteriores completados permiten abrir su reporte de solo lectura
+desde el indicador sin navegar ni reabrirlos;
 los estados cancelados o desconocidos muestran contenido en solo lectura.
 Guardar conserva el estado clínico; Guardar y avanzar confirma la atención
 y el estado antes de navegar. Anterior reabre el predecesor y conserva nodos y borradores.
@@ -463,8 +478,12 @@ Guardar y avanzar y Anterior quedan bloqueados hasta completar los predecesores.
 Si no quedan pendientes propios se conserva la selección de un paso propio completado
 o habilitado.
 Las validaciones del cliente también comprueban responsable en los registros recuperados
-antes de escribir. Esta restricción de interfaz requiere autorización equivalente en el
-backend para impedir acceso directo a los recursos REST.
+antes de escribir. El backend exige la misma asignación persistida para guardar y
+completar Atención, incluidas sus órdenes y resultados en las operaciones específicas;
+devuelve 403 si no coincide o falta responsable. Completar conserva la asignación.
+El login continúa simulado; esta comparación no autentica al solicitante ni cambia
+las lecturas REST. Alcance y pruebas:
+[responsable-asignado-backend.md](responsable-asignado-backend.md).
 
 ### Guardar y avanzar y estado personal en Consultas
 
@@ -534,3 +553,104 @@ y Consultas por rol (`galeno-agenda`), en ese orden. Ya no solicita
 Ambos componentes reciben el contexto actual antes de conectarse y conservan
 sus cargas, filtros, tarjetas y navegación. Los servicios agregados siguen
 disponibles para otros consumidores.
+
+Consultas por rol presenta Buscar por nombre, Desde y Hasta, en ese orden.
+El nombre filtra desde tres caracteres sobre la agenda cargada del rango, sin
+distinguir mayúsculas ni tildes y sin volver a solicitar la agenda. Los espacios
+exteriores no cuentan. Con menos de tres caracteres o al borrarlo se muestra
+todo el rango. Seleccionar Desde o Hasta consulta automáticamente el
+nuevo rango; los rangos inválidos muestran un aviso sin solicitar datos. No hay
+botón Aplicar. Hoy conserva el nombre y restablece únicamente las fechas.
+Los cambios de nombre durante una carga se aplican al recibir los datos; las
+respuestas de rangos anteriores se descartan. En escritorio, el nombre ocupa
+el 75% del ancho de los campos y cada fecha el 12.5%; en móvil se apilan.
+El campo indica «mínimo 3 caracteres». Mientras el filtro efectivo siga igual,
+se conservan las tarjetas y árboles existentes sin reconstruirlos; escribir la
+primera y segunda letra no provoca parpadeos ni solicitudes de documentos.
+Desde tres caracteres, la búsqueda espera 300 ms desde la última tecla antes de
+reconstruir las tarjetas. Borrar o bajar de tres caracteres restaura el rango
+inmediatamente y cancela la espera. Cambiar fechas o desconectar también cancela
+el temporizador pendiente. La caché estática es `galenosv-v34`.
+
+### Cierre de ramas con indicaFin
+
+Cuando la definición del paso tiene `indicaFin: true`, Atención muestra
+**Completar** en el botón y la confirmación. No pide un sucesor ni elige otra rama.
+Confirmar guarda primero los exámenes/órdenes pendientes y solicita el PUT
+`consulta_procedimiento_paso/{id}/completar` sin `siguiente`. Guardar solo conserva
+el estado, como antes.
+
+GalenoSV valida responsable, originales, clínica y grafo bajo los bloqueos
+existentes. En la misma transacción completa el paso actual e invalida las
+ramas restantes del mismo `consulta_procedimiento` que no estén COMPLETADO/FINALIZADO.
+Las ramas ya INVALIDO conservan ese estado.
+Conserva atención, responsables, órdenes y resultados de las demás ejecuciones,
+y todas sus fechas. Solo el paso atendido recibe fechaFin y fechaInicio si faltaba. No escribe fechaFin de consulta/procedimiento.
+Un reintento idéntico conserva las fechas. La respuesta es `{ paso, pasos }`;
+el frontend valida el conjunto y sus estados COMPLETADO/FINALIZADO/INVALIDO antes de actualizar
+sus registros y volver a Consultas. Otros procedimientos no se modifican.
+
+Caché estática `galenosv-v38`. Requiere desplegar GalenoSV y GalenoFE juntos.
+Pruebas: `ValidacionAtencionTest`, `AtencionTransaccionalResourceTest` y
+`test/atencion_test.html`.
+
+### Finalizado en el dashboard
+
+Las tarjetas del dashboard muestran «Finalizado» debajo de la fecha y hora
+cuando alguno de sus procedimientos tiene una ejecución COMPLETADO/FINALIZADO
+de un paso definido con `indicaFin: true`. Se normalizan mayúsculas y espacios
+del estado. En los demás casos, incluidos pasos pendientes, INVALIDO o sin
+ejecución, muestran «En curso» en la misma posición.
+La marca usa los datos de agenda actuales y no modifica estados ni fechas.
+Caché estática `galenosv-v40`. Cobertura: `test/agenda_test.html`.
+
+Las tarjetas del dashboard mantienen «Abrir consulta» centrado al fondo,
+incluso con alturas distintas o al desplegar el árbol. El ajuste se limita
+a `.agenda__consulta` dentro de los estilos de tarjeta. Caché `galenosv-v41`.
+
+### Reporte de pasos anteriores en Atención
+
+El responsable del paso activo puede pulsar un paso anterior COMPLETADO/FINALIZADO
+del mismo camino para abrir un diálogo de solo lectura, aunque el responsable
+del antecedente sea otro empleado. Se comprueba la ascendencia por secuencias,
+la visibilidad y la asignación actual; pasos posteriores, pendientes e INVALIDO
+no ofrecen reporte. El indicador conserva el paso activo y sus borradores.
+
+`galeno-reporte-paso` muestra atención, responsable, estado, fechas, órdenes
+y todos los resultados e interpretaciones ligados a esas órdenes, incluidos
+los históricos. Sin órdenes o resultados se informa su ausencia. Solo se
+convierten en enlaces los adjuntos http/https; todo texto se renderiza como texto.
+El reporte usa los registros REST ya cargados, no envía escrituras ni modifica
+estados. Cerrar o desconectar destruye el diálogo.
+Caché `galenosv-v42`. Pruebas: `test/atencion_test.html`.
+
+El indicador de Atención muestra el nombre completo del responsable entre el
+nombre de cada paso y su estado. Sin nombre disponible muestra «Sin responsable
+asignado»; las reasignaciones confirmadas actualizan la etiqueta. Caché `galenosv-v43`.
+
+Consultas recupera las asignaciones al recargar y oculta la consulta si ya no
+queda ningún paso válido asignado al contexto activo. Sin coincidencias informa
+«No hay consultas con pasos asignados a tu contexto activo en esta clínica».
+Caché `galenosv-v44`. Pruebas: `test/personal_test.html`.
+
+El dashboard también exige al menos una ejecución no INVALIDO asignada al
+`idPersonaRol` activo. Sin ejecución, con otro contexto de la misma persona
+o con asignaciones únicamente invalidadas, la consulta no aparece. Los pasos
+propios COMPLETADO/FINALIZADO conservan la tarjeta. Se mantienen los árboles
+del procedimiento y los antecedentes de otros responsables. Caché `galenosv-v45`.
+
+Al abrir una consulta, el Wizard conserva la prioridad del paso propio pendiente
+habilitado. Si no hay pendientes propios editables, selecciona el último paso
+propio COMPLETADO/FINALIZADO visible según el orden del grafo, en solo lectura.
+No usa fechaFin para ordenar ni elige pasos de otro contexto o INVALIDO.
+Una ruta que solicita un paso explícito mantiene esa selección. Caché `galenosv-v46`.
+
+Al guardar una selección de examen, tras confirmar su orden en REST se monta
+y abre inmediatamente «Registrar resultado (opcional)» en el mismo paso. No
+se reconstruye el Wizard ni se pierden borradores. Guardar de nuevo conserva
+los controles y no duplica órdenes ni crea resultados vacíos. Los resultados
+solo se registran al introducir contenido explícito. Caché `galenosv-v47`.
+
+El dashboard ahora exige un paso propio PENDIENTE/EN_PROCESO. Cuando solo quedan
+pasos propios completados o invalidados, oculta la consulta; Consultas conserva
+su historial de asignaciones completadas. Caché `galenosv-v48`.

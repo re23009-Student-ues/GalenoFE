@@ -19,7 +19,8 @@ export function filtrarRelacionesFixture(raw, filas) {
     const criterio = criterios[recurso];
     if (!criterio || !params.has(criterio[0])) return filas;
     const ids = conjunto(criterio[0]);
-    return filas.filter(f => ids.has(criterio[1](f)) && (!params.has('activo') || f.activo === (params.get('activo') === 'true')));
+    return filas.filter(f => ids.has(criterio[1](f)) && (!params.has('activo') || f.activo === (params.get('activo') === 'true'))
+        && (recurso !== 'procedimiento_paso_examen' || !params.has('examenActivo') || f.idExamen?.activo === (params.get('examenActivo') === 'true')));
 }
 export function respuestaRelacionesFixture(raw, filas) {
     const datos = filtrarRelacionesFixture(raw, filas);

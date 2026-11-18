@@ -14,7 +14,12 @@ galeno-citas, galeno-agenda, galeno-tarjeta-cita, galeno-selector-contexto { dis
 .agenda-panel details { padding: 10px; margin: 8px 0; background: #eef5fc; border-radius: 8px; }
 .agenda-panel pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .agenda-panel ul { padding-left: 22px; }
+/* Nombre: 75% del ancho de los campos; Desde y Hasta: 12.5% cada uno. */
+galeno-agenda .agenda-form label { min-width: 0; flex: 1 1 0; }
+galeno-agenda .agenda-form label:has([name="nombre"]) { flex: 6 1 0; }
+galeno-agenda .agenda-form input { box-sizing: border-box; }
 @media(max-width: 600px) { .agenda-panel { padding: 16px; } .agenda-form { flex-direction: column; align-items: stretch; } .agenda-form label { flex: auto; } }
+@media(max-width: 600px) { galeno-agenda .agenda-form label { flex: auto; } }
 
 /* Solo la búsqueda pública: hasta cuatro citas por fila, sin cambiar la agenda laboral. */
 galeno-citas .citas-documento { flex: 2 1 240px; min-width: 0; }
@@ -41,6 +46,8 @@ galeno-agenda .agenda__paciente { display: grid; grid-template-columns: minmax(0
 galeno-agenda .agenda__paciente > * { grid-column: 1; }
 galeno-agenda .agenda__paciente .agenda__consulta-fecha { grid-column: 2; grid-row: 1 / span 3; text-align: right; align-self: start; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 galeno-agenda .agenda__consulta-fecha > span { white-space: nowrap; }
+galeno-agenda .agenda__consulta-estado { color: #1f3a5f; font-weight: 600; }
+galeno-agenda .agenda__consulta-estado[data-estado="finalizado"] { color: #166534; }
 galeno-agenda .agenda__paciente h3 { font-size: 1rem; margin: 0; }
 galeno-agenda .agenda__paciente p { font-size: .875rem; font-weight: normal; margin: 0; }
 galeno-agenda .agenda__paciente [hidden] { display: none; }

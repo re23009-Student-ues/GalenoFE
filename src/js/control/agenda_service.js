@@ -135,15 +135,19 @@ export async function validarPaciente(tipo, numero) {
     if (!contextos.length) throw new Error('Esta persona no tiene inscripciones como paciente');
     return { persona, contextos };
 }
-/** Citas filtradas por persona en backend; los filtros visuales de fecha siguen siendo locales. */
-export async function buscarCitas(contextos) {
+/** Citas filtradas por persona y días opcionales en backend. */
+export async function buscarCitas(contextos, desde = '', hasta = '') {
+    if (desde || hasta) validarRango(desde || hasta, hasta || desde);
     const inscripciones = new Map(contextos
         .filter(c => esPaciente(c) && c.idPersonaRol && c.idClinica?.idClinica)
         .map(c => [c.idPersonaRol, c]));
     if (!inscripciones.size) throw new Error('No hay inscripciones de paciente con clínica disponible');
     const personas = new Set([...inscripciones.values()].map(c => c.idPersona?.idPersona));
     if (personas.size !== 1 || ![...personas][0]) throw new Error('Las inscripciones deben pertenecer a una misma persona');
-    const consultas = (await listarCompleto(`consulta?persona=${encodeURIComponent([...personas][0])}`, 'idConsulta')).filter(c => {
+    const filtros = new URLSearchParams({ persona: [...personas][0] });
+    if (desde) filtros.set('desde', desde);
+    if (hasta) filtros.set('hasta', hasta);
+    const consultas = (await listarCompleto(`consulta?${filtros}`, 'idConsulta')).filter(c => {
         const paciente = c.idPersonaRol;
         return inscripciones.has(paciente?.idPersonaRol)
             && inscripciones.get(paciente.idPersonaRol).idClinica.idClinica === paciente.idClinica?.idClinica;
@@ -153,15 +157,6 @@ export async function buscarCitas(contextos) {
     return consultas.map(c => ({
         ...c, procedimientos: procedimientos.filter(p => p.idConsulta?.idConsulta === c.idConsulta)
     }));
-}
-export function filtrarCitas(citas, desde = '', hasta = '') {
-    if (!desde && !hasta) return citas;
-    validarRango(desde || hasta, hasta || desde);
-    return citas.filter(c => {
-        if (!c.fechaInicio) return false;
-        const dia = diaAgenda(c.fechaInicio);
-        return (!desde || dia >= desde) && (!hasta || dia <= hasta);
-    });
 }
 export async function ticketPDF(idConsulta) {
     const respuesta = await leer(`consulta/${encodeURIComponent(idConsulta)}/ticket`, { headers: { Accept: 'application/pdf' } });
@@ -220,5 +215,7 @@ export async function cargarAgenda(contexto, desde, hasta) {
         };
         delRol.forEach(d => recorrer(d.idProcedimientoPaso));
         return { ...p, pasos, pasosDelRol: delRol, pasosPrevios: registros.filter(e => previos.has(e.idProcedimientoPaso?.idProcedimientoPaso)), secuencias: secuencias.filter(s => definiciones.some(d => d.idProcedimientoPaso === s.idProcedimientoPaso?.idProcedimientoPaso)) };
-    }).filter(p => p.pasosDelRol.length) })).filter(c => c.procedimientos.length);
+    }).filter(p => p.pasosDelRol.length) })).filter(c => c.procedimientos.some(p => p.pasos.some(paso =>
+        paso.registros.some(registro => registro.idPersonaRol?.idPersonaRol === contexto.idPersonaRol &&
+            ['PENDIENTE', 'EN_PROCESO'].includes(String(registro.estado ?? '').trim().toUpperCase())))));
 }

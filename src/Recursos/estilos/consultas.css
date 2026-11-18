@@ -1,4 +1,8 @@
 /* Pantalla Consultas (Agenda Médica). Las tarjetas se estilan en tarjeta.css. */
+.atencion__paso-responsable { display: block; font-size: .85em; font-weight: normal; overflow-wrap: anywhere; }
+galeno-reporte-paso { display: block; overflow-wrap: anywhere; }
+galeno-reporte-paso p { white-space: pre-wrap; }
+galeno-reporte-paso .reporte-paso__examen { border-top: 1px solid #bacddd; margin-top: 16px; padding-top: 12px; }
 
 consulta-controller {
     display: block;

@@ -138,7 +138,8 @@ export async function cargarDetalleAtencion(idConsulta) {
     const idsPasos = pasosDefinidos.map(p => p.idProcedimientoPaso);
     const [configuraciones, secuencias, resultados] = await Promise.all([
         listarPorConjunto('procedimiento_paso_examen', 'idProcedimientoPasoExamen', 'pasos', idsPasos,
-            (fila, bloque) => bloque.has(fila.idProcedimientoPaso?.idProcedimientoPaso) && fila.activo === true, { activo: 'true' }),
+            (fila, bloque) => bloque.has(fila.idProcedimientoPaso?.idProcedimientoPaso) && fila.activo === true,
+            { activo: 'true', examenActivo: 'true' }),
         secuenciasParaPasos(idsPasos), resultadosParaOrdenes(ordenes.map(o => o.idOrdenExamen))
     ]);
     return { procedimientos, pasosDefinidos, definiciones, secuencias,
@@ -276,7 +277,8 @@ export async function completarPasoAtencion(paso, valor, contexto, idConsulta, c
     await validarRegistro('consulta_procedimiento_paso', paso, contexto, idConsulta);
     const solicitud = { contexto: contexto.idPersonaRol, consulta: idConsulta, valor,
         originales: { valor: paso.valor ?? null, estado: paso.estado ?? null } };
-    if (camino) solicitud.siguiente = camino.siguiente;
+    const fin = paso.idProcedimientoPaso?.indicaFin === true;
+    if (camino && !fin) solicitud.siguiente = camino.siguiente;
     try {
         const respuesta = await leer(`consulta_procedimiento_paso/${encodeURIComponent(paso.idConsultaProcedimientoPaso)}/completar`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(solicitud)
@@ -297,7 +299,8 @@ export async function completarPasoAtencion(paso, valor, contexto, idConsulta, c
                     new Set(confirmados.map(p => p.idConsultaProcedimientoPaso)).size !== esperados.size ||
                     confirmados.some(p => !esperados.has(p.idConsultaProcedimientoPaso) || p.idConsultaProcedimiento?.idConsultaProcedimiento !== paso.idConsultaProcedimiento?.idConsultaProcedimiento ||
                         p.idConsultaProcedimiento?.idConsulta?.idConsulta !== idConsulta) ||
-                    !confirmados.some(p => p.idConsultaProcedimientoPaso === camino.siguiente && !esPasoInvalido(p))) {
+                    (fin ? confirmados.some(p => !['COMPLETADO', 'FINALIZADO', 'INVALIDO'].includes(estadoPaso(p))) :
+                        !confirmados.some(p => p.idConsultaProcedimientoPaso === camino.siguiente && !esPasoInvalido(p)))) {
                 throw new Error('El servidor no confirmó todos los pasos del camino. Recarga la atención.');
             }
             return { ...datos, _pasosConfirmados: confirmados };

@@ -87,6 +87,11 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
                         if ((registro.valor ?? null) !== data.originales.valor || (registro.estado ?? null) !== data.originales.estado) return new Response('', { status: 409 });
                         Object.assign(registro, { valor: data.valor, estado: 'COMPLETADO', idPersonaRol: usuario, fechaInicio: registro.fechaInicio || new Date().toISOString(), fechaFin: new Date().toISOString() });
                     }
+                    if (registro.idProcedimientoPaso.indicaFin === true) {
+                        const confirmados = pasos.filter(p => p.idConsultaProcedimiento.idConsultaProcedimiento === registro.idConsultaProcedimiento.idConsultaProcedimiento);
+                        for (const p of confirmados) if (!['COMPLETADO', 'FINALIZADO'].includes(p.estado)) Object.assign(p, { estado: 'INVALIDO' });
+                        return new Response(JSON.stringify({ paso: registro, pasos: confirmados }));
+                    }
                     if (data.siguiente) {
                         const elegido = pasos.find(p => p.idConsultaProcedimientoPaso === data.siguiente);
                         const alternativas = secuencias.filter(e => e.idProcedimientoPaso.idProcedimientoPaso === registro.idProcedimientoPaso.idProcedimientoPaso)
@@ -151,6 +156,21 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         secuencias = defs.slice(1).map((d, i) => ({ idProcedimientoPasoSecuencia: `s-${i}`, idProcedimientoPaso: defs[i], idProcedimientoPasoReferencia: d, tipoSecuencia: 'DEPENDIENTE' }));
     }
     const escrituras = () => fetchStub.getCalls().filter(c => c.args[1].method !== 'GET');
+    test('Indicador muestra responsable entre nombre y estado y actualiza las reasignaciones', async () => {
+        cadena(2); pasos[0].idPersonaRol = { ...usuario, idPersona: { nombres: '<b>Ana</b>', apellidos: 'Pérez' } };
+        pasos[1].idPersonaRol = null;
+        const c = await cargar('paso-1'), f = c.flujo;
+        const linea = f.wizard.steps[0].button.querySelector('.atencion__paso-responsable');
+        assert.equal(linea.textContent, '<b>Ana</b> Pérez'); assert.isNull(linea.querySelector('b'));
+        const titulo = f.wizard.steps[0].button.querySelector('.wizard__step-title');
+        assert.isTrue(!!(titulo.compareDocumentPosition(linea) & Node.DOCUMENT_POSITION_FOLLOWING));
+        assert.strictEqual(linea.nextElementSibling, f.wizard.steps[0].stateLabel);
+        assert.equal(f.wizard.steps[1].button.querySelector('.atencion__paso-responsable').textContent, 'Sin responsable asignado');
+        f.modelos.get('paso-1').paso.idPersonaRol = { ...usuario, idPersona: { nombres: 'Luis', apellidos: 'Gómez' } };
+        f.actualizarControles(); f.actualizarControles();
+        assert.equal(linea.textContent, 'Luis Gómez'); assert.lengthOf(f.wizard.steps[0].button.querySelectorAll('.atencion__paso-responsable'), 1);
+        assert.lengthOf(escrituras(), 0);
+    });
     test('Ruta directa abre el paso solicitado y conserva bloqueo por predecesores', async () => {
         cadena(3); router.manejarRuta('/atencion/consulta-1/paso/paso-3');
         await espera(() => fixture.querySelector('atencion-controller')?.flujo?.wizard?.getCurrentStep().id === 'paso-3');
@@ -203,6 +223,23 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         assert.equal(f.actual().paso.idPersonaRol.idPersonaRol, usuario.idPersonaRol);
         assert.isTrue(f.actual().editable); assert.isFalse(f.actual().valor.control.readOnly);
         assert.equal(c.querySelector('.atencion__estado-atencion').textContent, 'PENDIENTE');
+        assert.lengthOf(escrituras(), 0);
+    });
+    test('Al abrir una consulta completada selecciona el paso propio más avanzado según la secuencia', async () => {
+        cadena(3); pasos.forEach(p => { p.estado = 'COMPLETADO'; });
+        pasos[0].fechaFin = '2026-11-17T12:00:00Z'; pasos[2].fechaFin = '2026-11-16T12:00:00Z';
+        const c = await cargar(), f = c.flujo;
+        await espera(() => f.wizard.getCurrentStep().id === 'paso-3');
+        assert.isFalse(f.actual().editable); assert.isTrue(f.actual().valor.control.readOnly);
+        assert.isTrue(f.guardarBoton.disabled); assert.isTrue(f.wizard.back.disabled);
+        assert.isTrue(f.puedeVerReporte('paso-1')); assert.isTrue(f.puedeVerReporte('paso-2'));
+        assert.lengthOf(escrituras(), 0);
+    });
+    for (const tipo of ['ajeno', 'invalidado']) test(`La selección del último completado excluye el paso más avanzado ${tipo}`, async () => {
+        cadena(3); pasos.forEach(p => { p.estado = 'COMPLETADO'; });
+        if (tipo === 'ajeno') pasos[2].idPersonaRol = { ...usuario, idPersonaRol: 'otro' };
+        else pasos[2].estado = 'INVALIDO';
+        const c = await cargar(); await espera(() => c.flujo.wizard.getCurrentStep().id === 'paso-2');
         assert.lengthOf(escrituras(), 0);
     });
     test('Al abrir muestra el paso asignado si sus predecesores de otros responsables ya finalizaron', async () => {
@@ -265,13 +302,13 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         assert.include(f.actual().espera.textContent, 'Ana'); assert.notInclude(f.actual().espera.textContent, 'Luis');
         assert.isFalse(await f.guardarActual()); assert.isFalse(await f.siguiente()); assert.lengthOf(escrituras(), 0);
     });
-    test('Mismo rol no permite ver ni trabajar el paso de otro responsable', async () => {
+    test('Mismo rol no permite editar otro paso; un anterior completado ofrece reporte', async () => {
         cadena(); pasos[0].idPersonaRol = { ...usuario, idPersonaRol: 'otro-doctor' };
         pasos[0].valor = 'Contenido privado';
         const c = await cargar(), f = c.flujo;
         await espera(() => f.wizard.getCurrentStep().id === 'paso-2');
         assert.lengthOf(f.wizard.getSteps(), 3);
-        assert.isTrue(f.wizard.steps[0].button.disabled);
+        assert.isFalse(f.wizard.steps[0].button.disabled);
         assert.notInclude(f.wizard.root.textContent, 'Contenido privado');
         assert.isFalse(await f.ir('paso-1'));
         assert.lengthOf(escrituras(), 0);
@@ -433,11 +470,52 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         const c = await cargar(), f = c.flujo;
         assert.isTrue(await f.siguiente());
         assert.equal(f.wizard.getCurrentStep().id, 'paso-2');
-        assert.isTrue(f.wizard.steps[0].button.disabled);
+        assert.isFalse(f.wizard.steps[0].button.disabled);
         assert.isFalse(await f.ir('paso-1', false));
         assert.isFalse(f.modelos.get('paso-1').editable);
         assert.isTrue(f.modelos.get('paso-1').valor.control.readOnly);
         assert.lengthOf(escrituras(), 1);
+    });
+    test('Reporte de un paso anterior muestra atención y todos sus resultados sin guardar el borrador actual', async () => {
+        cadena(2); pasos[0].idPersonaRol = { ...usuario, idPersonaRol: 'otro', idPersona: { nombres: 'Ana', apellidos: 'Pérez' } };
+        pasos[0].valor = '<img src=x onerror=alert(1)>Atención previa';
+        pasos[0].fechaFin = '2026-11-17T10:00:00Z';
+        ordenes = [{ idOrdenExamen: 'orden-previa', idConsultaProcedimientoPaso: pasos[0], indicaciones: '[Atención 1] [Hemograma] En ayunas' },
+            { idOrdenExamen: 'orden-actual', idConsultaProcedimientoPaso: pasos[1], indicaciones: 'No pertenece al reporte' }];
+        resultados = [{ idExamenResultado: 'r1', idOrdenExamen: ordenes[0], resultado: 'Hemoglobina 14', interpretacion: 'Normal', rutaAtestado: 'https://ejemplo.test/resultado.pdf' },
+            { idExamenResultado: 'r2', idOrdenExamen: ordenes[0], resultado: 'Resultado histórico', interpretacion: '<b>Sin HTML</b>', rutaAtestado: 'javascript:alert(1)' },
+            { idExamenResultado: 'r3', idOrdenExamen: ordenes[1], resultado: 'Resultado de otro paso' }];
+        const c = await cargar(), f = c.flujo; await espera(() => f.actual().paso.idConsultaProcedimientoPaso === 'paso-2');
+        f.actual().valor.setValue('Borrador conservado');
+        f.wizard.steps[0].button.click();
+        const reporte = document.querySelector('galeno-reporte-paso'); assert.exists(reporte);
+        for (const texto of ['Atención previa', 'Ana Pérez', 'Hemograma', 'En ayunas', 'Hemoglobina 14', 'Normal', 'Resultado histórico', '<b>Sin HTML</b>']) assert.include(reporte.textContent, texto);
+        assert.notInclude(reporte.textContent, 'Resultado de otro paso'); assert.isNull(reporte.querySelector('img, b, input, textarea, select'));
+        assert.lengthOf(reporte.querySelectorAll('a'), 1); assert.equal(reporte.querySelector('a').protocol, 'https:');
+        assert.include(reporte.textContent, 'Referencia del adjunto');
+        assert.equal(f.actual().paso.idConsultaProcedimientoPaso, 'paso-2'); assert.equal(f.actual().valor.getValue(), 'Borrador conservado');
+        assert.lengthOf(escrituras(), 0); assert.equal(pasos[0].estado, 'COMPLETADO');
+        assert.isFalse(f.verReporte('paso-1'));
+        f.reporte.footer.querySelector('button').click(); assert.notExists(document.querySelector('galeno-reporte-paso'));
+        assert.isNull(f.reporte); assert.equal(f.actual().valor.getValue(), 'Borrador conservado');
+    });
+    test('Reporte sin exámenes informa su ausencia y se destruye al desconectar', async () => {
+        cadena(2); const c = await cargar(), f = c.flujo; await espera(() => f.actual().paso.idConsultaProcedimientoPaso === 'paso-2');
+        assert.isTrue(f.verReporte('paso-1')); assert.include(document.querySelector('galeno-reporte-paso').textContent, 'no tiene exámenes registrados');
+        f.reporte.close();
+        f.detalle.ordenes.push({ idOrdenExamen: 'sin-resultados', idConsultaProcedimientoPaso: f.modelos.get('paso-1').paso, indicaciones: '[Atención 1] [Examen histórico] Preparación' });
+        assert.isTrue(f.verReporte('paso-1'));
+        assert.include(document.querySelector('galeno-reporte-paso').textContent, 'Sin resultados registrados.');
+        c.remove(); assert.notExists(document.querySelector('galeno-reporte-paso')); assert.lengthOf(escrituras(), 0);
+    });
+    test('Reporte excluye pasos pendientes, invalidados, posteriores y un contexto que no sea responsable actual', async () => {
+        cadena(3); const c = await cargar('paso-2'), f = c.flujo;
+        assert.isFalse(f.verReporte('paso-3'));
+        f.modelos.get('paso-3').paso.estado = 'COMPLETADO'; assert.isFalse(f.verReporte('paso-3'));
+        f.modelos.get('paso-1').paso.estado = 'INVALIDO'; assert.isFalse(f.verReporte('paso-1'));
+        f.modelos.get('paso-1').paso.estado = 'COMPLETADO';
+        f.actual().paso.idPersonaRol = { ...usuario, idPersonaRol: 'otro' }; assert.isFalse(f.verReporte('paso-1'));
+        assert.notExists(document.querySelector('galeno-reporte-paso')); assert.lengthOf(escrituras(), 0);
     });
     test('Un paso ya completado no permite guardar ni Anterior aunque siga asignado al usuario', async () => {
         cadena(3); pasos.forEach(p => p.estado = 'COMPLETADO');
@@ -533,7 +611,8 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         await espera(() => !!document.querySelector('.confirm-dialog__confirm'));
         assert.lengthOf(escrituras(), 0); assert.isTrue(c.isConnected);
         document.querySelector('.confirm-dialog__confirm').click(); assert.isTrue(await pendiente);
-        await espera(() => !!fixture.querySelector('tarjeta-consulta'));
+        await espera(() => fixture.querySelector('consulta-controller')?.textContent.includes('No hay consultas con pasos asignados a tu contexto activo'));
+        assert.notExists(fixture.querySelector('tarjeta-consulta'));
         assert.equal(location.hash, '#/consultas'); assert.isFalse(c.isConnected);
         assert.equal(pasos[0].estado, 'PENDIENTE'); assert.equal(pasos[0].idPersonaRol.idPersonaRol, receptor.idPersonaRol);
         router.detener();
@@ -632,6 +711,31 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
             assert.lengthOf(escrituras(), 1); assert.notExists(document.querySelector('.confirm-dialog'));
         });
     }
+    test('indicaFin muestra Completar en el botón y la confirmación; cancelar conserva el paso', async () => {
+        confirmacionStub.restore(); pasos[0].idProcedimientoPaso.indicaFin = true;
+        const c = await cargar(), f = c.flujo; f.actual().valor.setValue('Atención final');
+        assert.equal(f.wizard.forward.textContent, 'Completar');
+        const pendiente = f.siguiente(); await espera(() => !!document.querySelector('.confirm-dialog__confirm'));
+        assert.equal(document.querySelector('.confirm-dialog__confirm').textContent, 'Completar');
+        document.querySelector('.confirm-dialog__cancel').click();
+        assert.isFalse(await pendiente); assert.lengthOf(escrituras(), 0);
+        assert.equal(pasos[0].estado, 'EN_PROCESO'); assert.equal(f.actual().valor.getValue(), 'Atención final');
+    });
+    for (const estadoRama of ['PENDIENTE', 'INVALIDO']) test(`indicaFin invalida la rama ${estadoRama} y regresa sin pedir sucesor`, async () => {
+        cadena(3); pasos[0].estado = 'PENDIENTE'; pasos[0].idProcedimientoPaso.indicaFin = true;
+        secuencias[1].idProcedimientoPaso = pasos[0].idProcedimientoPaso;
+        pasos[2].estado = estadoRama;
+        const c = await cargar(), f = c.flujo, salida = sandbox.spy(); c.addEventListener('volver-consultas', salida);
+        assert.equal(f.wizard.forward.textContent, 'Completar'); assert.isFalse(f.wizard.forward.disabled);
+        f.actual().valor.setValue('Cierre'); assert.isTrue(await f.siguiente());
+        assert.equal(pasos[0].estado, 'COMPLETADO');
+        assert.isTrue(pasos.slice(1).every(p => p.estado === 'INVALIDO'));
+        assert.equal(c.pasosConsulta[0].estado, 'COMPLETADO');
+        assert.isTrue(c.pasosConsulta.slice(1).every(p => p.estado === 'INVALIDO'));
+        assert.isFalse(f.hayCambios());
+        sinon.assert.calledOnce(salida); assert.lengthOf(escrituras(), 1);
+        assert.notProperty(JSON.parse(escrituras()[0].args[1].body), 'siguiente');
+    });
     test('Cerrar la confirmación con Escape no completa ni guarda', async () => {
         confirmacionStub.restore(); const c = await cargar(), f = c.flujo; f.actual().valor.setValue('Borrador');
         const pendiente = f.siguiente(); await espera(() => !!document.querySelector('.confirm-dialog'));
@@ -724,13 +828,32 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         assert.isTrue(e.checkbox.getChecked()); assert.equal(e.indicaciones.getValue(), 'Borrador de indicaciones');
         assert.isTrue(await f.guardarActual()); assert.equal(pasos[0].valor, 'Borrador valor');
         assert.equal(ordenes[0].indicaciones, '[Atención 1] [Examen] Borrador de indicaciones');
+        assert.lengthOf(m.resultados, 1);
+        const resultado = m.resultados[0];
+        assert.isTrue(m.root.querySelector('.atencion__resultado-paso').open);
+        assert.isFalse(resultado.valor.control.disabled); assert.isFalse(resultado.valor.control.readOnly);
+        assert.strictEqual(m.valor, f.actual().valor); assert.equal(f.wizard.getCurrentStep().id, 'paso-1');
         assert.isTrue(await f.guardarActual()); assert.lengthOf(ordenes, 1);
+        assert.lengthOf(m.resultados, 1); assert.strictEqual(m.resultados[0], resultado);
+        assert.lengthOf(resultados, 0);
         assert.lengthOf(escrituras().filter(c => c.args[1].method === 'POST'), 1);
         e.checkbox.control.click(); assert.isTrue(e.checkbox.getChecked());
         const recargada = await cargar('paso-1'), seleccion = recargada.flujo.actual().examenes[0];
         assert.isTrue(seleccion.checkbox.getChecked()); assert.equal(seleccion.indicaciones.getValue(), 'Borrador de indicaciones');
         seleccion.indicaciones.setValue('Actualizadas'); assert.isTrue(await recargada.flujo.guardarActual());
         assert.equal(ordenes[0].indicaciones, '[Atención 1] [Examen] Actualizadas');
+    });
+    test('Una orden recién guardada permite registrar su resultado sin recargar la consulta', async () => {
+        configuraciones = [{ idProcedimientoPasoExamen: 'config', activo: true, idProcedimientoPaso: pasos[0].idProcedimientoPaso, idExamen: { idExamen: 'ex', nombre: 'Hemograma', activo: true } }];
+        const c = await cargar(), f = c.flujo, m = f.actual();
+        m.examenes[0].checkbox.control.click(); m.examenes[0].indicaciones.setValue('En ayunas');
+        assert.isTrue(await f.guardarActual()); assert.lengthOf(m.resultados, 1); assert.lengthOf(resultados, 0);
+        m.resultados[0].valor.setValue('Hemoglobina 14'); m.resultados[0].interpretacion.setValue('Normal');
+        assert.isTrue(await f.guardarActual());
+        assert.lengthOf(ordenes, 1); assert.lengthOf(resultados, 1);
+        assert.equal(resultados[0].resultado, 'Hemoglobina 14'); assert.equal(resultados[0].interpretacion, 'Normal');
+        assert.equal(resultados[0].idOrdenExamen.idOrdenExamen, ordenes[0].idOrdenExamen);
+        assert.strictEqual(c.flujo, f); assert.strictEqual(f.actual(), m);
     });
     test('Órdenes sin examen identificable se conservan sin atribuirlas a una casilla', async () => {
         ordenes = [{ idOrdenExamen: 'orden', idConsultaProcedimientoPaso: pasos[0], indicaciones: 'Indicaciones guardadas' }];

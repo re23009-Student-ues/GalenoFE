@@ -77,6 +77,36 @@ suite('Paso 7: contrato transaccional de atención', () => {
         });
         assert.isTrue((await registrarResultadoAtencion(orden, { resultado: 'Nuevo', interpretacion: '' }, usuario, 'consulta'))._registrado);
     });
+    for (const [recurso, campo] of [['consulta_procedimiento_paso', 'valor'], ['orden_examen', 'indicaciones'], ['examen_resultado', 'resultado']]) {
+        test(`${recurso} conserva la defensa local ante responsable distinto o ausente`, async () => {
+            const actual = recurso === 'consulta_procedimiento_paso' ? paso : recurso === 'orden_examen' ? orden : resultado;
+            for (const responsable of [{ ...usuario, idPersonaRol: 'otro-empleado' }, null]) {
+                paso.idPersonaRol = responsable;fetchStub.callsFake(async () => response(actual));
+                await rejects(() => guardarCamposAtencion(recurso, actual, { [campo]: 'Borrador' }, usuario, 'consulta'), 'responsable asignado');
+            }
+            assert.isTrue(fetchStub.getCalls().every(c => c.args[1].method === 'GET'));
+            assert.equal(paso.valor, 'Original');assert.equal(paso.estado, 'PENDIENTE');
+        });
+        test(`${recurso} un 403 entre lectura y escritura conserva el borrador y no reintenta`, async () => {
+            const actual = recurso === 'consulta_procedimiento_paso' ? paso : recurso === 'orden_examen' ? orden : resultado;
+            const original = JSON.stringify(actual);
+            fetchStub.onFirstCall().resolves(response(actual));fetchStub.onSecondCall().resolves(new Response('', { status: 403 }));
+            await rejects(() => guardarCamposAtencion(recurso, actual, { [campo]: 'Borrador' }, usuario, 'consulta'), '403');
+            assert.equal(fetchStub.callCount, 2);assert.equal(JSON.stringify(actual), original);
+        });
+    }
+    test('completar conserva la comprobación local de asignación aunque el rol coincida', async () => {
+        for (const responsable of [{ ...usuario, idPersonaRol: 'otro-empleado' }, null]) {
+            paso.idPersonaRol = responsable;
+            await rejects(() => completarPasoAtencion(paso, 'Borrador', usuario, 'consulta'), 'responsable asignado');
+        }
+        sinon.assert.notCalled(fetchStub);assert.equal(paso.estado, 'PENDIENTE');assert.equal(paso.valor, 'Original');
+    });
+    test('403 al completar no muta el paso ni repite la solicitud', async () => {
+        const original = JSON.stringify(paso);fetchStub.resolves(new Response('', { status: 403 }));
+        await rejects(() => completarPasoAtencion(paso, 'Borrador', usuario, 'consulta'), '403');
+        sinon.assert.calledOnce(fetchStub);assert.equal(JSON.stringify(paso), original);
+    });
     const confirmado = (paso, valor = 'Atención nueva') => ({ ...paso, valor, estado: 'COMPLETADO', idPersonaRol: usuario, fechaFin: '2026-11-15T10:00:00Z' });
     test('completar envía atención y originales al endpoint específico, sin mutar el borrador', async () => {
         fetchStub.callsFake(async (url, opciones) => {

@@ -5,7 +5,7 @@ import { esc } from "../util_html.js";
 
 /**
  * Pantalla "Agenda Médica": una <tarjeta-consulta> por cada consulta visible
- * para el rol activo dentro de su clínica.
+ * con pasos asignados al contexto activo dentro de su clínica.
  * Uso: <consulta-controller>, con la propiedad `usuario` asignada antes de conectarlo.
  */
 class ConsultaController extends HTMLElement {
@@ -40,8 +40,14 @@ class ConsultaController extends HTMLElement {
         }
         if (!this.isConnected) return;   // el usuario ya cambió de pantalla
 
+        const asignadas = new Set(pasos.filter(paso => this.usuario?.idPersonaRol &&
+            paso.idPersonaRol?.idPersonaRol === this.usuario.idPersonaRol &&
+            String(paso.estado ?? '').trim().toUpperCase() !== 'INVALIDO')
+            .map(paso => paso.idConsultaProcedimiento?.idConsulta?.idConsulta));
+        lista = lista.filter(consulta => asignadas.has(consulta.idConsulta));
+
         if (!lista.length) {
-            this.innerHTML = `<p class="aviso">No hay consultas con pasos para tu rol en esta clínica</p>`;
+            this.innerHTML = `<p class="aviso">No hay consultas con pasos asignados a tu contexto activo en esta clínica</p>`;
             return;
         }
 

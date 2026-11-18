@@ -2,7 +2,8 @@ import { Wizard } from '../componentes/navigation/wizard/index.js';
 import { TextArea } from '../componentes/form/textarea/index.js';
 import { Checkbox } from '../componentes/form/checkbox/index.js';
 import { Toast } from '../componentes/feedback/index.js';
-import { ConfirmDialog } from '../componentes/overlays/index.js';
+import { ConfirmDialog, Modal } from '../componentes/overlays/index.js';
+import ReportePaso from '../componentes/reporte_paso.js';
 import { flujoDelProcedimiento, guardarCamposAtencion, registrarResultadoAtencion, estadoEditableAtencion,
     ordenesDeExamenes, textoOrdenExamen, indicacionesOrdenExamen, prefijoOrdenExamen, registrarOrdenAtencion, completarPasoAtencion, retrocederPasoAtencion, esResponsableDelPaso, pasosDelCamino, esPasoInvalido } from '../../control/atencion_service.js';
 
@@ -21,6 +22,7 @@ export default class AtencionFlujo {
     }
 
     desmontarWizard() {
+        this.reporte?.destroy(); this.reporte = null;
         if (!this.wizard) return;
         this.wizard.root.removeEventListener('click', this.onClick, true);
         this.wizard.root.removeEventListener('input', this.onEdit);
@@ -87,6 +89,7 @@ export default class AtencionFlujo {
                 event.preventDefault(); event.stopImmediatePropagation();
                 if (button === this.wizard.back) void this.anterior();
                 else if (button === this.wizard.forward) void this.siguiente();
+                else if (this.puedeVerReporte(button.dataset.step)) this.verReporte(button.dataset.step);
                 else void this.ir(button.dataset.step, false);
             }
         };
@@ -97,7 +100,7 @@ export default class AtencionFlujo {
         const propios = modelos.filter(m => this.visibles.has(m.paso.idProcedimientoPaso?.idProcedimientoPaso) && esResponsableDelPaso(m.paso, this.owner.usuario));
         const propio = (solicitado && propios.find(m => m.paso.idConsultaProcedimientoPaso === idPaso)) || propios.find(m => !flujo.completo(m.paso) && flujo.habilitado(m.paso) && estadoEditableAtencion(m.paso)) ||
             propios.find(m => !flujo.completo(m.paso) && estadoEditableAtencion(m.paso)) ||
-            propios.find(m => flujo.completo(m.paso) || flujo.habilitado(m.paso));
+            [...propios].reverse().find(m => flujo.completo(m.paso)) || propios.find(m => flujo.habilitado(m.paso));
         if (propio) void this.wizard.goToStep(propio.paso.idConsultaProcedimientoPaso);
         this.actualizarControles(); return true;
     }
@@ -163,26 +166,7 @@ export default class AtencionFlujo {
                 const campo = this.texto(item, 'Indicaciones registradas', orden.indicaciones, editable, `orden-${orden.idOrdenExamen}`);
                 m.ordenes.push({ orden, campo, inicial: campo.getValue() }); root.append(item);
             }
-            const resultados = this.detalle.resultados.filter(r => r.idOrdenExamen?.idOrdenExamen === orden.idOrdenExamen);
-            if (!resultados.length && editable) resultados.push({ idOrdenExamen: orden, resultado: '', interpretacion: '' });
-            for (const resultado of resultados) {
-                const nuevo = !resultado.idExamenResultado;
-                const item = crear(nuevo ? 'details' : 'section', 'atencion__resultado-paso');
-                item.append(crear(nuevo ? 'summary' : 'h4', '', `${nuevo ? 'Registrar resultado (opcional)' : 'Resultado'} de ${nombreOrden}`));
-                const valor = this.texto(item, 'Resultado', resultado.resultado, editable, `resultado-${resultado.idExamenResultado || orden.idOrdenExamen}`);
-                const interpretacion = this.texto(item, 'Interpretación', resultado.interpretacion, editable, `interpretacion-${resultado.idExamenResultado || orden.idOrdenExamen}`);
-                m.resultados.push({ resultado, valor, interpretacion, inicial: [valor.getValue(), interpretacion.getValue()] });
-                if (resultado.rutaAtestado) {
-                    const referencia = crear('p', 'atencion__adjunto');
-                    try {
-                        const url = new URL(resultado.rutaAtestado);
-                        if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
-                        const enlace = crear('a', '', 'Ver adjunto'); enlace.href = url.href; enlace.target = '_blank'; enlace.rel = 'noopener noreferrer'; referencia.append(enlace);
-                    } catch { referencia.textContent = `Referencia del adjunto: ${resultado.rutaAtestado}`; }
-                    item.append(referencia);
-                }
-                root.append(item);
-            }
+            this.montarResultados(m, orden, nombreOrden);
         }
         m.ayuda = crear('p', 'aviso atencion__limite-transicion'); root.append(m.ayuda);
         const crearSelector = (clase, label) => {
@@ -203,7 +187,62 @@ export default class AtencionFlujo {
         this.modelos.set(id, m); return m;
     }
 
+    montarResultados(m, orden, nombreOrden, abrir = false) {
+        if (m.resultados.some(r => r.resultado.idOrdenExamen?.idOrdenExamen === orden.idOrdenExamen)) return [];
+        const campos = [];
+        const resultados = this.detalle.resultados.filter(r => r.idOrdenExamen?.idOrdenExamen === orden.idOrdenExamen);
+        if (!resultados.length && m.editable) resultados.push({ idOrdenExamen: orden, resultado: '', interpretacion: '' });
+        for (const resultado of resultados) {
+            const nuevo = !resultado.idExamenResultado;
+            const item = crear(nuevo ? 'details' : 'section', 'atencion__resultado-paso');
+            item.append(crear(nuevo ? 'summary' : 'h4', '', `${nuevo ? 'Registrar resultado (opcional)' : 'Resultado'} de ${nombreOrden}`));
+            const valor = this.texto(item, 'Resultado', resultado.resultado, m.editable, `resultado-${resultado.idExamenResultado || orden.idOrdenExamen}`);
+            const interpretacion = this.texto(item, 'Interpretación', resultado.interpretacion, m.editable, `interpretacion-${resultado.idExamenResultado || orden.idOrdenExamen}`);
+            m.resultados.push({ resultado, valor, interpretacion, inicial: [valor.getValue(), interpretacion.getValue()] });
+            if (resultado.rutaAtestado) {
+                const referencia = crear('p', 'atencion__adjunto');
+                try {
+                    const url = new URL(resultado.rutaAtestado);
+                    if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
+                    const enlace = crear('a', '', 'Ver adjunto'); enlace.href = url.href; enlace.target = '_blank'; enlace.rel = 'noopener noreferrer'; referencia.append(enlace);
+                } catch { referencia.textContent = `Referencia del adjunto: ${resultado.rutaAtestado}`; }
+                item.append(referencia);
+            }
+            if (nuevo && abrir) item.open = true;
+            if (m.ayuda) m.ayuda.before(item); else m.root.append(item);
+            campos.push(valor, interpretacion);
+        }
+        return campos;
+    }
+
     actual() { return this.wizard ? this.modelos.get(this.wizard.getCurrentStep().id) : null; }
+    puedeVerReporte(id) {
+        const actual = this.actual(), destino = this.modelos.get(id)?.paso;
+        if (this.destroyed || this.ocupado || this.owner.guardando || !actual || !destino ||
+                !esResponsableDelPaso(actual.paso, this.owner.usuario) || !this.flujo.completo(destino) ||
+                !this.visibles.has(destino.idProcedimientoPaso?.idProcedimientoPaso)) return false;
+        const pendientes = [...this.flujo.anteriores.get(actual.paso.idProcedimientoPaso.idProcedimientoPaso)];
+        const vistos = new Set();
+        while (pendientes.length) {
+            const anterior = pendientes.pop();
+            if (vistos.has(anterior) || esPasoInvalido(this.flujo.porDefinicion.get(anterior))) continue;
+            vistos.add(anterior);
+            if (anterior === destino.idProcedimientoPaso.idProcedimientoPaso) return true;
+            pendientes.push(...this.flujo.anteriores.get(anterior));
+        }
+        return false;
+    }
+    verReporte(id) {
+        if (!this.puedeVerReporte(id) || this.reporte) return false;
+        const paso = this.modelos.get(id).paso;
+        const contenido = new ReportePaso();
+        contenido.datos = { paso, ordenes: this.detalle.ordenes, resultados: this.detalle.resultados };
+        const dialogo = new Modal({ title: `Reporte de ${paso.idProcedimientoPaso?.nombre || 'paso completado'}`, size: 'large',
+            actions: [{ label: 'Cerrar', onClick: modal => modal.close() }],
+            onClose: () => { dialogo.destroy(); if (this.reporte === dialogo) this.reporte = null; } });
+        this.reporte = dialogo;
+        dialogo.setContent(contenido); dialogo.open(); return true;
+    }
     mensajeEspera(paso) {
         if (!esResponsableDelPaso(paso, this.owner.usuario) || this.flujo.habilitado(paso)) return '';
         const pendientes = [...(this.flujo.anteriores.get(paso.idProcedimientoPaso?.idProcedimientoPaso) || [])]
@@ -233,7 +272,7 @@ export default class AtencionFlujo {
         selector.wrapper.hidden = pasos.length < 2;
         return pasos.length === 1 ? pasos[0].idConsultaProcedimientoPaso : selector.select.value;
     }
-    bifurcacion(m) { return this.destinos(m, this.flujo.siguientes).length > 1; }
+    bifurcacion(m) { return m.paso.idProcedimientoPaso?.indicaFin !== true && this.destinos(m, this.flujo.siguientes).length > 1; }
     actualizarVisibilidad() {
         this.visibles = pasosDelCamino(this.flujo, this.elecciones);
         let cambio = false;
@@ -253,7 +292,7 @@ export default class AtencionFlujo {
         m.estado.textContent = `Estado: ${m.paso.estado || 'No disponible'}`;
         m.espera.textContent = this.mensajeEspera(m.paso); m.espera.hidden = !m.espera.textContent;
         // Permite elegir la rama que quedaría habilitada al completar el paso actual.
-        const siguientes = this.destinos(m, this.flujo.siguientes).filter(p => this.flujo.habilitado(p) || this.flujo.completo(p) ||
+        const siguientes = (m.paso.idProcedimientoPaso?.indicaFin === true ? [] : this.destinos(m, this.flujo.siguientes)).filter(p => this.flujo.habilitado(p) || this.flujo.completo(p) ||
             [...this.flujo.anteriores.get(p.idProcedimientoPaso.idProcedimientoPaso)].every(id =>
                 id === m.paso.idProcedimientoPaso.idProcedimientoPaso || this.flujo.completo(this.flujo.porDefinicion.get(id))));
         this.siguienteId = this.actualizarSelector(m.sucesor, siguientes);
@@ -262,7 +301,7 @@ export default class AtencionFlujo {
         const historial = [...this.historial].reverse().find(id => idsAnteriores.has(id));
         this.anteriorId = historial || this.actualizarSelector(m.predecesor, anteriores);
         if (historial) m.predecesor.wrapper.hidden = true;
-        const terminal = !(this.flujo.siguientes.get(m.paso.idProcedimientoPaso?.idProcedimientoPaso)?.size);
+        const terminal = m.paso.idProcedimientoPaso?.indicaFin === true || !(this.flujo.siguientes.get(m.paso.idProcedimientoPaso?.idProcedimientoPaso)?.size);
         const ocupado = this.ocupado || this.owner.guardando;
         m.sucesor.select.disabled = ocupado; m.predecesor.select.disabled = ocupado;
         const responsable = !m.retrocesoDenegado && esResponsableDelPaso(m.paso, this.owner.usuario);
@@ -270,14 +309,22 @@ export default class AtencionFlujo {
         this.wizard.back.setAttribute('aria-label', 'Regresar al paso anterior, reabrirlo y reasignar responsables de ambos pasos');
         this.wizard.back.disabled = ocupado || !this.anteriorId || !responsable || this.flujo.completo(m.paso) || !this.flujo.habilitado(m.paso);
         const completo = this.flujo.completo(m.paso);
-        this.wizard.forward.textContent = completo && terminal ? 'Paso completado' : 'Guardar y avanzar';
+        this.wizard.forward.textContent = completo && terminal ? 'Paso completado' : m.paso.idProcedimientoPaso?.indicaFin === true ? 'Completar' : 'Guardar y avanzar';
         this.wizard.forward.disabled = ocupado || this.bifurcacion(m) && !this.siguienteId || !responsable || !this.flujo.habilitado(m.paso) || (completo ? terminal || !this.siguienteId || !esResponsableDelPaso(this.modelos.get(this.siguienteId)?.paso, this.owner.usuario) : !m.editable);
         this.guardarBoton.disabled = ocupado || !m.editable;
         m.ayuda.textContent = completo ? 'Paso completado. Solo el responsable del siguiente paso puede solicitar su reapertura con Anterior.' :
             !m.espera.hidden ? '' : 'Completar guarda la atención y confirma el paso en el servidor. Los exámenes son opcionales.';
         for (const step of this.wizard.steps) {
             const modelo = this.modelos.get(step.id);
-            step.button.disabled = !step.enabled || ocupado || this.flujo.completo(modelo.paso) || !esResponsableDelPaso(modelo.paso, this.owner.usuario) || step.id === m.paso.idConsultaProcedimientoPaso || !(this.flujo.habilitado(modelo.paso) || this.flujo.completo(modelo.paso));
+            let responsable = step.button.querySelector('.atencion__paso-responsable');
+            if (!responsable) {
+                responsable = crear('span', 'atencion__paso-responsable');
+                step.stateLabel.before(responsable);
+            }
+            responsable.textContent = [modelo.paso.idPersonaRol?.idPersona?.nombres, modelo.paso.idPersonaRol?.idPersona?.apellidos]
+                .filter(Boolean).join(' ').trim() || 'Sin responsable asignado';
+            step.button.disabled = !this.puedeVerReporte(step.id) && (!step.enabled || ocupado || this.flujo.completo(modelo.paso) || !esResponsableDelPaso(modelo.paso, this.owner.usuario) || step.id === m.paso.idConsultaProcedimientoPaso || !(this.flujo.habilitado(modelo.paso) || this.flujo.completo(modelo.paso)));
+            step.button.title = this.puedeVerReporte(step.id) ? 'Ver reporte del paso completado' : '';
             step.stateLabel.textContent = `${step.id === m.paso.idConsultaProcedimientoPaso ? 'Actual · ' : ''}${modelo.paso.estado || 'Sin estado'}`;
         }
         this.owner.actualizarCabeceraProcedimiento(this.procedimiento, m.paso);
@@ -329,6 +376,8 @@ export default class AtencionFlujo {
                 e.orden = orden;
                 this.detalle.ordenes.push(orden);
                 m.ordenes.push({ orden, examen: e.examen, campo: e.indicaciones, inicial: textoOrdenExamen(m.paso, e.examen, orden) });
+                const nuevos = this.montarResultados(m, orden, prefijoOrdenExamen(m.paso, e.examen), true);
+                nuevos.forEach(campo => campo.setDisabled(true)); editables.push(...nuevos);
             }
             for (const o of m.ordenes) if (o.campo.getValue() !== o.inicial) {
                 const indicaciones = o.examen ? indicacionesOrdenExamen(m.paso, o.examen, o.campo.getValue()) : o.campo.getValue();
@@ -350,7 +399,7 @@ export default class AtencionFlujo {
             }
             if (exigirAtencion && (!this.flujo.completo(m.paso) || elegirCamino)) {
                 const datos = await completarPasoAtencion(m.paso, m.valor.getValue(), this.owner.usuario, this.owner.consulta.idConsulta,
-                    elegirCamino ? { siguiente: this.siguienteId, pasos: this.flujo.pasos } : null);
+                    m.paso.idProcedimientoPaso?.indicaFin === true ? { pasos: this.flujo.pasos } : elegirCamino ? { siguiente: this.siguienteId, pasos: this.flujo.pasos } : null);
                 if (this.destroyed) return false;
                 const { _pasosConfirmados, ...confirmado } = datos;
                 Object.assign(m.paso, confirmado); m.inicial = datos.valor;
@@ -424,10 +473,10 @@ export default class AtencionFlujo {
     async confirmarCompletar(modelo) {
         if (this.ocupado || this.confirmacionCompletar || this.destroyed) return false;
         const elegido = this.modelos.get(this.siguienteId)?.paso;
-        const avisoCamino = this.bifurcacion(modelo) ? ` Se seguirá el camino «${elegido?.idProcedimientoPaso?.nombre || 'Sin nombre'}» y los pasos exclusivos de otros caminos quedarán inválidos y ocultos.` : '';
+        const avisoCamino = modelo.paso.idProcedimientoPaso?.indicaFin === true ? ' Las ramas no seleccionadas de este procedimiento quedarán inválidas y ocultas. Se conservarán los pasos ya completados.' : this.bifurcacion(modelo) ? ` Se seguirá el camino «${elegido?.idProcedimientoPaso?.nombre || 'Sin nombre'}» y los pasos exclusivos de otros caminos quedarán inválidos y ocultos.` : '';
         const dialogo = new ConfirmDialog({ title: 'Completar paso',
             message: `Se guardará la atención registrada y se marcará como completado el paso «${modelo.paso.idProcedimientoPaso?.nombre || 'Sin nombre'}».${avisoCamino} ¿Deseas continuar?`,
-            confirmText: 'Guardar y avanzar', cancelText: 'Cancelar', type: 'warning' });
+            confirmText: modelo.paso.idProcedimientoPaso?.indicaFin === true ? 'Completar' : 'Guardar y avanzar', cancelText: 'Cancelar', type: 'warning' });
         this.confirmacionCompletar = dialogo;
         this.ocupado = true; this.actualizarControles();
         try {

@@ -27,7 +27,9 @@ suite('Contexto, dashboard y consultas del personal', () => {
         contextoPrevio = sessionStorage.getItem('sesionPersonaRol');
         sandbox = sinon.createSandbox();
         sandbox.stub(ConsultaService.prototype, 'findAll').resolves(consultas);
-        sandbox.stub(ConsultaProcedimientoPasoService.prototype, 'listarParaConsultas').resolves([]);
+        sandbox.stub(ConsultaProcedimientoPasoService.prototype, 'listarParaConsultas').callsFake(async ids => procedimientos
+            .filter(p => ids.includes(p.idConsulta.idConsulta))
+            .map(p => ({ idConsultaProcedimientoPaso: 'paso-' + p.idConsultaProcedimiento, estado: 'PENDIENTE', idPersonaRol: medico, idConsultaProcedimiento: p })));
         procedimientos = consultas.map(c => ({ idConsultaProcedimiento: 'cp-' + c.idConsulta, idConsulta: c, idProcedimiento: { idProcedimiento: 'general' } }));
         definiciones = [{ idProcedimientoPaso: 'atencion', idRol: medico.idRol }];
         fetchStub = sandbox.stub(globalThis, 'fetch').callsFake(async url => {
@@ -91,7 +93,7 @@ suite('Contexto, dashboard y consultas del personal', () => {
         definiciones = [{ idProcedimientoPaso: 'triaje', idRol: { idRol: 'enfermeria', nombre: 'Médico' } }];
         await fixture.querySelector('consulta-controller').cargar();
         assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
-        assert.include(fixture.textContent, 'No hay consultas con pasos para tu rol');
+        assert.include(fixture.textContent, 'No hay consultas con pasos asignados a tu contexto activo');
     });
     test('consulta participación por rol sin exigir registros ni descargar catálogos', async () => {
         procedimientos.unshift({ ...procedimientos[0], idConsultaProcedimiento: 'sin-pasos', idProcedimiento: { idProcedimiento: 'vacio' } });
@@ -112,7 +114,7 @@ suite('Contexto, dashboard y consultas del personal', () => {
         definiciones = [];
         router.manejarRuta('/consulta/primera'); await settle();
         assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
-        assert.include(fixture.textContent, 'No hay consultas con pasos para tu rol');
+        assert.include(fixture.textContent, 'No hay consultas con pasos asignados a tu contexto activo');
     });
     test('completar lo asignado muestra Completado aunque otro responsable siga pendiente', async () => {
         const paso = { idConsultaProcedimientoPaso: 'propio', estado: ' COMPLETADO ',
@@ -151,10 +153,40 @@ suite('Contexto, dashboard y consultas del personal', () => {
         router.manejarRuta('/consultas'); await settle();
         assert.include(fixture.querySelector('tarjeta-consulta').shadowRoot.textContent, 'Completado');
     });
-    test('sin pasos asignados no declara completado el trabajo del responsable', async () => {
+    test('sin pasos asignados no muestra consultas aunque el empleado sea el paciente', async () => {
+        ConsultaProcedimientoPasoService.prototype.listarParaConsultas.resolves([]);
         router.manejarRuta('/consultas'); await settle();
-        assert.isTrue([...fixture.querySelectorAll('tarjeta-consulta')]
-            .every(t => !t.shadowRoot.textContent.includes('Completado')));
+        assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
+        assert.include(fixture.textContent, 'No hay consultas con pasos asignados a tu contexto activo');
+    });
+    test('coincidir en persona o rol no sustituye la asignación al contexto activo', async () => {
+        ConsultaProcedimientoPasoService.prototype.listarParaConsultas.resolves([
+            { estado: 'PENDIENTE', idPersonaRol: { ...medico, idPersonaRol: 'otro-contexto' }, idConsultaProcedimiento: procedimientos[0] },
+            { estado: 'COMPLETADO', idPersonaRol: medico, idConsultaProcedimiento: procedimientos[1] }
+        ]);
+        router.manejarRuta('/consultas'); await settle();
+        assert.deepEqual([...fixture.querySelectorAll('tarjeta-consulta')].map(t => t.consulta.idConsulta), ['segunda']);
+        ConsultaProcedimientoPasoService.prototype.listarParaConsultas.resolves([
+            { estado: ' INVALIDO ', idPersonaRol: medico, idConsultaProcedimiento: procedimientos[0] }
+        ]);
+        await fixture.querySelector('consulta-controller').cargar();
+        assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
+    });
+    test('la consulta por identificador exige asignación aunque exista un paso de su rol', async () => {
+        fetchStub.withArgs(sinon.match('/consulta/primera')).resolves(new Response(JSON.stringify(consultas[0])));
+        ConsultaProcedimientoPasoService.prototype.listarParaConsultas.resolves([]);
+        router.manejarRuta('/consulta/primera'); await settle();
+        assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
+        assert.include(fixture.textContent, 'No hay consultas con pasos asignados a tu contexto activo');
+    });
+    test('reasignar el último paso a otro contexto oculta la consulta al recargar', async () => {
+        const paso = { estado: 'PENDIENTE', idPersonaRol: medico, idConsultaProcedimiento: procedimientos[0] };
+        ConsultaProcedimientoPasoService.prototype.listarParaConsultas.resolves([paso]);
+        router.manejarRuta('/consultas'); await settle();
+        assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 1);
+        paso.idPersonaRol = { ...medico, idPersonaRol: 'otro-contexto' };
+        await fixture.querySelector('consulta-controller').cargar();
+        assert.lengthOf(fixture.querySelectorAll('tarjeta-consulta'), 0);
     });
     test('un fallo de carga de asignaciones muestra error sin estados parciales', async () => {
         ConsultaProcedimientoPasoService.prototype.listarParaConsultas.rejects(new Error('Sin asignaciones'));

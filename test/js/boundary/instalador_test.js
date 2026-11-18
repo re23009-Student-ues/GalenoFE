@@ -1,6 +1,7 @@
 import { assert } from '../lib/chai/index.js';
 import sinon from '../lib/sinon/sinon-esm.js';
 import '../../../src/js/boundary/galeno_app.js';
+import { Toast } from '../../../src/js/boundary/componentes/feedback/index.js';
 
 mocha.setup('tdd');
 suite('Instalación PWA desde la barra superior', () => {
@@ -113,6 +114,42 @@ suite('Instalación PWA desde la barra superior', () => {
         assert.isTrue(app.instalador.hidden);
         assert.isFalse(app.instalador.instalando);
         assert.isNull(app.instalador.eventoInstalacion);
+    });
+
+    test('reprogramar conserva solo el aviso más reciente y su acción abre la instalación', async () => {
+        const reloj = sandbox.useFakeTimers();
+        const informar = sandbox.stub(Toast, 'info').returns('aviso');
+        const quitar = sandbox.stub(Toast, 'dismiss');
+        const instalador = app.instalador;
+        instalador.programarRecomendacion('Sin oferta');
+        await reloj.tickAsync(3000);
+        sinon.assert.notCalled(informar);
+
+        const oferta = ofrecer();
+        instalador.programarRecomendacion('Aviso anterior');
+        await reloj.tickAsync(1000);
+        instalador.programarRecomendacion('Aviso vigente');
+        await reloj.tickAsync(2999);
+        sinon.assert.notCalled(informar);
+        await reloj.tickAsync(1);
+        sinon.assert.calledOnceWithExactly(informar, 'Aviso vigente', sinon.match({
+            duration: 6000, anchor: app.topbar, action: sinon.match({ label: 'Instalar' })
+        }));
+
+        await informar.firstCall.args[1].action.run();
+        sinon.assert.calledOnce(oferta.prompt);
+        sinon.assert.calledOnceWithExactly(quitar, 'aviso');
+        assert.isTrue(instalador.hidden);
+    });
+
+    test('desconectar antes del aviso cancela la recomendación pendiente', async () => {
+        const reloj = sandbox.useFakeTimers();
+        const informar = sandbox.stub(Toast, 'info');
+        ofrecer();
+        app.instalador.programarRecomendacion('Instalar');
+        app.remove();
+        await reloj.tickAsync(3000);
+        sinon.assert.notCalled(informar);
     });
 
     test('desconectar limpia listeners y reconectar conserva un único botón y la oferta', () => {

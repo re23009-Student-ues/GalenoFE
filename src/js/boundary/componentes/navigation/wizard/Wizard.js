@@ -1,11 +1,5 @@
 let sequence = 0;
-const defaults = { steps: [], linear: true, showProgress: true, showStepNumbers: true,
-    allowBackNavigation: true, previousText: 'Anterior', nextText: 'Siguiente',
-    finishText: 'Finalizar', loadingText: 'Procesando…', data: {} };
-const carouselDefaults = { enabled: true, autoScroll: true, showArrows: true, smoothScroll: true };
-const labels = { initial: 'Inicial', 'in-progress': 'En progreso', validating: 'Validando…',
-    'validation-error': 'Error de validación', completing: 'Finalizando…',
-    'completion-error': 'Error al finalizar', completed: 'Proceso completado' };
+const loadingText = 'Procesando…';
 
 class GalenoWizard extends HTMLElement {}
 customElements.define('galeno-wizard', GalenoWizard);
@@ -17,55 +11,35 @@ function element(tag, className, text) {
     return node;
 }
 
-function copyData(data) {
-    if (!data || typeof data !== 'object' || Array.isArray(data) ||
-        ![Object.prototype, null].includes(Object.getPrototypeOf(data))) throw new TypeError('Wizard: data debe ser un objeto plano.');
-    try { return structuredClone(data); }
-    catch { throw new TypeError('Wizard: data debe contener valores clonables, sin funciones ni nodos DOM.'); }
-}
-
-/** Coordina pasos y validaciones. No serializa controles, persiste datos ni realiza peticiones. */
+/** Presenta los pasos y comunica las acciones. Atención decide las transiciones. */
 export default class Wizard {
-    constructor(container, options = {}) {
-        this.container = typeof container === 'string' ? document.querySelector(container) : container;
-        if (!(this.container instanceof HTMLElement)) throw new TypeError('Wizard: contenedor inexistente.');
-        if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('Wizard: opciones inválidas.');
-        this.options = { ...defaults, ...options };
-        const o = this.options;
-        if (o.stepCarousel !== undefined && (!o.stepCarousel || typeof o.stepCarousel !== 'object' || Array.isArray(o.stepCarousel))) {
-            throw new TypeError('Wizard: stepCarousel debe ser un objeto.');
+    constructor(container, { steps, onSelect, onPrevious, onSave, onNext, onEdit }) {
+        if (!(container instanceof HTMLElement) || !Array.isArray(steps) || !steps.length ||
+            [onSelect, onPrevious, onSave, onNext, onEdit].some(callback => typeof callback !== 'function')) {
+            throw new TypeError('Wizard: configuración inválida.');
         }
-        o.stepCarousel = { ...carouselDefaults, ...o.stepCarousel };
-        if (Object.keys(carouselDefaults).some(key => typeof o.stepCarousel[key] !== 'boolean')) {
-            throw new TypeError('Wizard: las opciones de stepCarousel deben ser booleanas.');
-        }
-        if (['linear', 'showProgress', 'showStepNumbers', 'allowBackNavigation'].some(key => typeof o[key] !== 'boolean') ||
-            ['previousText', 'nextText', 'finishText', 'loadingText'].some(key => typeof o[key] !== 'string' || !o[key].trim()) ||
-            ['onStepChange', 'onComplete', 'isStepComplete'].some(key => o[key] !== undefined && typeof o[key] !== 'function') ||
-            !Array.isArray(o.steps) || !o.steps.length) throw new TypeError('Wizard: configuración inválida.');
+        this.container = container;
+        this.actions = { onSelect, onPrevious, onSave, onNext, onEdit };
         const ids = new Set(), contents = [];
-        this.steps = o.steps.map(step => {
+        this.steps = steps.map(step => {
             if (!step || typeof step.id !== 'string' || !step.id.trim() || ids.has(step.id) ||
-                typeof step.title !== 'string' || !step.title.trim() ||
-                (step.description !== undefined && typeof step.description !== 'string') ||
-                (step.validate !== undefined && typeof step.validate !== 'function') ||
-                ['enabled', 'optional'].some(key => step[key] !== undefined && typeof step[key] !== 'boolean') ||
-                !(step.content instanceof Node) || ![1, 3, 11].includes(step.content.nodeType) ||
-                step.content === this.container || step.content.contains(this.container) ||
+                typeof step.title !== 'string' || !step.title.trim() || typeof step.enabled !== 'boolean' ||
+                !(step.content instanceof HTMLElement) || step.content.contains(container) ||
                 contents.some(node => node.contains(step.content) || step.content.contains(node))) {
-                throw new TypeError('Wizard: cada paso requiere id único, título y un nodo DOM independiente.');
+                throw new TypeError('Wizard: cada paso requiere id único, título y un elemento DOM independiente.');
             }
             ids.add(step.id); contents.push(step.content);
-            return { ...step, description: step.description ?? '', enabled: step.enabled ?? true,
-                optional: step.optional ?? false, completed: false, error: false, version: 0 };
+            const { id, title, content, enabled } = step;
+            return { id, title, content, enabled, disabled: true, completed: false, detail: '', status: 'Sin estado' };
         });
-        if (!this.steps.some(step => step.enabled)) throw new TypeError('Wizard: debe existir un paso habilitado.');
-        this.initialData = copyData(o.data);
-        this.data = copyData(this.initialData);
         this.current = this.steps.findIndex(step => step.enabled);
+        if (this.current < 0) throw new TypeError('Wizard: debe existir un paso visible.');
         this.id = `wizard-${++sequence}`;
-        this.state = 'initial'; this.operation = false; this.externalLoading = false;
-        this.destroyed = false; this.token = 0; this.dataVersion = 0; this.owned = [];
+        this.state = 'initial';
+        this.externalLoading = false;
+        this.destroyed = false;
+        this.owned = [];
+        this.controls = { previous: { disabled: true, title: '' }, saveDisabled: true, next: { disabled: true, text: 'Guardar y avanzar' } };
     }
 
     render() {
@@ -81,9 +55,9 @@ export default class Wizard {
         this.header = element('header', 'wizard__header');
         const navigation = element('nav', 'wizard__navigation'); navigation.setAttribute('aria-label', 'Pasos del formulario');
         this.indicator = element('ol', 'wizard__steps'); navigation.append(this.indicator);
-        if (this.options.stepCarousel.enabled) this.mountCarousel(navigation);
-        this.progress = element('progress', 'wizard__progress'); this.progress.max = this.enabled().length;
-        this.progress.setAttribute('aria-label', 'Pasos completados'); this.progress.hidden = !this.options.showProgress;
+        this.mountCarousel(navigation);
+        this.progress = element('progress', 'wizard__progress');
+        this.progress.setAttribute('aria-label', 'Pasos completados');
         this.status = element('p', 'wizard__status'); this.status.setAttribute('role', 'status');
         this.header.append(navigation, this.progress, this.status);
         this.content = element('div', 'wizard__content');
@@ -94,53 +68,56 @@ export default class Wizard {
             const info = element('span', 'wizard__step-info');
             const title = element('span', 'wizard__step-title', step.title);
             title.id = `${this.id}-title-${index}`;
-            const description = element('span', 'wizard__step-description', step.description); description.hidden = !step.description;
+            const detail = element('span', 'atencion__paso-responsable');
             const state = element('span', 'wizard__step-state');
-            info.append(title, description, state); button.append(number, info); item.append(button); this.indicator.append(item);
+            info.append(title, detail, state); button.append(number, info); item.append(button); this.indicator.append(item);
             const panel = element('section', 'wizard__panel'); panel.id = `${this.id}-panel-${index}`;
             panel.setAttribute('aria-labelledby', `${this.id}-heading-${index}`);
             button.setAttribute('aria-controls', panel.id);
             const heading = element('h3', 'wizard__panel-title', step.title); heading.id = `${this.id}-heading-${index}`; heading.tabIndex = -1;
             panel.append(heading);
-            const nodes = step.content.nodeType === Node.DOCUMENT_FRAGMENT_NODE ? [...step.content.childNodes] : [step.content];
-            for (const child of nodes) {
-                const marker = child.parentNode ? document.createComment('wizard: ubicación original') : null;
-                if (marker) child.before(marker);
-                this.owned.push({ child, marker }); panel.append(child);
-            }
+            const child = step.content;
+            const marker = child.parentNode ? document.createComment('wizard: ubicación original') : null;
+            if (marker) child.before(marker);
+            this.owned.push({ child, marker }); panel.append(child);
             this.content.append(panel);
-            Object.assign(step, { item, button, number, stateLabel: state, panel, heading });
+            Object.assign(step, { item, button, number, detailLabel: detail, stateLabel: state, panel, heading });
         });
-        this.error = element('p', 'wizard__error'); this.error.setAttribute('role', 'alert'); this.error.tabIndex = -1;
-        this.loading = element('p', 'wizard__loading', this.options.loadingText); this.loading.hidden = true;
+        this.loading = element('p', 'wizard__loading', loadingText);
         this.loading.setAttribute('aria-hidden', 'true');
         this.footer = element('footer', 'wizard__footer');
         const actions = element('div', 'wizard__actions');
-        this.back = element('button', 'wizard__previous', this.options.previousText); this.back.type = 'button';
-        this.forward = element('button', 'wizard__next', this.options.nextText); this.forward.type = 'button';
-        actions.append(this.back, this.forward); this.footer.append(this.loading, actions);
-        this.root.append(this.header, this.content, this.error, this.footer);
+        this.back = element('button', 'wizard__previous', 'Anterior');
+        this.back.setAttribute('aria-label', 'Regresar al paso anterior, reabrirlo y reasignar responsables de ambos pasos');
+        this.save = element('button', 'atencion__boton atencion__guardar-paso', 'Guardar');
+        this.forward = element('button', 'wizard__next', 'Guardar y avanzar');
+        for (const button of [this.back, this.save, this.forward]) button.type = 'button';
+        actions.append(this.back, this.save, this.forward);
+        this.footer.append(this.loading, actions);
+        this.root.append(this.header, this.content, this.footer);
         this.onClick = event => {
             const button = event.target.closest('button');
-            if (button === this.back) void this.previous();
-            else if (button === this.forward) void this.next();
-            else if (button === this.carouselPrev) this.scrollIndicator(-1);
+            if (!button || button.disabled) return;
+            if (button === this.carouselPrev) this.scrollIndicator(-1);
             else if (button === this.carouselNext) this.scrollIndicator(1);
-            else if (button?.parentNode?.parentNode === this.indicator) void this.goToStep(button.dataset.step);
+            else if (button === this.back) this.actions.onPrevious();
+            else if (button === this.save) this.actions.onSave();
+            else if (button === this.forward) this.actions.onNext();
+            else {
+                const step = this.steps.find(step => step.button === button);
+                if (step) this.actions.onSelect(step.id);
+            }
         };
         this.onEdit = event => {
-            if (this.state === 'completed') return;
-            const step = this.steps.find(item => item.panel.contains(event.target));
-            if (!step) return;
-            step.version++; step.completed = false; step.error = false;
-            if (!this.busy() && this.state !== 'completed') {
-                this.state = 'in-progress'; this.clearError();
-            }
+            if (!this.steps[this.current].panel.contains(event.target)) return;
+            this.state = 'in-progress';
+            this.actions.onEdit();
             this.update();
         };
         this.onSubmit = event => {
             if (!event.defaultPrevented && this.steps[this.current].panel.contains(event.target)) {
-                event.preventDefault(); void this.next();
+                event.preventDefault();
+                if (!this.forward.disabled) this.actions.onNext();
             }
         };
         this.root.addEventListener('click', this.onClick);
@@ -207,8 +184,8 @@ export default class Wizard {
         this.carouselActive = this.viewport.clientWidth > 0 && this.viewport.scrollWidth > this.viewport.clientWidth + 1;
         this.stepsWrapper.classList.toggle('wizard__carousel--active', this.carouselActive);
         this.viewport.tabIndex = this.carouselActive ? 0 : -1;
-        this.carouselPrev.hidden = this.carouselNext.hidden = !this.carouselActive || !this.options.stepCarousel.showArrows;
-        if (this.carouselActive && this.options.stepCarousel.autoScroll) {
+        this.carouselPrev.hidden = this.carouselNext.hidden = !this.carouselActive;
+        if (this.carouselActive) {
             const viewport = this.viewport.getBoundingClientRect();
             let active = this.steps[this.current].item.getBoundingClientRect();
             const estilo = getComputedStyle(this.viewport);
@@ -251,49 +228,62 @@ export default class Wizard {
     }
 
     scrollIndicatorTo(left, smooth = true) {
-        const animate = smooth && this.options.stepCarousel.smoothScroll && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const animate = smooth && !matchMedia('(prefers-reduced-motion: reduce)').matches;
         this.viewport.scrollTo({ left, behavior: animate ? 'smooth' : 'instant' });
         this.updateCarouselButtons();
     }
 
-    enabled() { return this.steps.map((step, index) => step.enabled ? index : -1).filter(index => index !== -1); }
-    busy() { return this.operation || this.externalLoading; }
-    available() { return !this.destroyed && !!this.root && !this.busy() && this.state !== 'completed'; }
+    busy() { return this.externalLoading; }
 
-    canGo(index) {
-        if (!this.steps[index]?.enabled || index === this.current) return false;
-        if (index < this.current) return this.options.allowBackNavigation;
-        return !this.options.linear || this.steps.slice(this.current + 1, index).every(step => !step.enabled || step.completed);
+    updateView({ steps, previous, saveDisabled, next }) {
+        if (this.destroyed) return;
+        let visibilityChanged = false;
+        for (const [index, step] of this.steps.entries()) {
+            const view = steps[index];
+            visibilityChanged ||= step.enabled !== view.enabled;
+            const { enabled, completed, disabled, detail, status, tooltip } = view;
+            Object.assign(step, { enabled, completed, disabled, detail, status, tooltip });
+        }
+        this.controls = { previous, saveDisabled, next };
+        this.update();
+        if (visibilityChanged) this.scheduleCarousel(true);
     }
 
     update() {
         if (!this.root || this.destroyed) return;
-        if (this.options.isStepComplete) {
-            this.steps.forEach(step => {
-                try { step.completed = this.options.isStepComplete(step.id) === true; }
-                catch { step.completed = false; }
-            });
-        }
-        const busy = this.busy(), done = this.state === 'completed';
-        this.root.dataset.state = this.state; this.root.setAttribute('aria-busy', String(busy));
+        const busy = this.busy();
+        this.root.dataset.state = this.state;
+        this.root.setAttribute('aria-busy', String(busy));
+        let visible = 0, completed = 0, position = 0;
         this.steps.forEach((step, index) => {
             const active = index === this.current;
+            if (step.enabled) {
+                visible++;
+                if (step.completed) completed++;
+            }
+            if (active) position = visible;
             step.panel.hidden = !active;
-            step.item.className = `wizard__step${active ? ' wizard__step--active' : ''}${step.completed ? ' wizard__step--completed' : ''}${step.error ? ' wizard__step--error' : ''}`;
+            step.item.className = `wizard__step${active ? ' wizard__step--active' : ''}${step.completed ? ' wizard__step--completed' : ''}`;
             step.item.hidden = !step.enabled;
-            step.button.disabled = busy || done || !this.canGo(index);
+            step.button.disabled = busy || !step.enabled || step.disabled || active;
+            step.button.title = step.tooltip ?? '';
             if (active) step.button.setAttribute('aria-current', 'step'); else step.button.removeAttribute('aria-current');
-            step.number.textContent = step.error ? '!' : step.completed ? '✓' : this.options.showStepNumbers ? String(this.enabled().indexOf(index) + 1) : '•';
-            step.stateLabel.textContent = [active ? 'Actual' : '', step.error ? 'Error' : step.completed ? 'Completado' : !active ? 'Pendiente' : ''].filter(Boolean).join(' · ');
+            step.number.textContent = step.completed ? '✓' : step.enabled ? String(visible) : '0';
+            step.detailLabel.textContent = step.detail;
+            step.stateLabel.textContent = `${active ? 'Actual · ' : ''}${step.status}`;
         });
-        this.progress.value = this.steps.filter(step => step.enabled && step.completed).length;
-        const statusText = `${labels[this.state]} · Paso ${this.enabled().indexOf(this.current) + 1} de ${this.enabled().length}`;
-        const announcement = this.externalLoading && !this.operation ? `${this.options.loadingText} ${statusText}` : statusText;
+        this.progress.max = Math.max(1, visible);
+        this.progress.value = completed;
+        const label = this.state === 'initial' ? 'Inicial' : 'En progreso';
+        const announcement = `${busy ? loadingText + ' ' : ''}${label} · Paso ${position} de ${visible}`;
         if (this.status.textContent !== announcement) this.status.textContent = announcement;
         this.loading.hidden = !busy;
-        this.back.disabled = busy || done || !this.options.allowBackNavigation || this.current === this.enabled()[0];
-        this.forward.disabled = busy || done;
-        this.forward.textContent = this.current === this.enabled().at(-1) ? this.options.finishText : this.options.nextText;
+        const { previous, saveDisabled, next } = this.controls;
+        this.back.title = previous.title;
+        this.back.disabled = busy || previous.disabled;
+        this.save.disabled = busy || saveDisabled;
+        this.forward.textContent = next.text;
+        this.forward.disabled = busy || next.disabled;
         if (this.carouselCurrent !== this.current) {
             const initial = this.carouselCurrent === undefined;
             this.carouselCurrent = this.current;
@@ -301,146 +291,33 @@ export default class Wizard {
         }
     }
 
-    metadata(index) {
-        const step = this.steps[index];
-        return { id: step.id, title: step.title, description: step.description, index,
-            enabled: step.enabled, optional: step.optional, active: index === this.current,
-            completed: step.completed, status: step.error ? 'error' : index === this.current ? 'current' : step.completed ? 'completed' : 'pending' };
+    getCurrentStep() {
+        const { id, title, enabled, completed } = this.steps[this.current];
+        return { id, title, enabled, completed };
     }
-    getCurrentStep() { return this.metadata(this.current); }
-    getSteps() { return this.steps.map((_, index) => this.metadata(index)); }
-    getData() { return copyData(this.data); }
-    setData(data) {
-        const next = copyData(data);
-        if (!this.destroyed && this.state !== 'completed') {
-            this.data = { ...this.data, ...next }; this.dataVersion++;
-            this.steps.forEach(step => { step.completed = false; });
-            this.update();
-        }
-        return this;
+    getSteps() {
+        return this.steps.map(({ id, title, enabled, completed }) => ({ id, title, enabled, completed }));
     }
 
-    async next() {
-        if (!this.available()) return false;
-        const enabled = this.enabled(), position = enabled.indexOf(this.current);
-        return this.run(enabled[position + 1], position === enabled.length - 1);
-    }
-    async previous() {
-        if (!this.available() || !this.options.allowBackNavigation) return false;
-        const enabled = this.enabled(), position = enabled.indexOf(this.current);
-        if (!position) return false;
-        return this.goToStep(this.steps[enabled[position - 1]].id);
-    }
-    async goToStep(id) {
-        if (!this.available()) return false;
-        const index = this.steps.findIndex(step => step.id === id);
-        if (!this.canGo(index)) return false;
-        if (index < this.current) { this.clearError(); this.state = 'in-progress'; this.activate(index); return !this.destroyed; }
-        return this.run(index, false);
-    }
-
-    async check(index, token) {
-        const step = this.steps[index], version = step.version, dataVersion = this.dataVersion;
-        try {
-            const result = step.validate ? await step.validate(this.getData(), this.metadata(index)) : true;
-            if (this.destroyed || token !== this.token) return null;
-            if (version !== step.version || dataVersion !== this.dataVersion) return { valid: false, message: 'Los datos cambiaron durante la validación. Revisa e intenta nuevamente.' };
-            if (result === true) return { valid: true };
-            if (result === false) return { valid: false, message: 'Completa los campos requeridos para continuar.' };
-            if (result && typeof result.valid === 'boolean') return { valid: result.valid,
-                message: typeof result.message === 'string' && result.message.trim() ? result.message : 'Revisa los datos de este paso.' };
-        } catch { /* Nunca mostrar mensajes técnicos de excepciones externas. */ }
-        return { valid: false, message: 'No fue posible validar este paso. Intenta nuevamente.' };
-    }
-
-    async run(target, finish) {
-        this.operation = true; const token = ++this.token;
-        const versions = this.steps.map(step => step.version), dataVersion = this.dataVersion;
-        this.state = 'validating'; this.clearError(); this.update();
-        try {
-            const indices = [this.current];
-            // Un salto no lineal tampoco omite las validaciones obligatorias intermedias.
-            if (!finish && !this.options.linear) indices.push(...this.enabled().filter(index =>
-                index > this.current && index < target && !this.steps[index].optional));
-            if (finish) indices.push(...this.enabled().filter(index => index !== this.current && !this.steps[index].optional));
-            for (const index of indices) {
-                const result = await this.check(index, token);
-                if (!result || this.destroyed || token !== this.token) return false;
-                if (!result.valid) {
-                    return this.fail(index, result.message, finish);
-                }
-            }
-            if (dataVersion !== this.dataVersion || indices.some(index => versions[index] !== this.steps[index].version)) {
-                return this.fail(this.current, 'Los datos cambiaron durante la validación. Revisa e intenta nuevamente.', false);
-            }
-            indices.forEach(index => { this.steps[index].error = false; });
-            if (finish) {
-                this.state = 'completing'; this.update();
-                const version = this.dataVersion;
-                const result = await this.options.onComplete?.(this.getData());
-                if (this.destroyed || token !== this.token) return false;
-                if (result === false || version !== this.dataVersion) throw new Error('Finalización no confirmada');
-                indices.forEach(index => { this.steps[index].completed = true; this.steps[index].error = false; });
-                this.state = 'completed';
-            } else {
-                indices.forEach(index => { this.steps[index].completed = true; this.steps[index].error = false; });
-                this.state = 'in-progress'; this.activate(target);
-            }
-            return !this.destroyed;
-        } catch {
-            if (!this.destroyed && token === this.token) {
-                this.state = 'completion-error'; this.error.dataset.kind = 'completion';
-                this.error.textContent = 'No fue posible finalizar el proceso. Tus datos se conservan. Intenta nuevamente.';
-                this.error.focus();
-            }
-            return false;
-        } finally {
-            if (!this.destroyed && token === this.token) { this.operation = false; this.update(); }
-        }
-    }
-
-    fail(index, message, finish) {
-        const failed = finish ? index : this.current;
-        this.steps[failed].error = true; this.steps[failed].completed = false;
-        this.state = 'validation-error';
-        if (finish && index !== this.current) this.activate(index);
-        if (this.destroyed) return false;
-        this.error.dataset.kind = 'validation'; this.error.textContent = index === this.current ? message :
-            `Revisa el paso «${this.steps[index].title}». ${message}`;
-        this.error.focus();
-        return false;
-    }
-
-    activate(index) {
-        const previous = this.getCurrentStep();
-        this.current = index; this.update();
+    goToStep(id) {
+        if (this.destroyed || !this.root || this.busy()) return false;
+        const index = this.steps.findIndex(step => step.id === id && step.enabled);
+        if (index < 0 || index === this.current) return false;
+        this.current = index;
+        this.state = 'in-progress';
+        this.update();
         this.steps[index].heading.focus();
-        try { this.options.onStepChange?.(this.getCurrentStep(), previous); }
-        catch {
-            if (this.error) {
-                this.error.dataset.kind = 'callback'; this.error.textContent = 'No fue posible ejecutar el aviso de cambio de paso.';
-            }
-        }
+        return true;
     }
-    clearError() { if (this.error) { this.error.textContent = ''; delete this.error.dataset.kind; } }
+
     setLoading(loading) {
         if (typeof loading !== 'boolean') throw new TypeError('Wizard: loading debe ser booleano.');
         if (!this.destroyed) { this.externalLoading = loading; this.update(); }
-        return this;
     }
-    reset() {
-        if (this.destroyed || this.busy()) return false;
-        this.token++; this.dataVersion++;
-        this.data = copyData(this.initialData); this.state = 'initial';
-        this.steps.forEach(step => { step.completed = false; step.error = false; step.version++; });
-        const target = this.enabled()[0]; this.clearError();
-        if (this.root && this.current !== target) this.activate(target);
-        else { this.current = target; this.update(); }
-        return true;
-    }
+
     destroy() {
         if (this.destroyed) return;
-        this.destroyed = true; this.token++;
+        this.destroyed = true;
         this.carouselObserver?.disconnect();
         if (this.carouselFrame) cancelAnimationFrame(this.carouselFrame);
         if (this.viewport) {
@@ -459,10 +336,10 @@ export default class Wizard {
         }
         this.owned.length = 0; this.root?.remove();
         this.steps.forEach(step => {
-            step.content = step.validate = step.item = step.button = step.number = step.stateLabel = step.panel = step.heading = null;
+            step.content = step.detailLabel = step.item = step.button = step.number = step.stateLabel = step.panel = step.heading = null;
         });
-        this.options = {}; this.data = {}; this.initialData = {};
-        this.root = this.container = this.header = this.indicator = this.progress = this.status = this.content = this.error = this.loading = this.footer = this.back = this.forward = null;
+        this.actions = null;
+        this.root = this.container = this.header = this.indicator = this.progress = this.status = this.content = this.loading = this.footer = this.back = this.save = this.forward = null;
         this.onClick = this.onEdit = this.onSubmit = null;
         this.stepsWrapper = this.viewport = this.carouselPrev = this.carouselNext = this.carouselObserver = this.carouselFrame = null;
         this.onIndicatorScroll = this.onIndicatorKey = this.onCarouselResize = null;

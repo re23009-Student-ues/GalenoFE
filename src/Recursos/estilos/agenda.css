@@ -57,7 +57,6 @@ galeno-agenda .tree__label { min-width: 0; white-space: pre-wrap; overflow-wrap:
 
 /* Árbol mínimo de pasos dentro de cada tarjeta de consulta. */
 galeno-agenda .agenda__consulta .tree { border: 0; background: transparent; }
-galeno-agenda .agenda__consulta .tree__toolbar,
 galeno-agenda .agenda__consulta .tree:has(.tree__item) .tree__status { display: none; }
 galeno-agenda .agenda__consulta .tree__item { min-height: 28px; }
 

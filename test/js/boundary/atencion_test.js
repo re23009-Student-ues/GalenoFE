@@ -16,13 +16,16 @@ pruebasOrdenesExamen();
 pruebasRetrocesoAtencion();
 suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
     let sandbox, fixture, router, consultas, pasos, fetchStub, originalURL, configuraciones, ordenes, resultados, responder, documentos, secuencias, procedimientos, catalogos, confirmacionStub, retrocesoStub, invalidadosCamino;
+    let navegacion;
     const usuario = { idPersonaRol: 'doctor-1', idPersona: { nombres: 'Doctor' }, idRol: { idRol: 'medico', nombre: 'Doctor' }, idClinica: { idClinica: 'clinica-1' } };
     const espera = async predicate => {
         for (let i = 0; i < 50 && !predicate(); i++) await new Promise(resolve => setTimeout(resolve, 10));
         assert.isTrue(!!predicate(), 'La pantalla termina de cargar');
     };
+    suiteSetup(() => { originalURL = location.href; });
+    suiteTeardown(() => { history.replaceState({}, '', originalURL); });
     setup(() => {
-        originalURL = location.href;
+        navegacion = new AbortController();
         sandbox = sinon.createSandbox();
         invalidadosCamino = null;
         confirmacionStub = sandbox.stub(AtencionFlujo.prototype, 'confirmarCompletar').resolves(true);
@@ -133,7 +136,7 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         fixture.append(tituloEl, contenedor);
         router = crearRouter({ contenedor, tituloEl, obtenerUsuario: () => usuario });
     });
-    teardown(() => { router.detener(); fixture.remove(); Toast.dismissAll(); sandbox.restore(); history.replaceState({}, '', originalURL); });
+    teardown(() => { navegacion.abort(); router.detener(); fixture.remove(); Toast.dismissAll(); sandbox.restore(); });
 
     // Las pruebas del antiguo Wizard de siete apartados se sustituyen por el flujo real.
     async function cargar(pasoInicial) {
@@ -146,6 +149,24 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
             controller.flujo.actualizarControles();
         }
         return controller;
+    }
+    async function cargarConNavegacion() {
+        const ruta = '#/atencion/consulta-1';
+        history.replaceState({}, '', '#preparar-atencion');
+        // Esperar nuestra transición antes de que el router escuche eventos de hash.
+        // Los eventos encolados por el caso anterior ya se habrán entregado.
+        await new Promise(resolve => {
+            function alCambiarHash(e) {
+                if (new URL(e.oldURL).hash !== '#preparar-atencion' || new URL(e.newURL).hash !== ruta) return;
+                window.removeEventListener('hashchange', alCambiarHash);
+                resolve();
+            }
+            window.addEventListener('hashchange', alCambiarHash, { signal: navegacion.signal });
+            location.hash = ruta;
+        });
+        router.iniciar();
+        await espera(() => fixture.querySelector('atencion-controller')?.flujo?.wizard);
+        return fixture.querySelector('atencion-controller');
     }
     function cadena(cantidad = 3) {
         const p = pasos[0].idConsultaProcedimiento;
@@ -231,7 +252,7 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         const c = await cargar(), f = c.flujo;
         await espera(() => f.wizard.getCurrentStep().id === 'paso-3');
         assert.isFalse(f.actual().editable); assert.isTrue(f.actual().valor.control.readOnly);
-        assert.isTrue(f.guardarBoton.disabled); assert.isTrue(f.wizard.back.disabled);
+        assert.isTrue(f.wizard.save.disabled); assert.isTrue(f.wizard.back.disabled);
         assert.isTrue(f.puedeVerReporte('paso-1')); assert.isTrue(f.puedeVerReporte('paso-2'));
         assert.lengthOf(escrituras(), 0);
     });
@@ -274,7 +295,7 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         assert.isFalse(m.editable); assert.isTrue(m.valor.control.readOnly);
         assert.isTrue(m.examenes[0].checkbox.control.disabled);
         assert.isTrue(m.ordenes[0].campo.control.readOnly); assert.isTrue(m.resultados[0].valor.control.readOnly);
-        assert.isTrue(f.guardarBoton.disabled); assert.isTrue(f.wizard.forward.disabled); assert.isTrue(f.wizard.back.disabled);
+        assert.isTrue(f.wizard.save.disabled); assert.isTrue(f.wizard.forward.disabled); assert.isTrue(f.wizard.back.disabled);
         assert.isFalse(await f.guardarActual()); assert.isFalse(await f.siguiente()); assert.isFalse(await f.anterior());
         sinon.assert.notCalled(confirmacionStub); assert.lengthOf(escrituras(), 0);
         pasos[0].estado = 'COMPLETADO';
@@ -290,7 +311,7 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         const c = await cargar(), f = c.flujo;
         await espera(() => f.wizard.getCurrentStep().id === 'paso-2');
         assert.include(f.actual().espera.textContent, 'sin responsable registrado');
-        assert.isTrue(f.guardarBoton.disabled); assert.isFalse(await f.siguiente()); assert.lengthOf(escrituras(), 0);
+        assert.isTrue(f.wizard.save.disabled); assert.isFalse(await f.siguiente()); assert.lengthOf(escrituras(), 0);
     });
     test('Espera todas las ramas anteriores e identifica solo los responsables pendientes', async () => {
         cadena(3); pasos[0].estado = 'PENDIENTE'; pasos[1].estado = 'COMPLETADO';
@@ -317,16 +338,14 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         pasos[0].idPersonaRol = null; pasos[0].valor = 'Contenido privado';
         const c = await cargar(), f = c.flujo;
         assert.notInclude(f.wizard.root.textContent, 'Contenido privado');
-        assert.isTrue(f.guardarBoton.disabled); assert.isTrue(f.wizard.forward.disabled);
+        assert.isTrue(f.wizard.save.disabled); assert.isTrue(f.wizard.forward.disabled);
         assert.isFalse(await f.guardarActual()); assert.isFalse(await f.siguiente());
         assert.lengthOf(escrituras(), 0);
     });
     test('Guardar y avanzar confirmado actualiza Consultas y una nueva asignación devuelve En curso', async () => {
         confirmacionStub.restore(); cadena(2); pasos[0].estado = 'PENDIENTE';
         pasos[1].idPersonaRol = { ...usuario, idPersonaRol: 'otro-responsable' };
-        history.replaceState({}, '', '#/atencion/consulta-1'); router.iniciar();
-        await espera(() => fixture.querySelector('atencion-controller')?.detalle);
-        const c = fixture.querySelector('atencion-controller'), f = c.flujo;
+        const c = await cargarConNavegacion(), f = c.flujo;
         f.actual().valor.setValue('Atención confirmada');
         assert.equal(f.wizard.forward.textContent, 'Guardar y avanzar');
         const guardado = f.siguiente();
@@ -343,9 +362,7 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
     });
     test('Completar el último pendiente vuelve automáticamente a Consultas', async () => {
         confirmacionStub.restore();
-        history.replaceState({}, '', '#/atencion/consulta-1'); router.iniciar();
-        await espera(() => fixture.querySelector('atencion-controller')?.detalle);
-        const c = fixture.querySelector('atencion-controller'), f = c.flujo;
+        const c = await cargarConNavegacion(), f = c.flujo;
         f.actual().valor.setValue('Última atención');
         const guardado = f.siguiente();
         await espera(() => !!document.querySelector('.confirm-dialog__confirm'));
@@ -527,7 +544,7 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
     test('Un paso ya completado no permite guardar ni Anterior aunque siga asignado al usuario', async () => {
         cadena(3); pasos.forEach(p => p.estado = 'COMPLETADO');
         const c = await cargar('paso-2'), f = c.flujo;
-        assert.isTrue(f.wizard.back.disabled); assert.isTrue(f.guardarBoton.disabled);
+        assert.isTrue(f.wizard.back.disabled); assert.isTrue(f.wizard.save.disabled);
         assert.isTrue(f.actual().valor.control.readOnly);
         assert.notInclude(f.actual().root.textContent, 'Solo el responsable del siguiente paso');
         assert.isFalse(await f.anterior()); assert.isFalse(await f.guardarActual());
@@ -610,9 +627,7 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         const tarjetaAntes = document.createElement('tarjeta-consulta');
         tarjetaAntes.consulta = consultas[0]; tarjetaAntes.pasos = [pasos[0]]; tarjetaAntes.responsable = receptor;
         fixture.append(tarjetaAntes); assert.include(tarjetaAntes.shadowRoot.textContent, 'Completado'); tarjetaAntes.remove();
-        history.replaceState({}, '', '#/atencion/consulta-1'); router.iniciar();
-        await espera(() => fixture.querySelector('atencion-controller')?.detalle);
-        const c = fixture.querySelector('atencion-controller'), f = c.flujo;
+        const c = await cargarConNavegacion(), f = c.flujo;
         await espera(() => f.wizard.getCurrentStep().id === 'paso-2');
         const pendiente = f.anterior();
         await espera(() => !!document.querySelector('.confirm-dialog__confirm'));
@@ -942,11 +957,32 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         r.valor.setValue('Resultado registrado'); assert.isTrue(await c.flujo.guardarActual()); assert.isTrue(await c.flujo.guardarActual());
         assert.lengthOf(resultados, 1); assert.equal(escrituras().filter(c => c.args[1].method === 'POST').length, 1);
     });
+    test('Guardar desde el Wizard conserva en solo lectura un resultado confirmado sin Location', async () => {
+        ordenes = [{ idOrdenExamen: 'orden', idConsultaProcedimientoPaso: pasos[0], indicaciones: '' }];
+        fetchStub.withArgs(sinon.match(/\/examen_resultado\/atencion$/), sinon.match({ method: 'POST' }))
+            .callsFake(async (url, opciones) => {
+                await responder(url, opciones);
+                return new Response(null, { status: 201 });
+            });
+        const c = await cargar(), f = c.flujo;
+        const resultado = f.actual().resultados[0];
+        resultado.valor.setValue('Resultado confirmado');
+        f.wizard.save.click();
+        await espera(() => !f.wizard.busy() && resultado.valor.control.readOnly);
+
+        assert.equal(resultado.valor.getValue(), 'Resultado confirmado');
+        assert.isTrue(resultado.interpretacion.control.readOnly);
+        assert.equal(f.wizard.getCurrentStep().id, pasos[0].idConsultaProcedimientoPaso);
+        assert.isFalse(f.hayCambios());
+        assert.isTrue(await f.guardarActual());
+        assert.lengthOf(resultados, 1);
+        assert.lengthOf(escrituras(), 1);
+    });
     test('Estados cancelados o desconocidos se muestran sin edición de contenido', async () => {
         for (const estado of ['CANCELADO', 'NUEVO_ESTADO']) {
             pasos[0].estado = estado;
             const c = await cargar(), m = c.flujo.actual();
-            assert.isTrue(m.valor.control.readOnly); assert.isTrue(c.flujo.guardarBoton.disabled);
+            assert.isTrue(m.valor.control.readOnly); assert.isTrue(c.flujo.wizard.save.disabled);
         }
         assert.lengthOf(escrituras(), 0);
     });
@@ -976,11 +1012,28 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         procedimientos = [pasos[0].idConsultaProcedimiento, otro];
         const d = { idProcedimientoPaso: 'def-2', nombre: 'Paso propio del segundo', idRol: usuario.idRol };
         catalogos['procedimiento_paso/procedimiento/proc-2'] = [d]; pasos.push({ ...pasos[0], idConsultaProcedimientoPaso: 'paso-2', idConsultaProcedimiento: otro, idProcedimientoPaso: d });
-        const c = await cargar(); assert.exists(c.querySelector('.atencion__elegir-procedimiento')); assert.notExists(c.flujo.wizard);
-        assert.isTrue(c.seleccionarProcedimiento('cp-1')); c.flujo.actual().valor.setValue('Borrador uno');
-        assert.isTrue(c.seleccionarProcedimiento('cp-2')); c.flujo.actual().valor.setValue('Borrador dos');
-        c.seleccionarProcedimiento('cp-1'); assert.equal(c.flujo.actual().valor.getValue(), 'Borrador uno');
-        c.seleccionarProcedimiento('cp-2'); assert.equal(c.flujo.actual().valor.getValue(), 'Borrador dos'); assert.lengthOf(escrituras(), 0);
+        const c = await cargar();
+        const selector = c.querySelector('.atencion__elegir-procedimiento');
+        const elegir = id => {
+            selector.value = id;
+            selector.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        assert.exists(selector);
+        assert.notExists(c.flujo.wizard);
+
+        elegir('cp-1');
+        c.flujo.actual().valor.setValue('Borrador uno');
+        elegir('');
+        assert.equal(selector.value, 'cp-1');
+        assert.equal(c.flujo.actual().valor.getValue(), 'Borrador uno');
+
+        elegir('cp-2');
+        c.flujo.actual().valor.setValue('Borrador dos');
+        elegir('cp-1');
+        assert.equal(c.flujo.actual().valor.getValue(), 'Borrador uno');
+        elegir('cp-2');
+        assert.equal(c.flujo.actual().valor.getValue(), 'Borrador dos');
+        assert.lengthOf(escrituras(), 0);
     });
     test('Completar el último paso conserva la consulta y procedimiento abiertos', async () => {
         const c = await cargar(); assert.equal(c.flujo.wizard.forward.textContent, 'Guardar y avanzar'); assert.isFalse(c.flujo.wizard.forward.disabled);
@@ -1052,13 +1105,23 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         assert.isTrue(await f.siguiente()); assert.equal(pasos[0].fechaFin, fecha); assert.equal(f.wizard.getCurrentStep().id, 'paso-2');
     });
     test('Salir con borradores usa ConfirmDialog; cancelar conserva datos y confirmar permite salir', async () => {
-        history.replaceState({}, '', '#/atencion/consulta-1'); router.iniciar();
-        await espera(() => fixture.querySelector('atencion-controller')?.detalle);
-        const c = fixture.querySelector('atencion-controller'); c.flujo.actual().valor.setValue('Borrador');
-        const salida = c.salir(); await espera(() => document.querySelector('.confirm-dialog__cancel'));
-        document.querySelector('.confirm-dialog__cancel').click(); await salida; assert.isTrue(c.isConnected); assert.equal(c.flujo.actual().valor.getValue(), 'Borrador');
-        const segunda = c.salir(); await espera(() => document.querySelector('.confirm-dialog__confirm'));
-        document.querySelector('.confirm-dialog__confirm').click(); await segunda; await espera(() => !c.isConnected);
+        const c = await cargarConNavegacion();
+        c.flujo.actual().valor.setValue('Borrador');
+
+        const salida = c.salir();
+        document.querySelector('.confirm-dialog__cancel').click();
+        assert.isFalse(await salida);
+        assert.isTrue(c.isConnected);
+        assert.equal(c.flujo.actual().valor.getValue(), 'Borrador');
+        assert.equal(location.hash, '#/atencion/consulta-1');
+
+        const segunda = c.salir();
+        document.querySelector('.confirm-dialog__confirm').click();
+        assert.isTrue(await segunda);
+        await espera(() => fixture.querySelector('consulta-controller'));
+        assert.isFalse(c.isConnected);
+        assert.equal(location.hash, '#/consultas');
+        assert.lengthOf(escrituras(), 0);
     });
     test('Fallo REST y respuesta tardía no crean un Wizard vacío ni reemplazan otra pantalla', async () => {
         fetchStub.onSecondCall().resolves(new Response('', { status: 500 }));
@@ -1127,5 +1190,119 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         cadena(2); const c = await cargar('paso-1'); c.flujo.actual().valor.setValue(' ');
         assert.isFalse(await c.flujo.guardarActual()); assert.equal(pasos[0].valor, 'Valor 1'); assert.lengthOf(escrituras(), 0);
     });
+    test('Una consulta con datos demográficos incompletos carga sin buscar documentos sin paciente', async () => {
+        consultas[0].idPersonaRol.idPersona = null;
+        consultas[0].fechaInicio = 'fecha desconocida';
+        procedimientos = [{ ...pasos[0].idConsultaProcedimiento, idProcedimiento: { idProcedimiento: 'proc-1' } }];
+        const c = await cargar();
+        assert.equal(c.querySelector('.atencion__paciente-nombre').textContent, 'Nombre no disponible');
+        assert.equal(c.querySelector('.atencion__paciente-avatar').textContent, '?');
+        assert.include(c.querySelector('.atencion__paciente-edad').textContent, 'No disponible');
+        assert.equal(c.querySelector('.atencion__paciente-documento').textContent, 'Documento no disponible.');
+        assert.equal(c.querySelector('.atencion__procedimiento-actual').textContent, 'Procedimiento sin nombre');
+        assert.isFalse(fetchStub.getCalls().some(call => new URL(call.args[0]).pathname.endsWith('/documento')));
+        assert.exists(c.flujo.wizard);
+    });
+
+    test('Un fallo tardío de documento no muestra un aviso en la vista siguiente', async () => {
+        let resolverDocumento;
+        fetchStub.withArgs(sinon.match(/\/documento\?persona=/)).callsFake(
+            () => new Promise(resolve => { resolverDocumento = resolve; })
+        );
+        const c = await cargar();
+        assert.isFunction(resolverDocumento);
+        const documento = c.querySelector('.atencion__paciente-documento');
+        router.manejarRuta('/citas');
+        resolverDocumento(new Response('', { status: 503 }));
+        await espera(() => fixture.querySelector('galeno-citas'));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        assert.equal(documento.textContent, 'Cargando documento…');
+        assert.notExists(c.querySelector('.atencion__paciente-reintentar'));
+        assert.notInclude(fixture.textContent, 'No se pudo cargar el documento');
+    });
+
+    test('Un procedimiento cerrado permite leer la atención y bloquea Guardar y avanzar', async () => {
+        pasos[0].idConsultaProcedimiento.fechaFin = '2026-11-12T15:00:00Z';
+        procedimientos = [pasos[0].idConsultaProcedimiento];
+        const c = await cargar(), f = c.flujo;
+        assert.isTrue(f.actual().valor.control.readOnly);
+        assert.isTrue(f.wizard.save.disabled);
+        assert.isTrue(f.wizard.forward.disabled);
+        assert.isFalse(await f.siguiente());
+        sinon.assert.notCalled(confirmacionStub);
+        assert.lengthOf(escrituras(), 0);
+    });
+
+    test('Un paso sin ejecución previa muestra el nombre definido y permanece bloqueado', async () => {
+        cadena(2);
+        pasos.splice(0, 1);
+        const c = await cargar(), f = c.flujo;
+        assert.include(f.host.textContent, 'pasos configurados sin ejecución');
+        assert.include(f.actual().espera.textContent, 'Atención 1');
+        assert.include(f.actual().espera.textContent, 'sin responsable registrado');
+        assert.isTrue(f.wizard.save.disabled);
+        assert.isFalse(await f.siguiente());
+        assert.lengthOf(escrituras(), 0);
+    });
+
+    test('Solo un borrador activo bloquea beforeunload y desmontar libera el listener', async () => {
+        const c = await cargar(), f = c.flujo;
+        const intentarSalir = () => window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
+        assert.isTrue(intentarSalir());
+        f.actual().valor.setValue('Cambios sin guardar');
+        assert.isFalse(intentarSalir());
+        router.manejarRuta('/citas');
+        assert.isTrue(intentarSalir());
+        assert.lengthOf(escrituras(), 0);
+    });
+
+    test('Un examen seleccionado sin orden activa el aviso de borrador incluso sin editar atención', async () => {
+        configuraciones = [{ idProcedimientoPasoExamen: 'config', activo: true,
+            idProcedimientoPaso: pasos[0].idProcedimientoPaso, idExamen: { idExamen: 'ex', nombre: 'Hemograma', activo: true } }];
+        const c = await cargar(), f = c.flujo;
+        const checkbox = f.actual().examenes[0].checkbox;
+        assert.isFalse(c.hayCambios());
+        checkbox.label.click();
+        assert.isTrue(c.hayCambios());
+        const salida = c.salir();
+        document.querySelector('.confirm-dialog__cancel').click();
+        assert.isFalse(await salida);
+        assert.isTrue(checkbox.getChecked());
+        checkbox.label.click();
+        assert.isFalse(c.hayCambios());
+        assert.lengthOf(escrituras(), 0);
+    });
+
+    test('Guardar valida la atención obligatoria y conserva el texto inválido sin peticiones de escritura', async () => {
+        const c = await cargar(), f = c.flujo;
+        f.actual().valor.setValue(' ');
+        assert.isFalse(await f.guardarActual(true));
+        assert.include(f.actual().valor.error.textContent, 'Registra la atención');
+        assert.equal(f.actual().valor.getValue(), ' ');
+        assert.lengthOf(escrituras(), 0);
+    });
+
+    test('Cerrar la vista durante Guardar descarta una confirmación tardía sin tocar la pantalla siguiente', async () => {
+        const c = await cargar(), f = c.flujo;
+        const paso = f.actual().paso;
+        f.actual().valor.setValue('Se envía el borrador');
+        let responderGuardado;
+        fetchStub.withArgs(sinon.match(/\/consulta_procedimiento_paso\/.*\/atencion$/), sinon.match({ method: 'PUT' }))
+            .callsFake(() => new Promise(resolve => { responderGuardado = resolve; }));
+        const pendiente = f.guardarActual();
+        await espera(() => responderGuardado);
+        assert.isTrue(f.wizard.busy());
+
+        router.manejarRuta('/citas');
+        const citas = fixture.querySelector('galeno-citas');
+        responderGuardado(new Response(JSON.stringify({ ...paso, valor: 'Se envía el borrador' })));
+        assert.isFalse(await pendiente);
+        sinon.assert.notCalled(Toast.success);
+        assert.strictEqual(fixture.querySelector('galeno-citas'), citas);
+        assert.notExists(fixture.querySelector('galeno-wizard'));
+        assert.lengthOf(escrituras(), 1);
+    });
+
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

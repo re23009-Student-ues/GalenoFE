@@ -1,51 +1,40 @@
-import { indexTree } from './tree_table_model.js';
-
-// Comparte únicamente la validación sin DOM; no depende del componente TreeTable.
-export function copyTree(data, rowKey, childrenKey) {
-    const { roots } = indexTree(data, rowKey, childrenKey);
-    const result = [], stack = [{ nodes: roots, target: result }];
+function indexTree(data) {
+    if (!Array.isArray(data)) throw new TypeError('Tree: data debe ser un arreglo.');
+    const nodes = new Map(), roots = [], seen = new WeakSet();
+    const stack = [{ rows: data, parent: null, level: 1, target: roots }];
     while (stack.length) {
-        const { nodes, target } = stack.pop();
-        for (const node of nodes) {
-            const children = [], row = { ...node.row, [childrenKey]: children };
-            target.push(row); stack.push({ nodes: node.children, target: children });
+        const { rows, parent, level, target } = stack.pop();
+        const pending = [];
+        for (const row of rows) {
+            if (!row || typeof row !== 'object' || Array.isArray(row) || seen.has(row)) throw new TypeError('Tree: nodo inválido, cíclico o compartido.');
+            seen.add(row);
+            const id = row.id;
+            if (!((typeof id === 'string' && id.trim()) || (typeof id === 'number' && Number.isFinite(id))) || nodes.has(id)) throw new TypeError('Tree: identificadores únicos obligatorios.');
+            const children = row.children ?? [];
+            if (!Array.isArray(children)) throw new TypeError('Tree: los hijos deben ser un arreglo.');
+            const node = { id, row: { ...row }, parent, level, children: [] };
+            nodes.set(id, node); target.push(node);
+            pending.push({ rows: children, parent: node, level: level + 1, target: node.children });
         }
+        stack.push(...pending.reverse());
     }
-    return result;
+    return { nodes, roots };
 }
-export function createTree(data, options) {
-    const tree = indexTree(copyTree(data, options.rowKey, options.childrenKey), options.rowKey, options.childrenKey);
-    for (const node of tree.nodes.values()) node.disabled = !!node.row[options.disabledKey] || !!node.parent?.disabled;
+
+export function createTree(data) {
+    const tree = indexTree(data);
+    for (const node of tree.nodes.values()) {
+        node.row.children = node.children.map(child => child.row);
+        node.disabled = !!node.row.disabled || !!node.parent?.disabled;
+    }
     return tree;
 }
-export function visibleTree(roots, nodes, expanded, query, keys) {
-    const text = query.trim().toLocaleLowerCase('es'), included = new Set();
-    if (text) for (const node of nodes.values()) {
-        if (!keys.some(key => String(node.row[key] ?? '').toLocaleLowerCase('es').includes(text))) continue;
-        let parent = node;
-        while (parent && !included.has(parent.id)) { included.add(parent.id); parent = parent.parent; }
-    }
+export function visibleTree(roots, expanded) {
     const result = [], stack = [...roots].reverse();
     while (stack.length) {
         const node = stack.pop();
-        if (text && !included.has(node.id)) continue;
         result.push(node);
-        if (text || expanded.has(node.id)) for (let i = node.children.length - 1; i >= 0; i--) stack.push(node.children[i]);
+        if (expanded.has(node.id)) for (let i = node.children.length - 1; i >= 0; i--) stack.push(node.children[i]);
     }
     return result;
-}
-// Las ramas deshabilitadas son límites de propagación y agregación.
-export function aggregateSelection(roots, selected, disabled) {
-    const states = new Map(), stack = roots.map(node => [node, false]);
-    while (stack.length) {
-        const [node, visited] = stack.pop();
-        if (!visited) { stack.push([node, true]); for (const child of node.children) stack.push([child, false]); continue; }
-        const children = node.children.filter(child => !disabled(child)).map(child => states.get(child.id));
-        if (children.length && !disabled(node)) {
-            const all = children.every(state => state === 'true'), any = children.some(state => state !== 'false');
-            if (all) selected.add(node.id); else selected.delete(node.id);
-            states.set(node.id, all ? 'true' : any ? 'mixed' : 'false');
-        } else states.set(node.id, selected.has(node.id) ? 'true' : 'false');
-    }
-    return states;
 }

@@ -4,26 +4,17 @@
  * @param {function(string): void} opciones.onNavegar se llama con la ruta (data-route) del enlace pulsado
  * @returns {{marcarActiva: Function, cerrar: Function, destruir: Function}}
  */
-export function iniciarMenu({ onNavegar, raiz = document }) {
-    const sidebar = raiz.querySelector('.sidebar');
-    const btnMenu = raiz.querySelector('#btn-menu-movil');
-    const menuLateral = raiz.querySelector('#menu-lateral');
-
+function iniciarMenu({ sidebar, menuLateral, onNavegar }) {
     const cerrar = () => sidebar?.classList.remove('abierta');
 
     const marcarActiva = (ruta) => {
-        raiz.querySelectorAll('#menu-lateral a').forEach(a =>
+        menuLateral.querySelectorAll('a').forEach(a =>
             a.classList.toggle('activo', a.getAttribute('data-route') === ruta));
     };
 
-    const alternar = e => {
-        e.stopPropagation();
-        sidebar?.classList.toggle('abierta');
-    };
     const alPulsarFuera = e => {
         if (sidebar?.classList.contains('abierta') && !sidebar.contains(e.target)) cerrar();
     };
-    btnMenu?.addEventListener('click', alternar);
     document.addEventListener('click', alPulsarFuera);
 
     // Clics en los enlaces del menú
@@ -39,7 +30,6 @@ export function iniciarMenu({ onNavegar, raiz = document }) {
     menuLateral?.addEventListener('click', alNavegar);
 
     const destruir = () => {
-        btnMenu?.removeEventListener('click', alternar);
         document.removeEventListener('click', alPulsarFuera);
         menuLateral?.removeEventListener('click', alNavegar);
     };
@@ -50,13 +40,29 @@ class GalenoMenu extends HTMLElement {
     static get observedAttributes() { return ['ruta']; }
 
     connectedCallback() {
-        this.innerHTML = `<aside class="sidebar">
-            <div class="sidebar-header"><img class="sidebar-logo" src="Recursos/imagenes/logo-menu-marino.png" alt="GalenoSV · Tu salud, nuestra prioridad" /></div>
-            <nav id="menu-lateral">
-                <a href="#/dashboard" data-route="/dashboard">Inicio</a>
-                <a href="#/consultas" data-route="/consultas">Agenda Médica</a>
-            </nav></aside>`;
-        this.controles = iniciarMenu({ raiz: this, onNavegar: ruta => {
+        const sidebar = document.createElement('aside');
+        sidebar.className = 'sidebar';
+        const encabezado = document.createElement('div');
+        encabezado.className = 'sidebar-header';
+        const logo = document.createElement('img');
+        logo.className = 'sidebar-logo';
+        logo.src = 'Recursos/imagenes/logo-menu-marino.png';
+        logo.alt = 'GalenoSV · Tu salud, nuestra prioridad';
+        encabezado.append(logo);
+
+        const menuLateral = document.createElement('nav');
+        menuLateral.id = 'menu-lateral';
+        for (const [ruta, texto] of [['/dashboard', 'Inicio'], ['/consultas', 'Agenda Médica']]) {
+            const enlace = document.createElement('a');
+            enlace.setAttribute('href', `#${ruta}`);
+            enlace.dataset.route = ruta;
+            enlace.textContent = texto;
+            menuLateral.append(enlace);
+        }
+        sidebar.append(encabezado, menuLateral);
+        this.replaceChildren(sidebar);
+
+        this.controles = iniciarMenu({ sidebar, menuLateral, onNavegar: ruta => {
             this.dispatchEvent(new CustomEvent('galeno-navegar', { detail: { ruta }, bubbles: true, composed: true }));
         } });
         this.controles.marcarActiva(this.getAttribute('ruta'));

@@ -1,14 +1,40 @@
-import { ticketPDF, fechaAgenda, TICKET_PDF_DISPONIBLE } from '../../control/agenda_service.js';
-import { esc } from '../util_html.js';
+import { ticketPDF, fechaAgenda } from '../../control/agenda_service.js';
 import './tarjeta_simple.js';
 
 class TarjetaCita extends HTMLElement {
     connectedCallback() {
         this.version = (this.version || 0) + 1;
         const c = this.cita;
-        this.innerHTML = `<tarjeta-simple><span slot="titulo">${esc(fechaAgenda(c.fechaInicio))}</span><div slot="contenido"><p><strong>Clínica:</strong> ${esc(c.idPersonaRol?.idClinica?.nombre || 'Clínica sin nombre')}</p><p>Procedimientos: ${esc(c.procedimientos.map(p => p.idProcedimiento?.nombre || 'Procedimiento sin nombre').join(', ') || 'Sin procedimientos registrados')}</p></div><div slot="pie"><button type="button" ${TICKET_PDF_DISPONIBLE ? '' : 'disabled'}>Descargar consulta PDF</button><p role="status" aria-live="polite">${TICKET_PDF_DISPONIBLE ? '' : 'El ticket PDF todavía no está disponible.'}</p></div></tarjeta-simple>`;
+        const tarjeta = document.createElement('tarjeta-simple');
+        const titulo = document.createElement('span');
+        titulo.slot = 'titulo';
+        titulo.textContent = fechaAgenda(c.fechaInicio);
+
+        const contenido = document.createElement('div');
+        contenido.slot = 'contenido';
+        const clinica = document.createElement('p');
+        const etiquetaClinica = document.createElement('strong');
+        etiquetaClinica.textContent = 'Clínica:';
+        clinica.append(etiquetaClinica, ` ${c.idPersonaRol?.idClinica?.nombre || 'Clínica sin nombre'}`);
+        const procedimientos = document.createElement('p');
+        const nombres = c.procedimientos.map(p => p.idProcedimiento?.nombre || 'Procedimiento sin nombre').join(', ');
+        procedimientos.textContent = `Procedimientos: ${nombres || 'Sin procedimientos registrados'}`;
+        contenido.append(clinica, procedimientos);
+
+        const pie = document.createElement('div');
+        pie.slot = 'pie';
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.textContent = 'Descargar consulta PDF';
+        const aviso = document.createElement('p');
+        aviso.setAttribute('role', 'status');
+        aviso.setAttribute('aria-live', 'polite');
+        pie.append(boton, aviso);
+
+        tarjeta.append(titulo, contenido, pie);
+        this.replaceChildren(tarjeta);
         this.alDescargar = () => this.descargar();
-        this.querySelector('button').addEventListener('click', this.alDescargar);
+        boton.addEventListener('click', this.alDescargar);
     }
     disconnectedCallback() { this.version++; this.querySelector('button')?.removeEventListener('click', this.alDescargar); }
     async descargar() {
@@ -26,7 +52,11 @@ class TarjetaCita extends HTMLElement {
             enlace.href = url;
             enlace.download = `consulta-${this.cita.idConsulta}.pdf`;
             this.append(enlace);
-            try { enlace.click(); aviso.textContent = 'Consulta descargada'; }
+            try {
+                enlace.click();
+                aviso.textContent = 'Consulta descargada';
+                this.dispatchEvent(new CustomEvent('galeno-consulta-descargada', { bubbles: true }));
+            }
             finally { enlace.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
         } catch (e) { if (this.isConnected && version === this.version) aviso.textContent = e.message || 'No se pudo descargar la consulta'; }
         finally { if (this.isConnected && version === this.version) boton.disabled = false; }

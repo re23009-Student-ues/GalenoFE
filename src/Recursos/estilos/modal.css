@@ -47,9 +47,7 @@
 .modal button:disabled { opacity: .6; cursor: wait; }
 .modal--static, .modal--static::backdrop { transition: none; }
 .confirm-dialog { --confirm-accent: #1f3a5f; }
-.confirm-dialog--danger { --confirm-accent: #b91c1c; }
 .confirm-dialog--warning { --confirm-accent: #9a4e08; }
-.confirm-dialog--info { --confirm-accent: #1d4ed8; }
 .confirm-dialog__icon { width: 32px; height: 32px; fill: none; stroke: var(--confirm-accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .confirm-dialog__message { white-space: pre-line; }
 .confirm-dialog__confirm { background: var(--confirm-accent); border-color: var(--confirm-accent); color: #fff; }

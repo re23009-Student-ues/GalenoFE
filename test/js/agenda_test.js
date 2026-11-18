@@ -76,15 +76,15 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
  test('HU1 no actualiza catálogo después de desmontar', async () => { let resolver; fetchStub.callsFake(()=>new Promise(r=>resolver=r)); const vista=document.createElement('galeno-citas'); fixture.append(vista); vista.remove(); resolver(respuesta([tipo])); await settle(); assert.isTrue(vista.campo('tipo').disabled); });
  test('agenda cruza ramas por secuencia, no por fecha', async () => {
   const segundo = { ...origen, idProcedimientoPaso:'lab', nombre:'Laboratorio' };
-  const rutas = { consulta:[consulta],consulta_procedimiento:[procedimiento],consulta_procedimiento_paso:[origen,segundo].map((d,i)=>({idConsultaProcedimientoPaso:'e'+i,idConsultaProcedimiento:procedimiento,idProcedimientoPaso:d,estado:'ESTADO_REAL',valor:'<img src=x onerror=alert(1)>',idPersonaRol:empleado})),procedimiento_paso_secuencia:[origen,segundo].map((d,i)=>({idProcedimientoPasoSecuencia:'s'+i,idProcedimientoPaso:d,idProcedimientoPasoReferencia:destino,tipoSecuencia:'REAL'})), procedimiento_paso:[origen,segundo,destino] };
+  const rutas = { consulta:[consulta],consulta_procedimiento:[procedimiento],consulta_procedimiento_paso:[origen,segundo].map((d,i)=>({idConsultaProcedimientoPaso:'e'+i,idConsultaProcedimiento:procedimiento,idProcedimientoPaso:d,estado:'PENDIENTE',valor:'<img src=x onerror=alert(1)>',idPersonaRol:empleado})),procedimiento_paso_secuencia:[origen,segundo].map((d,i)=>({idProcedimientoPasoSecuencia:'s'+i,idProcedimientoPaso:d,idProcedimientoPasoReferencia:destino,tipoSecuencia:'REAL'})), procedimiento_paso:[origen,segundo,destino] };
   fetchStub.callsFake(async url=>respuestaRelacionesFixture(url, rutas[new URL(url).pathname.split('/resources/v1/')[1]]));
   const lista=await cargarAgenda(empleado,'2026-11-12','2026-11-12'); assert.lengthOf(lista[0].procedimientos[0].pasosPrevios,2); assert.lengthOf(lista[0].procedimientos[0].pasos, 3);
   const vista=document.createElement('galeno-agenda'); vista.usuario=empleado; fixture.append(vista); await vista.cargar();
-  const arbol = vista.querySelector('galeno-tree'); await arbol.expandAll();
+  const arbol = vista.querySelector('galeno-tree'); for (const id of arbol.nodes.keys()) arbol.expandNode(id);
   assert.deepEqual(arbol.view.map(n => n.row.nombre), ['General', 'Triaje -responsable', 'Atención', 'Laboratorio -responsable', 'Atención']);
   assert.deepEqual(arbol.view.map(n => n.level), [1, 2, 3, 2, 3]);
   assert.isNull(vista.querySelector('img,pre,galeno-tree-table,table'));
-  assert.notInclude(arbol.list.textContent, 'ESTADO_REAL'); assert.notInclude(arbol.list.textContent, 'Registro:');
+  assert.notInclude(arbol.list.textContent, 'PENDIENTE'); assert.notInclude(arbol.list.textContent, 'Registro:');
   const tarjeta = vista.querySelector('tarjeta-simple'); assert.exists(tarjeta);
   assert.equal(arbol.slot, 'contenido'); assert.equal(tarjeta.querySelector('[data-consulta]').slot, 'pie');
   let ruta; vista.addEventListener('galeno-navegar', e=>ruta=e.detail.ruta); vista.querySelector('[data-consulta]').click(); assert.equal(ruta,'/atencion/c1');
@@ -93,7 +93,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   const vista = document.createElement('galeno-agenda'); vista.usuario = empleado; fixture.append(vista); await vista.cargar();
   const arbol = vista.querySelector('galeno-tree');
   assert.exists(arbol, vista.textContent); assert.equal(arbol.list.getAttribute('role'), 'tree');
-  assert.deepEqual(arbol.view.map(n => n.row.nombre), ['General', 'Atención -responsable']); assert.isNull(arbol.search);
+  assert.deepEqual(arbol.view.map(n => n.row.nombre), ['General', 'Atención -responsable']); assert.notExists(arbol.querySelector('input'));
   const toggle = arbol.list.querySelector('[data-command=toggle]');
   assert.notEqual(getComputedStyle(toggle).display, 'none');
   toggle.click(); assert.lengthOf(arbol.view, 1);
@@ -323,11 +323,11 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   const navegar = sandbox.spy(); vista.addEventListener('galeno-navegar', navegar);
   const tabla = vista.querySelector('galeno-tree'); tabla.list.querySelector('.tree__label').click();
   assert.equal(navegar.callCount, 0);
-  assert.isNull(tabla.search);
+  assert.notExists(tabla.querySelector('input'));
   vista.querySelector('[name=nombre]').value = 'Ana';
   const cargar = sandbox.stub(vista, 'cargar'); vista.querySelector('[data-hoy]').click();
   assert.equal(vista.querySelector('[name=nombre]').value, 'Ana');
-  assert.isNull(tabla.search); assert.equal(cargar.callCount, 1);
+  assert.notExists(tabla.querySelector('input')); assert.equal(cargar.callCount, 1);
   assert.equal(vista.querySelector('[name=desde]').value, diaAgenda());
  });
  test('consultas usan tarjetas simples independientes con navegación solo en el botón', async () => {
@@ -337,7 +337,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   const tarjetas = vista.querySelectorAll('[data-lista] > tarjeta-simple'); assert.lengthOf(tarjetas, 2);
   assert.lengthOf(tarjetas[0].shadowRoot.querySelectorAll('slot[name=contenido]'), 1);
   assert.equal(tarjetas[0].querySelector('.agenda__paciente-nombre').textContent, 'Ana');
-  const [a, b] = vista.querySelectorAll('galeno-tree'); a.setData([]);
+  const [a, b] = vista.querySelectorAll('galeno-tree'); a.configure({ data: [], renderLabel: n => document.createTextNode(n.nombre), onNodeSelect() {} });
   assert.include(a.status.textContent, 'No hay nodos'); assert.lengthOf(b.view, 2);
   const navegar = sandbox.spy(); vista.addEventListener('galeno-navegar', navegar);
   b.list.querySelector('.tree__label').click(); assert.equal(navegar.callCount, 0);
@@ -410,6 +410,103 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
  });
  test('HU4 recarga por identificador y rechaza otra clínica', async () => { const vista=document.createElement('consulta-controller'); vista.usuario=empleado; vista.parametros={idConsulta:'c1'}; fixture.append(vista); await settle(); assert.lengthOf(vista.querySelectorAll('tarjeta-consulta'),1); vista.remove(); vista.usuario={...empleado,idClinica:{idClinica:'otra'}}; fixture.append(vista); await settle(); assert.include(vista.textContent,'no pertenece'); });
  test('un fallo REST nunca se convierte en cero citas', async () => { fetchStub.resolves(new Response('Error interno',{status:500})); let error; try { await buscarCitas([paciente]); } catch(e) {error=e;} assert.include(error.message,'500'); });
+ test('HU1 envía desde el formulario y bloquea búsquedas simultáneas', async () => {
+  const vista = document.createElement('galeno-citas');
+  fixture.append(vista);
+  await settle();
+  const tipoDocumento = vista.querySelector('[name=tipo]');
+  const numero = vista.querySelector('[name=numero]');
+  const buscar = vista.querySelector('[data-buscar]');
+  assert.isTrue(numero.disabled);
+  assert.isTrue(buscar.disabled);
+  tipoDocumento.value = 'dui';
+  tipoDocumento.dispatchEvent(new Event('input', { bubbles: true }));
+  assert.isFalse(numero.disabled);
+  numero.value = '00000000-0';
+  numero.dispatchEvent(new Event('input', { bubbles: true }));
+
+  let responder;
+  fetchStub.withArgs(sinon.match(url => new URL(url).pathname.endsWith('/documento/buscar')))
+   .callsFake(() => new Promise(resolve => { responder = resolve; }));
+  buscar.form.requestSubmit(buscar);
+  assert.isTrue(buscar.disabled);
+  buscar.form.requestSubmit();
+  const busquedas = fetchStub.getCalls().filter(call => new URL(call.args[0]).pathname.endsWith('/documento/buscar'));
+  assert.lengthOf(busquedas, 1);
+
+  responder(respuesta({ idPersona: paciente.idPersona }));
+  await settle();
+  assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'), 1);
+  assert.isFalse(buscar.disabled);
+  assert.isNull(sessionStorage.getItem('sesionPersona'));
+ });
+ test('Un documento sin persona o sin inscripción de paciente bloquea la búsqueda de citas', async () => {
+  const coincidencia = fetchStub.withArgs(sinon.match(/documento\/buscar/));
+  coincidencia.onFirstCall().resolves(respuesta({}));
+  coincidencia.onSecondCall().resolves(respuesta({ idPersona: paciente.idPersona }));
+  fetchStub.withArgs(sinon.match(/persona_rol\/persona/)).resolves(respuesta([empleado]));
+  async function comprobarError(mensaje) {
+   let error;
+   try { await validarPaciente(tipo, '00000000-0'); } catch (e) { error = e; }
+   assert.instanceOf(error, Error);
+   assert.include(error.message, mensaje);
+  }
+  await comprobarError('sin persona asociada');
+  await comprobarError('no tiene inscripciones como paciente');
+  assert.isFalse(fetchStub.getCalls().some(call => new URL(call.args[0]).pathname.endsWith('/consulta')));
+ });
+
+ test('El catálogo paginado rechaza objetos y filas sin identificador', async () => {
+  for (const [contenido, mensaje] of [[{ datos: [] }, 'lista válida'], [[{ nombre: 'Sin identificador' }], 'sin identificador']]) {
+   fetchStub.callsFake(async () => respuesta(contenido));
+   let error;
+   try { await listarCompleto('tipo_documento', 'idTipoDocumento'); } catch (e) { error = e; }
+   assert.instanceOf(error, Error);
+   assert.include(error.message, mensaje);
+  }
+  sinon.assert.calledTwice(fetchStub);
+ });
+
+ test('HU1 recupera el catálogo tras un error y anuncia si el reintento no trae tipos activos', async () => {
+  const catalogo = fetchStub.withArgs(sinon.match(/tipo_documento/));
+  catalogo.onFirstCall().resolves(new Response('', { status: 503 }));
+  catalogo.onSecondCall().resolves(respuesta([{ ...tipo, activo: false }]));
+  const vista = document.createElement('galeno-citas');
+  fixture.append(vista);
+  const reintentar = vista.querySelector('[data-reintentar]');
+  const estado = vista.querySelector('[data-estado]');
+  await settle();
+  assert.include(estado.textContent, '503');
+  assert.isFalse(reintentar.hidden);
+  reintentar.click();
+  await settle();
+  assert.isTrue(reintentar.hidden);
+  assert.isTrue(vista.campo('tipo').disabled);
+  assert.isTrue(vista.querySelector('[data-buscar]').disabled);
+  assert.include(estado.textContent, 'No hay tipos de documento activos');
+ });
+
+ test('HU1 devuelve el foco al documento si falla la búsqueda y permite reintentar', async () => {
+  const documento = fetchStub.withArgs(sinon.match(/documento\/buscar/));
+  documento.onFirstCall().resolves(new Response('', { status: 404 }));
+  documento.onSecondCall().resolves(respuesta({ idPersona: paciente.idPersona }));
+  const vista = document.createElement('galeno-citas');
+  fixture.append(vista);
+  await settle();
+  const [tipoDocumento, numero] = ['tipo', 'numero'].map(nombre => vista.campo(nombre));
+  for (const [campo, valor] of [[tipoDocumento, 'dui'], [numero, '00000000-0']]) {
+   campo.value = valor;
+   campo.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  await vista.buscar();
+  assert.strictEqual(document.activeElement, numero);
+  assert.include(vista.querySelector('[data-estado]').textContent, 'Documento no registrado');
+  assert.isTrue(vista.querySelector('[data-resultados]').hidden);
+  assert.isFalse(vista.querySelector('[data-buscar]').disabled);
+  await vista.buscar();
+  assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'), 1);
+ });
+
  test('HU1 descarta citas tardías al cambiar documento durante una búsqueda', async () => {
   const vista=document.createElement('galeno-citas');fixture.append(vista);await settle();
   vista.campo('tipo').value='dui';vista.campo('tipo').dispatchEvent(new Event('input',{bubbles:true}));

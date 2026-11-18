@@ -6,7 +6,6 @@ import { esPaciente } from './roles.js';
 // Misma zona usada por las vistas JSF de GalenoSV; el formato JSON de fechas queda por verificar.
 export const ZONA_AGENDA = 'America/El_Salvador';
 // Resumen de consulta generado por GalenoSV con OpenPDF.
-export const TICKET_PDF_DISPONIBLE = true;
 export function diaAgenda(fecha = new Date()) {
     const d = fecha instanceof Date ? fecha : new Date(String(fecha).replace(/\[.*\]$/, ''));
     if (!Number.isFinite(d.getTime())) throw new Error('Fecha REST no válida');

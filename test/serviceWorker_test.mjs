@@ -30,6 +30,7 @@ function worker() {
         skipWaiting: async () => { waiting++; }, clients: { claim: async () => { claimed++; } }
     };
     vm.runInNewContext(source, {
+        __coverage__: globalThis.__coverage__,
         self, URL, Request, AbortController, console: { warn() {} },
         setTimeout(fn, delay) { const id = {}; timers.set(id, { fn, delay }); return id; },
         clearTimeout(id) { timers.delete(id); },
@@ -67,8 +68,6 @@ test('Precarga completa: archivos existentes y módulos importados de la aplicac
     }
     assert.ok(paths.has('/src/js/boundary/vistas/resumen_controller.js'));
     assert.ok(paths.has('/src/js/boundary/vistas/consulta_controller.js'));
-    assert.ok(paths.has('/src/js/boundary/componentes/calendar/calendar.js'));
-    assert.ok(paths.has('/src/js/boundary/componentes/data-display/dataTable.js'));
     const manifest = JSON.parse(await readFile(new URL('../src/manifest.json', import.meta.url), 'utf8'));
     for (const recurso of [...manifest.icons, ...manifest.screenshots]) {
         assert.ok(paths.has(new URL(recurso.src, scope).pathname), `Falta recurso del manifest: ${recurso.src}`);

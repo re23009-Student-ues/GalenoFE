@@ -190,9 +190,9 @@ suite('Shell en Web Components', () => {
         sinon.assert.calledOnce(salir);
     });
 
-    test('atributos de entrada actualizan título y ruta; texto de usuario no se interpreta como HTML', () => {
+    test('el shell muestra el título y marca la ruta; texto de usuario no se interpreta como HTML', () => {
         app.usuario = { ...usuario, idPersona: { nombres: '<img src=x>', apellidos: 'Prueba' } };
-        app.topbar.setAttribute('titulo', 'Agenda');
+        app.tituloEl.textContent = 'Agenda';
         app.menu.setAttribute('ruta', '/consultas');
         assert.equal(app.tituloEl.textContent, 'Agenda');
         assert.isTrue(app.querySelector('[data-route="/consultas"]').classList.contains('activo'));

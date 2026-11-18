@@ -9,17 +9,11 @@ explícitamente en otras páginas.
 ```js
 import { TextArea } from '../componentes/form/textarea/index.js'; // desde vistas/
 
-// Puede ser un <textarea> existente o un contenedor donde crear uno.
-const notes = new TextArea('#observations', {
+const notes = new TextArea(document.querySelector('#observations'), {
     name: 'observations', label: 'Observaciones', placeholder: 'Escribe aquí…',
     rows: 4, minRows: 3, maxRows: 10, autoResize: true,
     required: true, minLength: 10, maxLength: 1000, showCounter: true,
-    helperText: 'Describe las observaciones.',
-    validator: value => value.trim() ? true : 'No uses solo espacios.',
-    onInput: (value, event) => { /* Evento input nativo */ },
-    onChange: (value, event) => { /* Evento change nativo */ },
-    onFocus: (value, event) => {},
-    onBlur: (value, event) => {}
+    helperText: 'Describe las observaciones.'
 }).render();
 
 const result = notes.validate(); // { valid: boolean, message: string }
@@ -30,36 +24,31 @@ const formData = new FormData(document.querySelector('#patientForm'));
 
 | Opción | Predeterminado | Contrato |
 | --- | --- | --- |
-| `name`, `placeholder` | Valores nativos existentes o `''` | Texto |
+| `name`, `placeholder` | `''` | Texto |
 | `label` | Sin etiqueta adicional | Texto opcional |
-| `ariaLabel` | Nombre existente, name o `Texto multilínea` | Nombre alternativo si no hay label configurado |
-| `value` | Valor actual del textarea o `''` | Texto; no se trunca automáticamente |
-| `rows` | Filas nativas existentes o `4` | Entero positivo |
+| `ariaLabel` | name o `Texto multilínea` | Nombre alternativo si no hay label configurado |
+| `value` | `''` | Texto; no se trunca automáticamente |
+| `rows` | `4` | Entero positivo |
 | `minRows` | `rows` | Mínimo en modo autoResize |
 | `maxRows` | Mayor entre `rows` y `10` | Entero positivo, no menor que minRows |
-| `minLength`, `maxLength` | Restricción nativa existente o `null` | Entero >= 0; null elimina la restricción |
-| `required`, `disabled`, `readOnly` | Valores nativos existentes o false | Booleanos |
+| `minLength`, `maxLength` | `null` | Entero >= 0; null elimina la restricción |
+| `required`, `disabled`, `readOnly` | `false` | Booleanos |
 | `autoResize` | `false` | Mantiene el comportamiento nativo si está deshabilitado |
 | `showCounter` | `false` | Contador visual sin región live ni anuncio en cada tecla |
 | `helperText` | `''` | Texto seguro |
-| `validator` | Sin validador | Función síncrona pura `(value) => true | false | string` |
-| `onInput`, `onChange`, `onFocus`, `onBlur` | Sin callbacks | `(value, nativeEvent)` |
 
-Si hay un label externo, omitir `label` para reutilizarlo sin añadir otra etiqueta visible. Un label
-configurado explícitamente añade una etiqueta propia y establece aria-labelledby;
-no modifica el texto de etiquetas externas. En un label envolvente utiliza un
-span etiquetado para no generar labels anidados. Sin etiqueta visible se conserva
-el nombre accesible existente o se proporciona un nombre alternativo.
+Una etiqueta visible da nombre accesible al campo. Si se omite, el nombre se toma
+de `ariaLabel`, `name` o «Texto multilínea».
 
 ## API
 
-- `render()`: idempotente; devuelve la instancia. No reemplaza un textarea existente.
+- `render()`: idempotente; devuelve la instancia.
 - `getValue()`: lee siempre el valor DOM actual; después de destroy devuelve el último valor conservado.
 - `setValue(string)`, `clear()`: actualizan valor, contador, validez y altura sin
-  emitir input/change ni callbacks artificiales. No modifican el valor de reset
+  emitir input/change artificiales. No modifican el valor de reset
   después de renderizar. Antes del primer render, setValue establece el valor inicial.
 - `focus()`, `blur()`: métodos nativos, sin bloquear Tab/Shift+Tab. Sus eventos
-  reales sí llaman los callbacks correspondientes.
+  se conservan en el control.
 - `validate()`: `{ valid, message }`; muestra errores explícitamente. Después de
   destruir devuelve `{ valid: false, message: 'El control fue destruido.' }`.
 - `setError(string)`: error suministrado por la página; usa textContent y
@@ -72,17 +61,12 @@ el nombre accesible existente o se proporciona un nombre alternativo.
 - `refresh()`: método adicional para recalcular contador, validez, asociación al
   formulario y altura después de cambios directos mediante APIs DOM.
 - `destroy()`: idempotente. Desconecta observadores, eventos, reset y frames pendientes.
-  Restaura atributos, clases, estilos, defaultValue y validez personalizada originales
-  de un control existente, preservando su valor actual, identidad y listeners
-  externos. Lo devuelve a su posición original con un marcador; sin marcador queda
-  separado y accesible mediante la referencia de la página. Un control creado
-  dentro de un contenedor se elimina junto con la vista.
+  Elimina el control junto con su vista.
 
 Los setters de tipos inválidos y las configuraciones incorrectas lanzan TypeError.
 Los límites numéricos aceptan como máximo 2147483647, sin conversiones silenciosas
 por desbordamiento de atributos nativos.
-No compartir un mismo textarea entre varias instancias; sí se admiten múltiples
-campos independientes. Los métodos mutadores son inofensivos tras destroy si sus
+Los métodos mutadores son inofensivos tras destroy si sus
 argumentos son válidos.
 
 ## Validación y formularios
@@ -91,7 +75,7 @@ Se utilizan required, minlength, maxlength y setCustomValidity nativos. También
 comprueba la longitud de valores programáticos: los navegadores no siempre marcan
 tooShort/tooLong tras asignar value desde JavaScript. Un campo opcional vacío no
 incumple minLength. No se recortan espacios: required sigue la semántica nativa;
-la regla de espacios pertenece al validator de la página.
+la regla de espacios se aplica desde la pantalla cuando corresponde.
 
 El contador usa `textarea.value.length`, en unidades UTF-16 como maxlength. Por
 ejemplo, muchos emojis ocupan dos unidades; los saltos de línea del value se
@@ -99,15 +83,8 @@ normalizan a LF de acuerdo con el comportamiento nativo. Sin límite: `N caracte
 Con límite: `N / máximo`. maxlength restringe la escritura/pegado nativos; setValue
 puede superar ese límite y conserva el texto, marcándolo inválido.
 
-El validador personalizado se ejecuta después de las restricciones básicas y debe
-ser síncrono y sin efectos externos. `true` valida; un string no vacío es el error;
-false u otros resultados invalidan con mensaje genérico. Las excepciones muestran
-un mensaje seguro sin trazas. Las promesas no están admitidas como validadores;
-se consideran inválidas y sus rechazos se consumen para evitar errores sin manejar.
-Para validación asíncrona, coordinarla desde la página o el Wizard.
-
-La validez se sincroniza silenciosamente desde el render para que el formulario
-nativo también reconozca la validación personalizada. Los mensajes visuales y
+La validez se sincroniza desde el render con las restricciones nativas.
+Los mensajes visuales y
 aria-invalid solo se activan tras input, change, blur, un evento invalid nativo,
 setError o validate. Inicialmente no hay mensaje de error visible.
 
@@ -115,7 +92,7 @@ No hay listener de submit ni preventDefault. FormData recibe el name y valor nat
 disabled queda excluido; readOnly mantiene selección y consulta del texto, participa
 en FormData y está excluido de validación de restricciones como indica HTML.
 El reset del formulario conserva defaultValue nativo; contador, error y altura se
-actualizan después de su acción predeterminada, sin emitir callbacks artificiales.
+actualizan después de su acción predeterminada, sin emitir eventos artificiales.
 
 En un ejemplo de página (la página decide si enviar):
 
@@ -145,14 +122,11 @@ movimiento del DOM: la página debe llamar destroy al abandonar el campo.
 const host = document.createElement('div');
 const form = document.createElement('form'); form.append(host);
 const notes = new TextArea(host, { name: 'notes', required: true, autoResize: true }).render();
-const wizard = new Wizard(wizardHost, { steps: [
-    { id: 'notes', title: 'Notas', content: form, validate: () => notes.validate().valid }
-] }).render();
-// El mismo host o formulario puede ser contenido de Modal.
-// Al abandonar: notes.destroy(); wizard.destroy(); modal?.destroy();
+// Atención pasa el formulario como content de un paso; también puede usarse en Modal.
+// Al abandonar la vista: notes.destroy().
 ```
 
-Se conserva aria-describedby externo y se añaden ayuda/error por id, sin duplicados.
+La ayuda y el error se asocian por identificador mediante aria-describedby.
 Los ids generados son únicos; el foco y los eventos siguen siendo nativos. El
 contador no es live para evitar anuncios repetidos. El error usa role=alert.
 

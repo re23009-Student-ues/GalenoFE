@@ -1,6 +1,13 @@
-import TarjetaSimple from './tarjeta_simple.js';
+import './tarjeta_simple.js';
 import Consulta from '../../entity/consulta.js';
 import { formatoFecha, estadoConsulta, estadoConsultaResponsable } from "../../control/fechas.js";
+
+function contenidoDeSlot(etiqueta, slot, texto) {
+    const elemento = document.createElement(etiqueta);
+    elemento.slot = slot;
+    elemento.textContent = texto;
+    return elemento;
+}
 
 /**
  * Tarjeta de una consulta, construida sobre <tarjeta-simple>.
@@ -12,9 +19,8 @@ import { formatoFecha, estadoConsulta, estadoConsultaResponsable } from "../../c
 class TarjetaConsulta extends HTMLElement {
     constructor() {
         super();
-        this.tarjeta = new TarjetaSimple();
+        this.tarjeta = document.createElement("tarjeta-simple");
         this.consulta = new Consulta();
-        this.resumenEstado = null; // DTO de lectura del backend, separado de las ejecuciones.
         this.responsable = null; // Contexto laboral para el estado de sus asignaciones.
         this.pasos = []; // Pasos reales de esta consulta, asignados antes de conectar.
         this.root = this.attachShadow({ mode: "open" });
@@ -25,27 +31,21 @@ class TarjetaConsulta extends HTMLElement {
         const persona = c.idPersonaRol?.idPersona;
         const nombre = `${persona?.nombres ?? ""} ${persona?.apellidos ?? ""}`.trim();
         const estado = this.responsable ? estadoConsultaResponsable(c, this.responsable, this.pasos) :
-            this.resumenEstado?.estado ?? estadoConsulta(c, new Date(), this.pasos);
+            estadoConsulta(c, new Date(), this.pasos);
 
-        const titulo = this.crearElemento("p", "titulo", formatoFecha(c.fechaInicio));
-        const paciente = this.crearElemento("p", "contenido", `Paciente: ${nombre || "Sin nombre"}`);
-        const observaciones = this.crearElemento("p", "contenido", c.observaciones || "Sin observaciones");
+        const observaciones = contenidoDeSlot("p", "contenido", c.observaciones || "Sin observaciones");
         observaciones.className = "obs";
-        const clinica = this.crearElemento("span", "pie", c.idPersonaRol?.idClinica?.nombre ?? "");
-        const insignia = this.crearElemento("span", "pie", estado);
+        const insignia = contenidoDeSlot("span", "pie", estado);
         insignia.className = `estado estado--${estado.toLowerCase().replace(" ", "-")}`;
 
-        // replaceChildren evita duplicados si el elemento se reconecta
-        this.tarjeta.replaceChildren(titulo, paciente, observaciones, clinica, insignia);
-        this.root.replaceChildren(this.tarjeta);
-    }
-
-    /** Crea un elemento con texto seguro (textContent) y lo asigna a un slot. */
-    crearElemento(etiqueta, slot, texto) {
-        const el = document.createElement(etiqueta);
-        el.setAttribute("slot", slot);
-        el.textContent = texto;
-        return el;
+        this.tarjeta.replaceChildren(
+            contenidoDeSlot("p", "titulo", formatoFecha(c.fechaInicio)),
+            contenidoDeSlot("p", "contenido", `Paciente: ${nombre || "Sin nombre"}`),
+            observaciones,
+            contenidoDeSlot("span", "pie", c.idPersonaRol?.idClinica?.nombre ?? ""),
+            insignia
+        );
+        if (this.tarjeta.parentNode !== this.root) this.root.replaceChildren(this.tarjeta);
     }
 }
 

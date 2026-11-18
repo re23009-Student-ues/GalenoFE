@@ -2,7 +2,6 @@ import { assert } from '../lib/chai/index.js';
 import sinon from '../lib/sinon/sinon-esm.js';
 import { TextArea } from '../../../src/js/boundary/componentes/form/textarea/index.js';
 import { Modal } from '../../../src/js/boundary/componentes/overlays/index.js';
-import { Wizard } from '../../../src/js/boundary/componentes/navigation/wizard/index.js';
 
 mocha.setup('tdd');
 const frames = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -23,14 +22,17 @@ suite('TextArea nativo', () => {
         assert.isTrue(field.control.required); assert.equal(field.control.rows, 4); assert.isFalse(field.required.hidden);
     });
     test('Render repetido conserva el mismo control y no duplica callbacks', () => {
-        let calls = 0; const field = create({ onInput: () => calls++ }); const control = field.control;
+        const field = create(); const control = field.control;
+        const refresh = sinon.spy(field, "refresh");
         field.render().render(); control.value = 'Línea 1\nLínea 2'; control.dispatchEvent(new Event('input', { bubbles: true }));
         assert.strictEqual(field.control, control); assert.lengthOf(field.root.querySelectorAll('textarea'), 1);
-        assert.equal(calls, 1); assert.equal(field.getValue(), 'Línea 1\nLínea 2');
+        assert.equal(refresh.callCount, 3); assert.equal(field.getValue(), 'Línea 1\nLínea 2');
     });
     test('setValue y clear sincronizan contador sin emitir eventos de usuario', () => {
         const input = sinon.spy(), change = sinon.spy();
-        const field = create({ showCounter: true, maxLength: 20, onInput: input, onChange: change });
+        const field = create({ showCounter: true, maxLength: 20 });
+        field.control.addEventListener("input", input);
+        field.control.addEventListener("change", change);
         field.setValue('Texto\nNuevo'); assert.equal(field.counter.textContent, '11 / 20');
         field.clear(); assert.equal(field.getValue(), ''); assert.equal(field.counter.textContent, '0 / 20');
         assert.isFalse(input.called); assert.isFalse(change.called);
@@ -55,21 +57,6 @@ suite('TextArea nativo', () => {
         field.setValue('abcdef'); assert.equal(field.getValue(), 'abcdef'); assert.isFalse(field.validate().valid);
         assert.equal(field.control.maxLength, 5); assert.isTrue(field.control.validity.customError);
     });
-    test('Validador personalizado sincroniza la validez del formulario sin mostrar error inicial', () => {
-        const form = document.createElement('form'), host = document.createElement('div'); form.append(host); fixture.append(form);
-        const field = create({ validator: value => value.trim() ? true : 'No uses solo espacios.' }, host);
-        assert.equal(field.error.textContent, ''); assert.isFalse(form.checkValidity());
-        assert.equal(field.error.textContent, 'No uses solo espacios.');
-        field.setValue('Válido'); assert.isTrue(form.checkValidity());
-    });
-    test('Excepciones y resultados incorrectos de validator producen errores seguros', async () => {
-        for (const validator of [() => { throw new Error('traza privada'); }, () => undefined,
-            () => false, async () => { throw new Error('detalle privado'); }]) {
-            const field = create({ validator }); const result = field.validate();
-            assert.isFalse(result.valid); assert.notInclude(result.message, 'privad');
-        }
-        await pause();
-    });
     test('setError y ayuda son texto seguro; clearError mantiene las restricciones', () => {
         const field = create({ required: true, helperText: 'Ayuda' });
         field.setError('<img src=x>'); assert.equal(field.error.textContent, '<img src=x>'); assert.notExists(field.root.querySelector('img'));
@@ -78,17 +65,6 @@ suite('TextArea nativo', () => {
         field.setHelperText('<b>Ayuda nueva</b>'); assert.equal(field.helper.textContent, '<b>Ayuda nueva</b>');
         field.setHelperText(''); assert.isTrue(field.helper.hidden);
         assert.isFalse(field.control.getAttribute('aria-describedby')?.includes(field.helper.id) ?? false);
-    });
-    test('Input, change, focus y blur conservan su semántica nativa', () => {
-        const callbacks = { onInput: sinon.spy(), onChange: sinon.spy(), onFocus: sinon.spy(), onBlur: sinon.spy() };
-        const field = create(callbacks); field.focus(); assert.strictEqual(document.activeElement, field.control);
-        assert.isTrue(field.root.classList.contains('textarea--focused'));
-        field.control.value = 'Editado'; field.control.dispatchEvent(new Event('input', { bubbles: true }));
-        assert.equal(callbacks.onInput.callCount, 1); assert.isFalse(callbacks.onChange.called);
-        field.control.dispatchEvent(new Event('change', { bubbles: true })); field.blur();
-        assert.equal(callbacks.onChange.callCount, 1); assert.equal(callbacks.onFocus.callCount, 1); assert.equal(callbacks.onBlur.callCount, 1);
-        assert.equal(callbacks.onInput.firstCall.args[0], 'Editado');
-        assert.isFalse(field.root.classList.contains('textarea--focused'));
     });
     test('FormData incluye name y valor; disabled lo excluye y readOnly lo conserva', () => {
         const form = document.createElement('form'), host = document.createElement('div'); form.append(host); fixture.append(form);
@@ -116,29 +92,6 @@ suite('TextArea nativo', () => {
         field.setError('Error de la página'); assert.isFalse(form.checkValidity());
         field.clearError(); assert.isTrue(form.checkValidity());
     });
-    test('Textarea existente conserva identidad, name, valor, listeners y posición al destruir', () => {
-        const form = document.createElement('form'), before = document.createElement('span'), control = document.createElement('textarea'), after = document.createElement('span');
-        control.name = 'existing'; control.defaultValue = 'Original'; control.value = 'Borrador'; control.rows = 5;
-        let calls = 0; control.addEventListener('input', () => calls++);
-        form.append(before, control, after); fixture.append(form);
-        const field = create({ showCounter: true, autoResize: true, label: 'Notas' }, control);
-        assert.strictEqual(field.control, control); assert.equal(field.getValue(), 'Borrador'); assert.equal(control.name, 'existing');
-        field.setValue('Editado'); control.dispatchEvent(new Event('input')); field.destroy();
-        assert.deepEqual([...form.children], [before, control, after]); assert.equal(control.value, 'Editado');
-        assert.equal(control.defaultValue, 'Original'); assert.equal(control.rows, 5); assert.equal(calls, 1);
-        assert.isFalse(control.classList.contains('textarea__control'));
-    });
-    test('Etiquetas existentes, aria-describedby original y wrapping label se conservan', () => {
-        const label = document.createElement('label'); label.textContent = 'Etiqueta existente';
-        const control = document.createElement('textarea'); control.setAttribute('aria-describedby', 'ayuda-externa');
-        label.append(control); fixture.append(label);
-        const field = create({ required: true, helperText: 'Ayuda adicional' }, control);
-        assert.lengthOf(fixture.querySelectorAll('label'), 1); assert.strictEqual(control.labels[0], label);
-        assert.include(control.getAttribute('aria-describedby'), 'ayuda-externa');
-        field.validate(); assert.include(control.getAttribute('aria-describedby'), field.error.id);
-        field.destroy(); assert.equal(control.getAttribute('aria-describedby'), 'ayuda-externa');
-        assert.equal(label.textContent, 'Etiqueta existente'); assert.strictEqual(control.parentElement, label);
-    });
     test('AutoResize crece, se reduce, respeta filas máximas y activa scroll', () => {
         const field = create({ autoResize: true, minRows: 2, maxRows: 4 });
         const initial = field.control.getBoundingClientRect().height;
@@ -151,8 +104,9 @@ suite('TextArea nativo', () => {
         assert.equal(field.control.style.overflowY, 'hidden');
     });
     test('AutoResize desactivado conserva altura manual y resize nativo', () => {
-        const control = document.createElement('textarea'); control.style.height = '140px'; control.style.resize = 'vertical'; fixture.append(control);
-        const field = create({ autoResize: false }, control); field.setValue('Línea\n'.repeat(20));
+        const field = create({ autoResize: false });
+        const control = field.control; control.style.height = '140px'; control.style.resize = 'vertical';
+        field.setValue('Línea\n'.repeat(20));
         assert.equal(control.style.height, '140px'); assert.equal(control.style.resize, 'vertical');
     });
     test('Inicialmente oculto recalcula al mostrarse y al estrecharse', async () => {
@@ -169,20 +123,6 @@ suite('TextArea nativo', () => {
         modal.open(); await frames(); assert.isAbove(field.control.getBoundingClientRect().height, 0);
         assert.equal(field.control.style.overflowY, 'auto'); field.focus(); assert.isTrue(modal.element.contains(document.activeElement));
         modal.close(); modal.open(); await frames(); assert.equal(field.getValue(), 'Línea\n'.repeat(10));
-    });
-    test('Wizard: conserva el control, valida y redimensiona al activar su paso', async () => {
-        const form = document.createElement('form'), host = document.createElement('div'); form.append(host);
-        const first = document.createElement('p'); first.textContent = 'Inicio';
-        const wizardHost = document.createElement('div'); fixture.append(wizardHost);
-        const field = create({ autoResize: true, minRows: 1, maxRows: 3, required: true, name: 'notes' }, host);
-        const wizard = new Wizard(wizardHost, { steps: [
-            { id: 'one', title: 'Inicio', content: first },
-            { id: 'two', title: 'Notas', content: form, validate: () => field.validate().valid }
-        ] }).render(); components.push(wizard);
-        await wizard.next(); await frames(); assert.isAbove(field.control.getBoundingClientRect().height, 0);
-        assert.isFalse(await wizard.next()); field.setValue('Notas\n'.repeat(10));
-        assert.isTrue(await wizard.previous()); await wizard.next(); await frames();
-        assert.equal(new FormData(form).get('notes'), 'Notas\n'.repeat(10)); assert.isTrue(await wizard.next());
     });
     test('Form reset actualiza valor, contador y error tras el reset nativo', async () => {
         const form = document.createElement('form'), host = document.createElement('div'); form.append(host); fixture.append(form);
@@ -231,5 +171,49 @@ suite('TextArea nativo', () => {
         const field = create({ required: true, autoResize: true }); field.setValue('Texto').validate();
         assert.isFalse(fetch.called); assert.isFalse(storage.called);
     });
+    test('Sin ResizeObserver recalcula tras resize y deja de observar al desconectar', async () => {
+        sinon.stub(window, 'ResizeObserver').value(undefined);
+        const host = document.createElement('div');
+        host.style.width = '400px';
+        fixture.append(host);
+        const field = create({ autoResize: true, minRows: 1, maxRows: 40, value: 'Texto '.repeat(90) }, host);
+        const altura = field.control.getBoundingClientRect().height;
+        host.style.width = '160px';
+        window.dispatchEvent(new Event('resize'));
+        window.dispatchEvent(new Event('resize'));
+        await frames();
+        assert.isAbove(field.control.getBoundingClientRect().height, altura);
+
+        host.remove();
+        const resize = sinon.spy(field, 'resize');
+        window.dispatchEvent(new Event('resize'));
+        await frames();
+        sinon.assert.notCalled(resize);
+    });
+
+    test('Cancelar reset conserva el valor y el mensaje accesible original', async () => {
+        const form = fixture.appendChild(document.createElement('form'));
+        const field = create({ value: 'Inicio', showCounter: true }, form);
+        form.addEventListener('reset', evento => evento.preventDefault(), { once: true });
+        field.setValue('Borrador').setError('Revisa el texto');
+        form.reset();
+        await pause();
+        assert.equal(field.getValue(), 'Borrador');
+        assert.equal(field.error.textContent, 'Revisa el texto');
+        assert.include(field.control.getAttribute('aria-describedby'), field.error.id);
+        assert.equal(field.counter.textContent, '8 caracteres');
+    });
+
+    test('Tras destruir el control los setters conservan el último valor sin remontarlo', () => {
+        const field = create({ value: 'Último valor' });
+        const host = field.target;
+        field.destroy();
+        field.setValue('Otro').setDisabled(true).setReadOnly(true).setHelperText('Otra ayuda').setError('Error');
+        field.clearError().focus().blur().render();
+        assert.equal(field.getValue(), 'Último valor');
+        assert.isFalse(field.validate().valid);
+        assert.isEmpty(host.children);
+    });
+
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

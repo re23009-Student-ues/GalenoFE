@@ -22,21 +22,25 @@ suite('Actualización HU4 y caché sensible', () => {
     async function lifecycle(type) {
         let completion; handlers.get(type)({ waitUntil(promise) { completion = promise; } }); await completion;
     }
-    test('precarga v50 y el mismo main actualizado que carga el HTML', async () => {
+    test('precarga estáticos con versión y el mismo main actualizado que carga el HTML', async () => {
         await lifecycle('install');
-        sinon.assert.calledWithExactly(cachesMock.open, 'galenosv-v50');
+        sinon.assert.calledOnce(cachesMock.open);
+        assert.match(cachesMock.open.firstCall.args[0], /^galenosv-v\d+$/);
         const index = new DOMParser().parseFromString(html, 'text/html');
         const main = index.querySelector('script[type="module"]').getAttribute('src');
-        assert.equal(main, 'js/main.js?v=23');
+        assert.match(main, /^js\/main\.js\?v=\d+$/);
         const requests = cache.addAll.firstCall.args[0];
         assert.isTrue(requests.some(request => request.url === new URL(main, selfMock.registration.scope).href));
         assert.isTrue(requests.every(request => request.cache === 'reload'));
         sinon.assert.calledOnce(selfMock.skipWaiting);
     });
     test('activación elimina versiones del rollback y caché API anterior; conserva otras aplicaciones', async () => {
-        cachesMock.keys.resolves(['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galenosv-v48', 'galenosv-v49', 'galenosv-v50', 'galeno-api-v0', 'galeno-api-v1', 'otra-app']);
+        await lifecycle('install');
+        const actual = cachesMock.open.firstCall.args[0];
+        const anteriores = ['galenosv-v0', 'galeno-api-v0', 'galeno-api-v1'];
+        cachesMock.keys.resolves([...anteriores, actual, 'otra-app']);
         await lifecycle('activate');
-        assert.deepEqual(cachesMock.delete.getCalls().map(call => call.args[0]), ['galenosv-v13', 'galenosv-v14', 'galenosv-v15', 'galenosv-v16', 'galenosv-v17', 'galenosv-v18', 'galenosv-v19', 'galenosv-v48', 'galenosv-v49', 'galeno-api-v0', 'galeno-api-v1']);
+        assert.deepEqual(cachesMock.delete.getCalls().map(call => call.args[0]), anteriores);
         sinon.assert.calledOnce(selfMock.clients.claim);
     });
     test('precarga conserva Wizard, Checkbox y Atención y excluye recursos retirados', async () => {

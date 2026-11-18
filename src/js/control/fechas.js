@@ -12,7 +12,7 @@ export function formatoFecha(texto) {
 export function estadoConsulta(c, ahora = new Date(), pasos = []) {
     pasos = Array.isArray(pasos) ? pasos.filter(paso => String(paso?.estado ?? '').trim().toUpperCase() !== 'INVALIDO') : [];
     const inicio = parseFecha(c.fechaInicio);
-    if (Array.isArray(pasos) && pasos.length && pasos.every(paso =>
+    if (pasos.length && pasos.every(paso =>
         typeof paso?.estado === 'string' && ['COMPLETADO', 'FINALIZADO'].includes(paso.estado.trim().toUpperCase()))) {
         return "Finalizada";
     }
@@ -29,11 +29,6 @@ export function estadoConsultaResponsable(c, contexto, pasos = [], ahora = new D
     if (!asignados.length) return estadoConsulta(c, ahora, pasos);
     return asignados.every(paso => typeof paso.estado === 'string' &&
         ['COMPLETADO', 'FINALIZADO'].includes(paso.estado.trim().toUpperCase())) ? 'Completado' : 'En curso';
-}
-
-
-export function formatoCorto(fecha, zona) {
-    return fecha.toLocaleString("es-SV", { dateStyle: "medium", timeStyle: "short", ...(zona ? { timeZone: zona } : {}) });
 }
 
 /** Años cumplidos a la fecha local actual; conserva el día civil recibido del REST. */

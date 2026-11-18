@@ -10,7 +10,7 @@ Basada en router, main, sesión, login, service worker y componentes actuales de
 | `src/js/router.js` | Rutas por hash y protección por sesión. |
 | `src/js/boundary/` | Shell (`galeno_app.js`, `galeno_outlet.js`, `menu_lateral.js`, `topbar.js`), login y utilidades. |
 | `src/js/boundary/vistas/` | Controladores de dashboard y consultas, conservados con su comportamiento actual. |
-| `src/js/boundary/componentes/` | Tarjetas, instalador, calendario, gráficas y tabla reutilizables. |
+| `src/js/boundary/componentes/` | Tarjetas, instalador, árbol de Agenda y controles de Atención. |
 | `src/js/control/`, `src/js/entity/` | Servicios REST y lógica; entidades y respuestas/errores. |
 | `src/Recursos/estilos/`, `imagenes/` | CSS propio e imágenes, respectivamente, dentro de `Recursos`. |
 | `test/js/`, `test/` | Pruebas y dependencias locales de pruebas; páginas HTML y prueba del service worker. |
@@ -264,34 +264,28 @@ El shell usa DOM ligero y CSS propio en `src/Recursos/estilos/principal.css` y `
 
 `instalador-app` vive en `galeno-topbar`, tanto público como personal; el pie no tiene botón. Solo ofrece «Instalar» (con aria-label) tras `beforeinstallprompt`, que pospone con `preventDefault`, fuera de standalone y sin `appinstalled`. Al pulsar espera `prompt()` y `userChoice`, consume el evento y se oculta; `appinstalled` también lo oculta. Conserva la oferta al cambiar de modo; sus estilos de Shadow DOM están en `instalador.css`.
 
-`galeno-menu` recibe el atributo `ruta`; `galeno-topbar`, `.usuario` y atributo `titulo`. Salidas `CustomEvent` con propagación: `galeno-navegar` (`detail: { ruta }`), `galeno-cerrar-sesion`, `galeno-alternar-menu`. App monta `galeno-login` en `#pantalla-login` con `mostrarLogin()` y lo retira al recibir `galeno-login-exitoso` (`bubbles`, `composed`). El formulario gestiona catálogo/reintento, errores con `aria-live` y foco inicial; al desconectarse limpia listeners e ignora éxitos tardíos. App procesa alternar menú; main recibe el éxito para establecer contexto y consumir la ruta pendiente, y procesa navegación/cierre y escucha `hashchange` para marcar la ruta. Desconectar app emite `galeno-desconectar` para limpiar la coordinación; menú limpia sus listeners en `disconnectedCallback()`.
+`galeno-menu` recibe el atributo `ruta`; `galeno-topbar`, `.usuario` y `tituloEl`, cuyo texto actualiza el router. Salidas `CustomEvent` con propagación: `galeno-navegar` (`detail: { ruta }`), `galeno-cerrar-sesion`, `galeno-alternar-menu`. App monta `galeno-login` en `#pantalla-login` con `mostrarLogin()` y lo retira al recibir `galeno-login-exitoso` (`bubbles`, `composed`). El formulario gestiona catálogo/reintento, errores con `aria-live` y foco inicial; al desconectarse limpia listeners e ignora éxitos tardíos. App procesa alternar menú; main recibe el éxito para establecer contexto y consumir la ruta pendiente, y procesa navegación/cierre y escucha `hashchange` para marcar la ruta. Desconectar app emite `galeno-desconectar` para limpiar la coordinación; menú limpia sus listeners en `disconnectedCallback()`.
 
-Para nuevos componentes: prefijo `galeno-`, atributos simples, propiedades para objetos y `CustomEvent` de salida. Los anteriores conservan nombres y contratos: `.consulta` en `tarjeta-consulta`; slots `titulo`, `contenido`, `pie` en `tarjeta-simple`. Calendar, DataTable y gráficas son clases auxiliares con callbacks; controladores liberan recursos con `destroy()`. Solo ECMAScript, sin frameworks, librerías ni CSS externos; Mocha/Chai/Sinon solo en pruebas. La cobertura del personal migrada del portal está en `test/js/boundary/personal_test.js` y `test/personal_test.html`; los componentes reutilizables conservan sus suites.
+Para nuevos componentes: prefijo `galeno-`, atributos simples, propiedades para objetos y `CustomEvent` de salida. Los anteriores conservan nombres y contratos: `.consulta` en `tarjeta-consulta`; slots `titulo`, `contenido`, `pie` en `tarjeta-simple`. Los controladores liberan recursos con `destroy()`. Solo ECMAScript, sin frameworks, librerías ni CSS externos; Mocha/Chai/Sinon solo en pruebas. La cobertura del personal migrada del portal está en `test/js/boundary/personal_test.js` y `test/personal_test.html`; los componentes reutilizables conservan sus suites.
 
 ## 5. Checklist por archivo nuevo
 
-Wizard se importa desde `boundary/componentes/navigation/wizard/index.js` con
-`new Wizard(container, options).render()`. Su vista es `<galeno-wizard>` y los
-estilos están en `Recursos/estilos/wizard.css`. Mantiene paneles DOM estables,
-valida callbacks síncronos/asíncronos y vuelve a revisar los pasos obligatorios
-antes de finalizar. No serializa formularios, persiste datos ni conoce REST. La
-página sincroniza sus controles con `setData()` y destruye la instancia al salir;
-destruir restaura los nodos originales e ignora resultados tardíos. Documentación
-del contrato en `componentes/navigation/wizard/README.md` y pruebas en
-`test/wizard_test.html`.
-El indicador usa carrusel por desbordamiento real y ResizeObserver, con opciones
-`stepCarousel: { enabled, autoScroll, showArrows, smoothScroll }` (todas `true`
-por defecto). Las flechas desplazan sin navegar pasos; los métodos existentes
-mantienen visible el activo. `enabled: false` conserva el indicador original.
-Los formularios no se reconstruyen; destroy limpia observador, frame y listeners.
+Wizard se importa desde `boundary/componentes/navigation/wizard/index.js` y
+presenta los pasos de Atención con paneles DOM estables. Atención envía el estado
+visible, los responsables y las acciones disponibles mediante `updateView()`.
+Los botones comunican intenciones a Atención. El flujo aplica permisos, confirma,
+valida y guarda antes de indicar el paso activo mediante `goToStep()`.
+El carrusel aparece cuando el indicador desborda, mantiene visible el paso activo
+y respeta movimiento reducido. `destroy()` restaura los nodos originales y libera
+observador, frames y listeners. Pruebas en `test/wizard_test.html`.
 
 TextArea se importa desde `boundary/componentes/form/textarea/index.js` con
 `new TextArea(target, options).render()`. La vista `<galeno-textarea>` conserva un
 textarea nativo en DOM ligero, por lo que name, FormData y validación HTML5 siguen
-funcionando. Puede envolver un textarea existente sin reemplazarlo o crear uno en
-un contenedor. El ajuste automático usa ResizeObserver y requestAnimationFrame y
-se reactiva al mostrar pasos ocultos de Wizard o abrir Modal. Los validadores son
-síncronos y setValue no emite eventos artificiales. Estilos en
+funcionando. Crea el textarea dentro de un contenedor. El ajuste automático usa
+ResizeObserver y requestAnimationFrame al mostrar pasos ocultos de Wizard o abrir
+Modal. La validación nativa sigue disponible y `setValue()` conserva el comportamiento
+de los eventos del navegador. Estilos en
 `Recursos/estilos/textarea.css`, contrato en
 `componentes/form/textarea/README.md` y pruebas en `test/textarea_test.html`.
 

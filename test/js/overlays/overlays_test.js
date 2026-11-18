@@ -14,9 +14,14 @@ function backdrop(element) {
 suite('Modal y ConfirmDialog nativos', () => {
     let modals, fixture;
     const make = options => { const modal = new Modal({ animated: false, ...options }); modals.push(modal); return modal; };
+    const show = options => {
+        const dialog = new ConfirmDialog(options);
+        modals.push(dialog);
+        return dialog.open().result;
+    };
     setup(() => { modals = []; fixture = document.querySelector('#fixtures'); });
     teardown(async () => {
-        ConfirmDialog.dismissAll(); modals.forEach(modal => modal.destroy());
+        modals.forEach(modal => modal.destroy());
         await wait(); fixture.replaceChildren(); sinon.restore();
         assert.lengthOf(document.querySelectorAll('.modal'), 0);
     });
@@ -27,9 +32,9 @@ suite('Modal y ConfirmDialog nativos', () => {
         assert.equal(modal.element.getAttribute('aria-labelledby'), modal.title.id);
         modal.close().close(); await wait(); assert.isFalse(modal.isOpen()); assert.equal(closes, 1);
     });
-    test('Texto seguro, título dinámico y acciones opcionales', () => {
-        const modal = make({ title: 'Inicial' });
-        modal.setTitle('<b>Título</b>').setContent('<img src=x>').open();
+    test('Texto seguro en título y contenido, con acciones opcionales', () => {
+        const modal = make({ title: '<b>Título</b>' });
+        modal.setContent('<img src=x>').open();
         assert.equal(modal.title.textContent, '<b>Título</b>');
         assert.equal(modal.body.textContent, '<img src=x>'); assert.notExists(modal.element.querySelector('img, b'));
         assert.isTrue(modal.footer.hidden);
@@ -115,21 +120,20 @@ suite('Modal y ConfirmDialog nativos', () => {
         assert.throws(() => make({ size: 'enorme' }), TypeError);
         assert.throws(() => make({ title: '' }), TypeError);
         const modal = make(); assert.throws(() => modal.setContent(modal.body), TypeError);
-        let error; try { await ConfirmDialog.show({ type: 'otro' }); } catch (e) { error = e; }
-        assert.instanceOf(error, TypeError);
+        assert.throws(() => new ConfirmDialog({ type: 'otro' }), TypeError);
     });
-    test('Confirmar resuelve true una vez y no ejecuta cancelación', async () => {
-        let cancellations = 0; const result = ConfirmDialog.show({ onCancel: () => cancellations++ });
+    test('Confirmar resuelve true, invoca la acción una vez y cierra el diálogo', async () => {
+        const onConfirm = sinon.spy(); const result = show({ onConfirm });
         assert.isTrue(top().contains(document.activeElement));
         assert.isTrue(document.activeElement.classList.contains('confirm-dialog__cancel'));
-        confirm(); assert.isTrue(await result); assert.equal(cancellations, 0);
+        confirm(); assert.isTrue(await result); sinon.assert.calledOnce(onConfirm); assert.notExists(top());
     });
-    test('Cancelar resuelve false y ejecuta callback exactamente una vez', async () => {
-        let calls = 0; const result = ConfirmDialog.show({ onCancel: () => calls++ });
-        cancel(); assert.isFalse(await result); ConfirmDialog.dismissAll(); assert.equal(calls, 1);
+    test('Cancelar resuelve false sin confirmar', async () => {
+        const onConfirm = sinon.spy(); const result = show({ onConfirm });
+        cancel(); assert.isFalse(await result); sinon.assert.notCalled(onConfirm);
     });
     for (const way of ['escape', 'overlay', 'close']) test(`Cierre ${way} resuelve false`, async () => {
-        const result = ConfirmDialog.show(); const dialog = top();
+        const result = show(); const dialog = top();
         if (way === 'escape') dialog.dispatchEvent(new Event('cancel', { cancelable: true }));
         else if (way === 'overlay') backdrop(dialog);
         else dialog.querySelector('.modal__close').click();
@@ -137,7 +141,7 @@ suite('Modal y ConfirmDialog nativos', () => {
     });
     test('Éxito asíncrono bloquea botones, cierres y doble confirmación', async () => {
         let done, calls = 0;
-        const result = ConfirmDialog.show({ onConfirm: () => { calls++; return new Promise(resolve => { done = resolve; }); } });
+        const result = show({ onConfirm: () => { calls++; return new Promise(resolve => { done = resolve; }); } });
         const dialog = top(); confirm(); dialog.querySelector('.confirm-dialog__confirm').click();
         assert.equal(calls, 1); assert.equal(dialog.getAttribute('aria-busy'), 'true');
         assert.isTrue([...dialog.querySelectorAll('button')].every(button => button.disabled));
@@ -147,7 +151,7 @@ suite('Modal y ConfirmDialog nativos', () => {
     });
     test('Error asíncrono seguro: mantiene promesa pendiente y permite reintentar', async () => {
         let calls = 0, settled = false;
-        const result = ConfirmDialog.show({ onConfirm: async () => { if (++calls === 1) throw new Error('secreto servidor'); } });
+        const result = show({ onConfirm: async () => { if (++calls === 1) throw new Error('secreto servidor'); } });
         result.then(() => { settled = true; });
         confirm(); await wait(); assert.isTrue(top().open); assert.isFalse(settled);
         assert.include(top().querySelector('[role=alert]').textContent, 'No fue posible');
@@ -155,18 +159,8 @@ suite('Modal y ConfirmDialog nativos', () => {
         confirm(); assert.isTrue(await result); assert.equal(calls, 2);
     });
     test('Permite cancelar después de un fallo', async () => {
-        const result = ConfirmDialog.show({ onConfirm: async () => { throw new Error('fallo'); } });
+        const result = show({ onConfirm: async () => { throw new Error('fallo'); } });
         confirm(); await wait(); cancel(); assert.isFalse(await result);
-    });
-    test('Confirmaciones en cola, sin superposición y orden FIFO', async () => {
-        const first = ConfirmDialog.show({ title: 'Primera' }), second = ConfirmDialog.show({ title: 'Segunda' });
-        assert.lengthOf(document.querySelectorAll('.confirm-dialog[open]'), 1);
-        assert.include(top().textContent, 'Primera'); cancel(); assert.isFalse(await first);
-        assert.include(top().textContent, 'Segunda'); confirm(); assert.isTrue(await second);
-    });
-    test('dismissAll resuelve activa y pendientes sin dejar nodos', async () => {
-        const promises = [ConfirmDialog.show(), ConfirmDialog.show(), ConfirmDialog.show()];
-        ConfirmDialog.dismissAll(); assert.deepEqual(await Promise.all(promises), [false, false, false]);
     });
     test('Destruir durante onConfirm resuelve false y tolera finalización tardía', async () => {
         let done;
@@ -175,24 +169,15 @@ suite('Modal y ConfirmDialog nativos', () => {
         assert.isFalse(await dialog.result); done(); await wait(); assert.isFalse(dialog.isOpen());
     });
     test('Destruir antes de abrir resuelve false una vez y no crea DOM', async () => {
-        let calls = 0;
-        const dialog = new ConfirmDialog({ onCancel: () => calls++ });
+        const dialog = new ConfirmDialog();
         dialog.destroy(); dialog.destroy(); dialog.open();
-        assert.isFalse(await dialog.result); assert.equal(calls, 1); assert.isFalse(dialog.isOpen());
+        assert.isFalse(await dialog.result); assert.isFalse(dialog.isOpen());
     });
-    test('Icono SVG personalizado se clona sin modificar su ubicación', async () => {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); fixture.append(svg);
-        const result = ConfirmDialog.show({ icon: svg });
-        assert.strictEqual(svg.parentNode, fixture);
-        assert.notStrictEqual(top().querySelector('.confirm-dialog__icon'), svg);
-        cancel(); assert.isFalse(await result);
-    });
-    test('Tipos, colores, SVG local, texto seguro y movimiento reducido', async () => {
-        for (const type of ['default', 'danger', 'warning', 'info']) {
-            const result = ConfirmDialog.show({ type, title: '<b>Título</b>', message: '<img src=x>', color: '#123456' });
+    test('Tipos, SVG local, texto seguro y movimiento reducido', async () => {
+        for (const type of ['default', 'warning']) {
+            const result = show({ type, title: '<b>Título</b>', message: '<img src=x>' });
             assert.isTrue(top().classList.contains(`confirm-dialog--${type}`));
             assert.exists(top().querySelector('svg path')); assert.notExists(top().querySelector('img, b'));
-            assert.equal(top().style.getPropertyValue('--confirm-accent'), '#123456');
             if (matchMedia('(prefers-reduced-motion: reduce)').matches) assert.equal(getComputedStyle(top()).transitionDuration, '0s');
             cancel(); await result;
         }
@@ -200,7 +185,24 @@ suite('Modal y ConfirmDialog nativos', () => {
     test('Componentes sin peticiones HTTP', async () => {
         const fetch = sinon.stub(window, 'fetch').throws(new Error('offline'));
         const modal = make().setContent('Sin red').open(); modal.close();
-        const result = ConfirmDialog.show(); cancel(); await result; assert.isFalse(fetch.called);
+        const result = show(); cancel(); await result; assert.isFalse(fetch.called);
     });
+    test('Destruir un modal ocupado permite abrir el siguiente y conserva el foco del nuevo diálogo', () => {
+        const opener = fixture.appendChild(document.createElement('button'));
+        opener.focus();
+        const anterior = make({ title: 'Anterior' }).open();
+        anterior.setBusy(true).setBusy(true);
+        anterior.destroy();
+        const siguiente = make({ title: 'Siguiente', initialFocus: '[' });
+        const accion = document.createElement('button');
+        siguiente.setContent(accion).open();
+        assert.isTrue(siguiente.isOpen());
+        assert.isTrue(siguiente.element.contains(document.activeElement));
+        siguiente.close();
+        assert.strictEqual(document.activeElement, opener);
+        siguiente.destroy();
+        assert.isFalse(accion.isConnected);
+    });
+
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

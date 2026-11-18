@@ -11,13 +11,6 @@ class ResumenController extends HTMLElement {
     }
 
     connectedCallback() {
-        this.cargar();
-    }
-
-    cargar() {
-        this.montarAgenda();
-    }
-    montarAgenda() {
         const selector = document.createElement('galeno-selector-contexto');
         selector.usuario = this.usuario;
         const agenda = document.createElement('galeno-agenda');

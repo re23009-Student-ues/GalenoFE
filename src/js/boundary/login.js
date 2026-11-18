@@ -2,34 +2,33 @@ import { autenticarEmpleado, guardarSesion } from "../control/sesion_service.js"
 import { ejemploDocumento } from "../control/documento_formato.js";
 import TipoDocumentoService from "../control/tipoDocumento_service.js";
 
-const PLANTILLA = `
-    <form class="login-caja" id="login-form">
-        <img class="login-logo" src="Recursos/imagenes/logo.png" alt="GalenoSV · Tu salud, nuestra prioridad" />
-        <p class="login-sub">Ingresa con tu documento</p>
+function etiqueta(texto, campo) {
+    const nodo = document.createElement('label');
+    nodo.htmlFor = campo.id;
+    nodo.textContent = texto;
+    nodo.append(campo);
+    return nodo;
+}
 
-        <label for="login-tipo-documento">Tipo de documento
-            <select id="login-tipo-documento" aria-describedby="login-indicaciones" disabled></select>
-        </label>
-        <p class="login-aviso" id="login-indicaciones"></p>
-        <label for="login-documento">Número de documento
-            <input id="login-documento" type="text" autocomplete="off" aria-describedby="login-indicaciones" />
-        </label>
+function boton(id, texto, tipo = 'button') {
+    const nodo = document.createElement('button');
+    nodo.id = id;
+    nodo.type = tipo;
+    nodo.textContent = texto;
+    return nodo;
+}
 
-        <p class="login-aviso" id="login-aviso" role="alert" aria-live="assertive" aria-atomic="true">Cargando…</p>
-        <button type="button" id="login-reintentar" class="login-reintentar" hidden>Reintentar</button>
-        <button type="submit" id="login-entrar" disabled>Entrar</button>
-        <button type="button" id="login-volver" class="login-reintentar">Volver a mis citas</button>
-    </form>`;
+function opcion(texto, valor) {
+    const nodo = document.createElement('option');
+    nodo.textContent = String(texto ?? '');
+    nodo.value = String(valor ?? '');
+    return nodo;
+}
 
-/** Llena un <select> con opciones (se usa Option: el texto nunca se interpreta como HTML). */
 function llenar(select, opciones, textoInicial) {
-    select.innerHTML = "";
-    select.add(new Option(textoInicial, ""));
-    opciones.forEach(o => select.add(new Option(o.texto, o.valor)));
+    select.replaceChildren(opcion(textoInicial, ''), ...opciones.map(({ texto, valor }) => opcion(texto, valor)));
     select.disabled = opciones.length === 0;
-    if (opciones.length === 1) {   // una sola opción: se elige sola
-        select.value = opciones[0].valor;
-    }
+    if (opciones.length === 1) select.value = opciones[0].valor;
 }
 
 /** Formulario autónomo: autentica y comunica el resultado al shell. */
@@ -37,23 +36,61 @@ class GalenoLogin extends HTMLElement {
     connectedCallback() { this.iniciar(); }
     disconnectedCallback() { this.escuchas?.abort(); }
 
+    montarFormulario() {
+        const form = document.createElement('form');
+        form.className = 'login-caja';
+        form.id = 'login-form';
+        const logo = document.createElement('img');
+        logo.className = 'login-logo';
+        logo.src = 'Recursos/imagenes/logo.png';
+        logo.alt = 'GalenoSV · Tu salud, nuestra prioridad';
+        const subtitulo = document.createElement('p');
+        subtitulo.className = 'login-sub';
+        subtitulo.textContent = 'Ingresa con tu documento';
+
+        const indicaciones = document.createElement('p');
+        indicaciones.id = 'login-indicaciones';
+        indicaciones.className = 'login-aviso';
+        const selTipo = document.createElement('select');
+        selTipo.id = 'login-tipo-documento';
+        selTipo.disabled = true;
+        selTipo.setAttribute('aria-describedby', indicaciones.id);
+        const documento = document.createElement('input');
+        documento.id = 'login-documento';
+        documento.type = 'text';
+        documento.autocomplete = 'off';
+        documento.setAttribute('aria-describedby', indicaciones.id);
+
+        const aviso = document.createElement('p');
+        aviso.id = 'login-aviso';
+        aviso.className = 'login-aviso';
+        aviso.setAttribute('role', 'alert');
+        aviso.setAttribute('aria-live', 'assertive');
+        aviso.setAttribute('aria-atomic', 'true');
+        aviso.textContent = 'Cargando…';
+
+        const btnReintentar = boton('login-reintentar', 'Reintentar');
+        btnReintentar.className = 'login-reintentar';
+        btnReintentar.hidden = true;
+        const btnEntrar = boton('login-entrar', 'Entrar', 'submit');
+        btnEntrar.disabled = true;
+        const btnVolver = boton('login-volver', 'Volver a mis citas');
+        btnVolver.className = 'login-reintentar';
+
+        form.append(logo, subtitulo, etiqueta('Tipo de documento', selTipo), indicaciones,
+            etiqueta('Número de documento', documento), aviso, btnReintentar, btnEntrar, btnVolver);
+        this.replaceChildren(form);
+        return { form, selTipo, documento, indicaciones, aviso, btnEntrar, btnReintentar, btnVolver };
+    }
+
     async iniciar() {
         this.escuchas?.abort();
         const escuchas = this.escuchas = new AbortController();
         const { signal } = escuchas;
         const vigente = () => this.isConnected && !signal.aborted;
-        const pantalla = this;
-        pantalla.innerHTML = PLANTILLA;
+        const { form, selTipo, documento, indicaciones, aviso, btnEntrar, btnReintentar, btnVolver } = this.montarFormulario();
 
-        const form = pantalla.querySelector("#login-form");
-        const selTipo = pantalla.querySelector("#login-tipo-documento");
-        const documento = pantalla.querySelector("#login-documento");
-        const indicaciones = pantalla.querySelector("#login-indicaciones");
-        const aviso = pantalla.querySelector("#login-aviso");
-        const btnEntrar = pantalla.querySelector("#login-entrar");
-        const btnReintentar = pantalla.querySelector("#login-reintentar");
-
-        pantalla.querySelector('#login-volver').addEventListener('click', () => {
+        btnVolver.addEventListener('click', () => {
             escuchas.abort(); // Descarta también un ingreso que aún esté pendiente.
             this.dispatchEvent(new CustomEvent('galeno-login-cancelado', { bubbles: true, composed: true }));
         }, { signal });

@@ -9,16 +9,33 @@ class GalenoApp extends HTMLElement {
     connectedCallback() {
         this.toggleAttribute('restaurando', Boolean(obtenerSesion()));
         if (!this.outlet) {
-            this.innerHTML = `<div class="contenedor-app"><main class="contenido-principal">
-                <galeno-topbar></galeno-topbar>
-                <galeno-estado-conexion></galeno-estado-conexion>
-                <galeno-outlet id="app-root"></galeno-outlet>
-                <footer class="pie">Galenos · Gestión clínica</footer>
-                </main></div><div id="pantalla-login" class="pantalla-login" hidden></div>`;
+            this.montarShell();
             this.addEventListener('galeno-alternar-menu', () => this.menu?.alternar());
             this.addEventListener('galeno-login-exitoso', () => this.ocultarLogin());
         }
         this.usuario = this._usuario ?? null;
+    }
+
+    montarShell() {
+        const contenedor = document.createElement('div');
+        contenedor.className = 'contenedor-app';
+        const principal = document.createElement('main');
+        principal.className = 'contenido-principal';
+        const topbar = document.createElement('galeno-topbar');
+        const conexion = document.createElement('galeno-estado-conexion');
+        const outlet = document.createElement('galeno-outlet');
+        outlet.id = 'app-root';
+        const pie = document.createElement('footer');
+        pie.className = 'pie';
+        pie.textContent = 'Galenos · Gestión clínica';
+        principal.append(topbar, conexion, outlet, pie);
+        contenedor.append(principal);
+
+        const pantalla = document.createElement('div');
+        pantalla.id = 'pantalla-login';
+        pantalla.className = 'pantalla-login';
+        pantalla.hidden = true;
+        this.replaceChildren(contenedor, pantalla);
     }
 
     get outlet() { return this.querySelector('galeno-outlet'); }

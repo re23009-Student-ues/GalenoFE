@@ -11,14 +11,7 @@ galeno-tree { display: block; min-width: 0; }
     border: 1px solid var(--tree-border); border-radius: 10px; font: inherit;
     min-width: 0;
 }
-.tree[data-theme="dark"] { --tree-background: #1e2530; --tree-text: #edf3fb; --tree-muted: #a9b6c6; --tree-border: #4b5b70; --tree-hover: #2a3748; --tree-selected: #294a70; color-scheme: dark; }
 .tree[data-theme="light"] { color-scheme: light; }
-@media (prefers-color-scheme: dark) {
-    .tree[data-theme="auto"] { --tree-background: var(--tree-dark-background, #1e2530); --tree-text: var(--tree-dark-text, #edf3fb); --tree-muted: #a9b6c6; --tree-border: #4b5b70; --tree-hover: #2a3748; --tree-selected: #294a70; color-scheme: dark; }
-}
-.tree__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; }
-.tree__toolbar label { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.tree__search { min-width: 0; max-width: 100%; box-sizing: border-box; border: 1px solid var(--tree-border); border-radius: 6px; padding: 8px; font: inherit; color: inherit; background: var(--tree-background); }
 .tree__button { border: 1px solid var(--tree-border); border-radius: 5px; padding: 6px 8px; font: inherit; background: var(--tree-background); color: inherit; cursor: pointer; }
 .tree__status { margin: 0; padding: 4px 12px 10px; font-size: .875em; color: var(--tree-muted); overflow-wrap: anywhere; }
 .tree__list { overflow: auto; max-width: 100%; padding: 4px 0; }
@@ -26,21 +19,15 @@ galeno-tree { display: block; min-width: 0; }
 .tree--guides .tree__item { background-image: repeating-linear-gradient(to right, transparent 0 17px, var(--tree-border) 17px 18px, transparent 18px 20px); background-size: calc(var(--tree-depth) * 20px) 100%; background-position: 8px 0; background-repeat: no-repeat; }
 .tree__item:hover { background-color: var(--tree-hover); }
 .tree__item:active { background-color: var(--tree-selected); }
-.tree__item[aria-selected="true"], .tree__item[aria-checked="mixed"] { background-color: var(--tree-selected); }
+.tree__item[aria-selected="true"] { background-color: var(--tree-selected); }
 .tree__item[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
 .tree__toggle { flex: 0 0 24px; width: 24px; height: 26px; padding: 0; border: 0; background: transparent; font-size: 20px; }
-.tree__checkbox { accent-color: var(--tree-accent); flex-shrink: 0; }
-.tree__icon { display: inline-flex; flex: 0 0 auto; max-width: 28px; overflow: hidden; }
-.tree__icon:empty { display: none; }
-.tree__icon > :is(svg, img) { width: 20px; height: 20px; }
 .tree__label { white-space: pre; }
-.tree mark { background: #f9d86e; color: #17212d; border-radius: 2px; }
 .tree :focus-visible { outline: 2px solid var(--tree-accent); outline-offset: -2px; }
 .tree [hidden] { display: none; }
 @media (prefers-reduced-motion: no-preference) {
     .tree__item { animation: tree-appear 120ms ease-out; }
     @keyframes tree-appear { from { opacity: .5; transform: translateY(-2px); } to { opacity: 1; transform: translateY(0); } }
 }
-@media (max-width: 480px) { .tree__toolbar { align-items: stretch; } .tree__toolbar label { flex-basis: 100%; } .tree__search { flex: 1; } }
 
 .tree__toggle[aria-hidden="true"] { visibility: hidden; }

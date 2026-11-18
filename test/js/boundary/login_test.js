@@ -263,5 +263,33 @@ suite('Ingreso HU2 y contexto de trabajo', () => {
         sinon.assert.notCalled(exitoso);
     });
 
+    test('Sin tipos activos, el formulario explica el bloqueo y no busca documentos', async () => {
+        fetchStub.withArgs(sinon.match(/tipo_documento/)).resolves(json([{ ...tipo, activo: false }]));
+        fixture.querySelector('galeno-app').mostrarLogin();
+        await pausa();
+        enviar();
+        assert.include(fixture.querySelector('#login-aviso').textContent, 'No hay tipos de documento activos');
+        assert.isTrue(fixture.querySelector('#login-tipo-documento').disabled);
+        assert.isTrue(fixture.querySelector('#login-entrar').disabled);
+        sinon.assert.calledOnce(fetchStub);
+        assert.isNull(obtenerSesion());
+    });
+
+    test('Mientras el documento está pendiente, un segundo submit no autentica dos veces', async () => {
+        let responder;
+        const documento = fetchStub.withArgs(sinon.match(/documento\/buscar/));
+        documento.returns(new Promise(resolve => { responder = resolve; }));
+        fixture.querySelector('galeno-app').mostrarLogin();
+        await pausa();
+        enviar();
+        enviar();
+        sinon.assert.calledOnce(documento);
+        assert.isTrue(fixture.querySelector('#login-entrar').disabled);
+        responder(json({ idPersona: persona }));
+        await pausa();
+        sinon.assert.calledOnce(exitoso);
+        assert.deepEqual(obtenerSesion(), persona);
+    });
+
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

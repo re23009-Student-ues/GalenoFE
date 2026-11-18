@@ -1,7 +1,4 @@
 let sequence = 0;
-const ownedAttributes = ['id', 'name', 'placeholder', 'rows', 'minlength', 'maxlength', 'required',
-    'disabled', 'readonly', 'aria-invalid', 'aria-required', 'aria-describedby', 'aria-labelledby', 'aria-label', 'class', 'style'];
-
 class GalenoTextArea extends HTMLElement {
     connectedCallback() { this.field?.connect(); }
     disconnectedCallback() { this.field?.disconnect(); }
@@ -14,19 +11,16 @@ function element(tag, className, text) {
     return node;
 }
 
-/** Campo nativo en DOM ligero: admite un contenedor o un textarea existente. */
+/** Campo nativo en DOM ligero: crea el control dentro de un contenedor. */
 export default class TextArea {
     constructor(target, options = {}) {
-        this.target = typeof target === 'string' ? document.querySelector(target) : target;
-        if (!(this.target instanceof HTMLElement)) throw new TypeError('TextArea: contenedor o textarea inexistente.');
+        this.target = target;
+        if (!(target instanceof HTMLElement) || target instanceof HTMLTextAreaElement) throw new TypeError('TextArea: contenedor inválido.');
         if (!options || typeof options !== 'object' || Array.isArray(options)) throw new TypeError('TextArea: opciones inválidas.');
-        this.existing = this.target instanceof HTMLTextAreaElement;
-        this.control = this.existing ? this.target : document.createElement('textarea');
-        const native = this.control;
-        const rows = options.rows ?? (this.existing ? native.rows : 4);
-        this.options = { name: native.name, placeholder: native.placeholder, rows, minRows: rows, maxRows: Math.max(rows, 10),
-            minLength: native.minLength < 0 ? null : native.minLength, maxLength: native.maxLength < 0 ? null : native.maxLength,
-            required: native.required, disabled: native.disabled, readOnly: native.readOnly,
+        this.control = document.createElement('textarea');
+        const rows = options.rows ?? 4;
+        this.options = { name: '', placeholder: '', rows, minRows: rows, maxRows: Math.max(rows, 10),
+            minLength: null, maxLength: null, required: false, disabled: false, readOnly: false,
             autoResize: false, showCounter: false, helperText: '', ...options };
         const o = this.options;
         if (['name', 'placeholder', 'helperText'].some(key => typeof o[key] !== 'string') ||
@@ -34,18 +28,14 @@ export default class TextArea {
             ['required', 'disabled', 'readOnly', 'autoResize', 'showCounter'].some(key => typeof o[key] !== 'boolean') ||
             ['rows', 'minRows', 'maxRows'].some(key => !Number.isSafeInteger(o[key]) || o[key] < 1 || o[key] > 2147483647) || o.maxRows < o.minRows ||
             ['minLength', 'maxLength'].some(key => o[key] !== null && (!Number.isSafeInteger(o[key]) || o[key] < 0 || o[key] > 2147483647)) ||
-            (o.minLength !== null && o.maxLength !== null && o.minLength > o.maxLength) ||
-            ['validator', 'onInput', 'onChange', 'onFocus', 'onBlur'].some(key => o[key] !== undefined && typeof o[key] !== 'function')) {
+            (o.minLength !== null && o.maxLength !== null && o.minLength > o.maxLength)) {
             throw new TypeError('TextArea: configuración inválida.');
         }
         do { this.id = `galeno-textarea-${++sequence}`; }
         while (['control', 'label', 'helper', 'error'].some(suffix => document.getElementById(`${this.id}-${suffix}`)));
-        this.original = Object.fromEntries(ownedAttributes.map(name => [name, native.getAttribute(name)]));
-        this.originalDefault = native.defaultValue;
-        this.originalValidity = native.validity.customError ? native.validationMessage : '';
-        this.describedBy = (native.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean);
-        this.value = native.value; this.touched = false; this.destroyed = false;
-        this.manualError = this.originalValidity; this.validityMessage = ''; this.resetTimer = null;
+        this.value = '';
+        this.touched = false; this.destroyed = false;
+        this.manualError = ''; this.validityMessage = ''; this.resetTimer = null;
         this.resizeFrame = null;
     }
 
@@ -58,23 +48,14 @@ export default class TextArea {
     mount() {
         const o = this.options, control = this.control;
         this.root = document.createElement('galeno-textarea'); this.root.className = 'textarea'; this.root.field = this;
-        const wrappingLabel = this.existing ? control.closest('label') : null;
-        this.label = element(wrappingLabel ? 'span' : 'label', 'textarea__label'); this.label.id = `${this.id}-label`;
+        this.label = element('label', 'textarea__label'); this.label.id = `${this.id}-label`;
         const labelText = element('span', '', o.label || '');
         this.required = element('span', 'textarea__required', ' *'); this.required.setAttribute('aria-hidden', 'true');
         this.label.append(labelText, this.required); this.label.hidden = !o.label;
-        if (!o.label && control.labels.length) {
-            const nativeLabel = control.labels[0];
-            if (wrappingLabel) nativeLabel.insertBefore(this.required, nativeLabel.firstChild);
-            else nativeLabel.append(this.required);
-        }
-        if (!control.id) control.id = `${this.id}-control`;
-        if (!wrappingLabel) this.label.htmlFor = control.id;
+        control.id = `${this.id}-control`;
+        this.label.htmlFor = control.id;
         if (o.label) control.setAttribute('aria-labelledby', this.label.id);
-        else if (o.ariaLabel) control.setAttribute('aria-label', o.ariaLabel);
-        else if (!control.labels.length && !control.getAttribute('aria-label') && !control.getAttribute('aria-labelledby')) {
-            control.setAttribute('aria-label', o.name || 'Texto multilínea');
-        }
+        else control.setAttribute('aria-label', o.ariaLabel || o.name || 'Texto multilínea');
         control.classList.add('textarea__control');
         control.name = o.name; control.placeholder = o.placeholder; control.rows = o.rows;
         control.required = o.required; control.disabled = o.disabled; control.readOnly = o.readOnly;
@@ -86,18 +67,12 @@ export default class TextArea {
         this.counter = element('span', 'textarea__counter'); this.counter.hidden = !o.showCounter;
         this.error = element('p', 'textarea__error'); this.error.id = `${this.id}-error`; this.error.setAttribute('role', 'alert');
         this.footer = element('div', 'textarea__footer'); this.footer.append(this.helper, this.counter);
-        if (this.existing && control.parentNode) {
-            this.marker = document.createComment('textarea: ubicación original'); control.before(this.marker, this.root);
-        }
         this.root.append(this.label, control, this.footer, this.error);
-        this.onInput = event => {
-            this.manualError = ''; this.touched = true; this.refresh(); this.options.onInput?.(this.value, event);
+        this.onEdit = () => {
+            this.manualError = ''; this.touched = true; this.refresh();
         };
-        this.onChange = event => {
-            this.manualError = ''; this.touched = true; this.refresh(); this.options.onChange?.(this.value, event);
-        };
-        this.onFocus = event => { this.updateStates(); this.options.onFocus?.(this.getValue(), event); };
-        this.onBlur = event => { this.touched = true; this.refresh(); this.options.onBlur?.(this.value, event); };
+        this.onFocus = () => this.updateStates();
+        this.onBlur = () => { this.touched = true; this.refresh(); };
         this.onInvalid = () => { this.touched = true; this.refresh(); };
         this.onReset = event => {
             clearTimeout(this.resetTimer);
@@ -106,8 +81,8 @@ export default class TextArea {
                 if (!this.destroyed && !event.defaultPrevented) { this.touched = false; this.manualError = ''; this.refresh(); }
             }, 0);
         };
-        control.addEventListener('input', this.onInput);
-        control.addEventListener('change', this.onChange);
+        control.addEventListener('input', this.onEdit);
+        control.addEventListener('change', this.onEdit);
         control.addEventListener('focus', this.onFocus);
         control.addEventListener('blur', this.onBlur);
         control.addEventListener('invalid', this.onInvalid);
@@ -122,7 +97,7 @@ export default class TextArea {
                 });
             } else this.onResize = () => this.scheduleResize();
         }
-        if (!this.existing) this.target.append(this.root);
+        this.target.append(this.root);
         // En un contenedor conectado, insertar el root pudo ejecutar connectedCallback
         // antes de terminar el montaje. Conectar explícitamente ahora es idempotente.
         if (this.root.isConnected) this.connect(); else this.refresh();
@@ -175,15 +150,6 @@ export default class TextArea {
             else if (control.minLength >= 0 && value.length > 0 && value.length < control.minLength) message = `Escribe al menos ${control.minLength} caracteres.`;
             else if (control.maxLength >= 0 && value.length > control.maxLength) message = `No excedas ${control.maxLength} caracteres.`;
             else if (!control.validity.valid) message = control.validationMessage;
-            else if (this.options.validator) {
-                try {
-                    const result = this.options.validator(value);
-                    if (result !== true) {
-                        if (result && typeof result.then === 'function') Promise.resolve(result).catch(() => {});
-                        message = typeof result === 'string' && result.trim() ? result : 'Revisa el contenido de este campo.';
-                    }
-                } catch { message = 'No fue posible validar este campo. Intenta nuevamente.'; }
-            }
         }
         this.validityMessage = message; control.setCustomValidity(message);
         const visible = show ? message : '';
@@ -191,10 +157,10 @@ export default class TextArea {
         control.setAttribute('aria-invalid', String(!!visible));
         control.setAttribute('aria-required', String(control.required));
         this.root.classList.toggle('textarea--invalid', !!visible);
-        const descriptions = new Set(this.describedBy);
-        if (this.options.helperText) descriptions.add(this.helper.id);
-        if (visible) descriptions.add(this.error.id);
-        if (descriptions.size) control.setAttribute('aria-describedby', [...descriptions].join(' ')); else control.removeAttribute('aria-describedby');
+        const descriptions = [];
+        if (this.options.helperText) descriptions.push(this.helper.id);
+        if (visible) descriptions.push(this.error.id);
+        if (descriptions.length) control.setAttribute('aria-describedby', descriptions.join(' ')); else control.removeAttribute('aria-describedby');
         return { valid: !message, message };
     }
 
@@ -285,26 +251,12 @@ export default class TextArea {
         if (this.destroyed) return;
         this.value = this.getValue(); this.destroyed = true; this.disconnect();
         const control = this.control;
-        for (const [event, handler] of [['input', this.onInput], ['change', this.onChange], ['focus', this.onFocus], ['blur', this.onBlur], ['invalid', this.onInvalid]]) {
+        for (const [event, handler] of [['input', this.onEdit], ['change', this.onEdit], ['focus', this.onFocus], ['blur', this.onBlur], ['invalid', this.onInvalid]]) {
             if (handler) control.removeEventListener(event, handler);
         }
-        if (this.existing) {
-            for (const [name, value] of Object.entries(this.original)) {
-                if (value === null) control.removeAttribute(name); else control.setAttribute(name, value);
-            }
-            control.defaultValue = this.originalDefault; control.value = this.value;
-            control.setCustomValidity(this.originalValidity);
-        }
-        this.required?.remove();
-        if (this.root) {
-            this.root.field = null;
-            if (this.existing) {
-                if (this.marker?.parentNode) this.marker.replaceWith(control); else control.remove();
-            }
-            this.root.remove();
-        }
-        this.options = {}; this.original = {}; this.describedBy = [];
-        this.observer = this.form = this.target = this.control = this.root = this.marker = this.label = this.required = this.helper = this.counter = this.error = this.footer = null;
-        this.onInput = this.onChange = this.onFocus = this.onBlur = this.onInvalid = this.onReset = this.onResize = null;
+        if (this.root) { this.root.field = null; this.root.remove(); }
+        this.options = {};
+        this.observer = this.form = this.target = this.control = this.root = this.label = this.required = this.helper = this.counter = this.error = this.footer = null;
+        this.onEdit = this.onFocus = this.onBlur = this.onInvalid = this.onReset = this.onResize = null;
     }
 }

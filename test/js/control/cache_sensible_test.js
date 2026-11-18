@@ -121,6 +121,59 @@ suite('Paso 8: REST sin caché y aislamiento de contexto', () => {
         assert.equal(await (await solicitarREST(url)).json(),1); assert.equal(await (await solicitarREST(url)).json(),2);
         assert.equal(verificaciones,1); assert.equal(fetchStub.callCount,2);
     });
+    test('una lectura con señal ya cancelada conserva el motivo y no devuelve datos', async () => {
+        const motivo = new DOMException('Pantalla cerrada', 'AbortError');
+        fetchStub.callsFake(async (_, { signal }) => {
+            assert.isTrue(signal.aborted);
+            throw signal.reason;
+        });
+        assert.strictEqual(await rechaza(() => solicitarREST(url, { signal: AbortSignal.abort(motivo) })), motivo);
+        sinon.assert.calledOnce(fetchStub);
+    });
+    test('cancelar mientras se consume el cuerpo interrumpe la lectura y limpia el listener', async () => {
+        const externo = new AbortController();
+        const quitar = sandbox.spy(externo.signal, 'removeEventListener');
+        fetchStub.callsFake(async (_, { signal }) => {
+            const r = response(null);
+            sandbox.stub(r, 'json').callsFake(() => new Promise((_, reject) => {
+                signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+            }));
+            return r;
+        });
+        const respuesta = await solicitarREST(url, { signal: externo.signal });
+        const pendiente = observar(respuesta.json());
+        const motivo = new DOMException('Pantalla cerrada', 'AbortError');
+        externo.abort(motivo);
+        assert.strictEqual((await pendiente).error, motivo);
+        sinon.assert.calledOnceWithExactly(quitar, 'abort', sinon.match.func);
+    });
+    test('si cambia el worker durante la verificación, valida el nuevo antes de pedir datos', async () => {
+        let puertoAnterior;
+        const anterior = { postMessage: sandbox.spy((_, [puerto]) => { puertoAnterior = puerto; }) };
+        const nuevo = { postMessage: sandbox.spy((_, [puerto]) => puerto.postMessage({ politica: 'cache-antigua' })) };
+        worker = anterior;
+        const pendiente = observar(solicitarREST(url));
+        sinon.assert.calledOnce(anterior.postMessage);
+
+        worker = nuevo;
+        puertoAnterior.postMessage({ politica: 'sin-cache-rest-v1' });
+        assert.equal((await pendiente).error.codigo, 'WORKER_ANTIGUO');
+        sinon.assert.calledOnce(nuevo.postMessage);
+        sinon.assert.notCalled(fetchStub);
+    });
+    test('una excepción al contactar al worker bloquea REST y permite verificarlo de nuevo', async () => {
+        const informar = sandbox.stub();
+        informar.onFirstCall().throws(new Error('Canal cerrado'));
+        informar.onSecondCall().callsFake((_, [puerto]) => puerto.postMessage({ politica: 'sin-cache-rest-v1' }));
+        worker = { postMessage: informar };
+        await rechaza(() => solicitarREST(url), 'WORKER_ANTIGUO');
+        sinon.assert.notCalled(fetchStub);
+
+        fetchStub.resolves(response({ vigente: true }));
+        assert.deepEqual(await (await solicitarREST(url)).json(), { vigente: true });
+        sinon.assert.calledTwice(informar);
+        sinon.assert.calledOnce(fetchStub);
+    });
     test('ingreso/cambio/salida limpian cachés API históricas sin tocar estáticos ni otras apps', async () => {
         claves.resolves(['galeno-api-v0','galeno-api-v1','galeno-api-v99','galenosv-v16','otra-app']);
         guardarSesion({idPersona:'persona',nombres:'IT',apellidos:'IT'}); establecerContexto({idPersonaRol:'rol'}); await cerrarSesion(); await limpiarCachesAPI();
@@ -128,5 +181,29 @@ suite('Paso 8: REST sin caché y aislamiento de contexto', () => {
         for (const n of ['galeno-api-v0','galeno-api-v1','galeno-api-v99']) assert.include(borradas,n);
         assert.notInclude(borradas,'galenosv-v16'); assert.notInclude(borradas,'otra-app'); assert.isNull(sessionStorage.getItem('sesionPersona'));
     });
+    test('Una respuesta de escritura con Location preserva el cuerpo y cierra su temporizador', async () => {
+        const reloj = sandbox.useFakeTimers();
+        fetchStub.resolves(new Response(JSON.stringify({ confirmado: true }), {
+            status: 200, headers: { Location: '/consulta/confirmada' }
+        }));
+        const respuesta = await solicitarREST(url, { method: 'PUT' });
+        assert.equal(respuesta.headers.get('Location'), '/consulta/confirmada');
+        await reloj.tickAsync(TIEMPO_ESCRITURA_REST);
+        assert.deepEqual(await respuesta.json(), { confirmado: true });
+        sinon.assert.calledOnce(fetchStub);
+    });
+
+    test('Un fallo de CacheStorage no impide cerrar la sesión ni consultar datos vigentes', async () => {
+        claves.rejects(new Error('CacheStorage no disponible'));
+        borrar.rejects(new Error('CacheStorage no disponible'));
+        guardarSesion({ idPersona: 'persona' });
+        establecerContexto({ idPersonaRol: 'rol' });
+        await cerrarSesion();
+        assert.isNull(sessionStorage.getItem('sesionPersona'));
+        assert.isNull(sessionStorage.getItem('sesionPersonaRol'));
+        fetchStub.resolves(response({ vigente: true }));
+        assert.deepEqual(await (await solicitarREST(url)).json(), { vigente: true });
+    });
+
 });
 mocha.run();

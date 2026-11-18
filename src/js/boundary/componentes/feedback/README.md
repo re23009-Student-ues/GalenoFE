@@ -17,57 +17,26 @@ Toast.error('No fue posible completar la operación.');
 Toast.warning('Existen campos pendientes de completar.');
 Toast.info('Los datos se están actualizando.');
 
-Toast.configure({ duration: 4000, maxVisible: 5, position: 'top-right' });
-const id = Toast.show({
-    type: 'success', title: 'Paciente registrado',
-    message: 'El paciente se registró correctamente.', duration: 5000,
-    position: 'top-right', closable: true, showProgress: true
-});
+const id = Toast.info('Revisando cambios…');
 Toast.dismiss(id);
-
-const pending = Toast.info('Operación en proceso…', { duration: 0, closable: false });
-Toast.dismiss(pending);
-Toast.dismissAll();
 ```
 
-## API y configuración
+## API
 
-- `show(options)` y `success/error/warning/info(message, options)` devuelven un ID
-  único o `null` si la configuración, el mensaje o el momento de invocación no son
-  válidos (se requiere `document.body`). Los atajos fijan el tipo y el mensaje.
-- `dismiss(id)` devuelve `true` al iniciar el cierre o cancelar un pendiente;
-  `false` para IDs inexistentes o ya cerrándose.
-- `dismissAll()` limpia inmediatamente visibles, pendientes, animaciones de salida
-  y temporizadores. Conserva los contenedores vacíos para reutilizarlos.
-- `configure(options)` devuelve `true` si aplica la configuración, `false` si la
-  rechaza. La validación es atómica y no lanza excepciones por opciones inválidas.
-  También se rechazan propiedades desconocidas.
+- `success`, `error`, `warning` e `info` reciben un mensaje y devuelven el ID
+  del aviso. Un mensaje vacío o inválido devuelve `null`.
+- `dismiss(id)` inicia el cierre o cancela un aviso pendiente. `dismissAll()`
+  vacía la cola y limpia los temporizadores.
+- `info(mensaje, { duration, action })` permite indicar la duración en milisegundos
+  y una acción opcional con `label` y `run`. El botón cierra el aviso y ejecuta `run`.
 
-| Opción | Predeterminado | Valores |
-| --- | --- | --- |
-| `message` | Obligatorio en show | Texto no vacío; solo individual |
-| `type` | `info` | `success`, `error`, `warning`, `info` |
-| `title` | `''` | Texto opcional |
-| `duration` | `4000` | Número finito de 0 a 2147483647 ms; 0 = persistente |
-| `position` | `top-right` | `top-right`, `top-left`, `top-center`, `bottom-right`, `bottom-left`, `bottom-center` |
-| `maxVisible` | `5` | Entero positivo; solo configuración global |
-| `closable` | `true` | Booleano |
-| `pauseOnHover` | `true` | Booleano |
-| `showProgress` | `true` | Booleano; sin barra cuando duration = 0 |
-| `animated` | `true` | Booleano; respeta movimiento reducido |
-
-Las opciones individuales prevalecen sobre las globales. Cada notificación guarda
-su configuración al crearse, incluidas las pendientes. `maxVisible` gobierna la
-capacidad global: aumentarlo activa pendientes inmediatamente; reducirlo conserva
-las visibles hasta su cierre. La cola es FIFO entre todas las posiciones, y los
-temporizadores empiezan al montar cada notificación. Las que están saliendo siguen
-ocupando espacio hasta finalizar su transición. Cada pila muestra las más antiguas
-arriba; las inferiores se anclan al borde inferior sin invertir el orden.
+Se muestran hasta cinco avisos arriba a la derecha, con botón de cierre y
+progreso. Por defecto cada aviso cuenta cuatro segundos desde que se muestra. La cola es FIFO
+y un aviso que está cerrándose conserva su lugar hasta completar la transición.
 
 El foco dentro de la notificación siempre pausa el temporizador para facilitar el
 cierre con teclado. Hover y foco son motivos independientes: se reanuda cuando
-ambos terminan. No se mueve el foco al mostrar una notificación. El mensaje y título
-se anuncian juntos una sola vez; el progreso es decorativo.
+ambos terminan. No se mueve el foco al mostrar una notificación. El mensaje se anuncia una sola vez; el progreso es decorativo.
 
 Personalización mediante reglas `.toast-container` cargadas después del CSS:
 `--toast-success`, `--toast-error`, `--toast-warning`, `--toast-info`,
@@ -117,8 +86,6 @@ del service worker aprobaron.
 
 No se incluye límite de longitud de texto ni expiración de la cola: quien llama
 debe evitar ráfagas ilimitadas. Una pila con mucho contenido permite desplazamiento
-vertical. Las posiciones se gestionan independientemente; en pantallas estrechas,
-conviene usar una misma posición para evitar que pilas distintas coincidan. Las
-notificaciones persistentes requieren cierre explícito y pueden bloquear la cola.
+vertical.
 La lectura efectiva depende del navegador y lector de pantalla y debe verificarse
 manualmente con las tecnologías de asistencia objetivo.

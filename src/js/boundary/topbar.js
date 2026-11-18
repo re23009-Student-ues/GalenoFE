@@ -4,7 +4,7 @@ import './componentes/instalador_app.js';
  * Muestra en la barra superior quién tiene la sesión abierta.
  * @param {Object} usuario persona_rol de la sesión
  */
-export function pintarUsuario(usuario, raiz = document) {
+function pintarUsuario(usuario, raiz) {
   const p = usuario.idPersona ?? {};
   raiz.querySelector("#usuario-nombre").textContent =
     `${p.nombres ?? ""} ${p.apellidos ?? ""}`.trim() || "Sin nombre";
@@ -15,17 +15,19 @@ export function pintarUsuario(usuario, raiz = document) {
 }
 
 class GalenoTopbar extends HTMLElement {
-    static get observedAttributes() { return ['titulo']; }
-
     connectedCallback() {
         if (!this.tituloEl) {
-            this.innerHTML = `<header class="topbar"><h1 id="titulo-pagina"></h1><instalador-app></instalador-app><div class="topbar-controles"></div></header>`;
+            const encabezado = document.createElement('header');
+            encabezado.className = 'topbar';
+            const titulo = document.createElement('h1');
+            titulo.id = 'titulo-pagina';
+            const instalador = document.createElement('instalador-app');
+            const controles = document.createElement('div');
+            controles.className = 'topbar-controles';
+            encabezado.append(titulo, instalador, controles);
+            this.replaceChildren(encabezado);
         }
-        this.attributeChangedCallback();
         this.pintar();
-    }
-    attributeChangedCallback() {
-        if (this.tituloEl) this.tituloEl.textContent = this.getAttribute('titulo') ?? '';
     }
     get tituloEl() { return this.querySelector('#titulo-pagina'); }
     set usuario(valor) { this._usuario = valor; this.pintar(); }
@@ -35,23 +37,64 @@ class GalenoTopbar extends HTMLElement {
         const controles = this.querySelector('.topbar-controles');
         if (!controles) return;
         this.tituloEl.hidden = !this.usuario;
-        if (!this.usuario) {
-            controles.innerHTML = `<a href="#/citas" aria-label="GalenoSV: búsqueda de citas"><img class="logo-publico" src="Recursos/imagenes/logo.png" alt="GalenoSV" /></a>
-                <a href="#/login">Acceso del personal</a>`;
-            return;
+        if (this.usuario) {
+            if (!controles.querySelector('.usuario')) this.montarPersonal(controles);
+            pintarUsuario(this.usuario, controles);
+        } else if (!controles.firstElementChild?.matches('a')) {
+            this.montarPublico(controles);
         }
-        controles.innerHTML = `<button id="btn-menu-movil" class="menu-movil" aria-label="Abrir menú" type="button">☰</button>
-            <div class="usuario"><div class="avatar" id="usuario-avatar"></div><div class="usuario-datos">
-            <strong id="usuario-nombre"></strong><small id="usuario-detalle"></small></div>
-            <button class="btn-salir" id="btn-salir" type="button">Cerrar sesión</button></div>`;
-        pintarUsuario(this.usuario, this);
-        this.querySelector('#btn-menu-movil').addEventListener('click', e => {
+    }
+
+    montarPublico(controles) {
+        const citas = document.createElement('a');
+        citas.href = '#/citas';
+        citas.setAttribute('aria-label', 'GalenoSV: búsqueda de citas');
+        const logo = document.createElement('img');
+        logo.className = 'logo-publico';
+        logo.src = 'Recursos/imagenes/logo.png';
+        logo.alt = 'GalenoSV';
+        citas.append(logo);
+        const acceso = document.createElement('a');
+        acceso.href = '#/login';
+        acceso.textContent = 'Acceso del personal';
+        controles.replaceChildren(citas, acceso);
+    }
+
+    montarPersonal(controles) {
+        const menu = document.createElement('button');
+        menu.id = 'btn-menu-movil';
+        menu.className = 'menu-movil';
+        menu.type = 'button';
+        menu.setAttribute('aria-label', 'Abrir menú');
+        menu.textContent = '☰';
+        menu.addEventListener('click', e => {
             e.stopPropagation();
             this.dispatchEvent(new CustomEvent('galeno-alternar-menu', { bubbles: true, composed: true }));
         });
-        this.querySelector('#btn-salir').addEventListener('click', () => {
+
+        const usuario = document.createElement('div');
+        usuario.className = 'usuario';
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar';
+        avatar.id = 'usuario-avatar';
+        const datos = document.createElement('div');
+        datos.className = 'usuario-datos';
+        const nombre = document.createElement('strong');
+        nombre.id = 'usuario-nombre';
+        const detalle = document.createElement('small');
+        detalle.id = 'usuario-detalle';
+        datos.append(nombre, detalle);
+        const salir = document.createElement('button');
+        salir.id = 'btn-salir';
+        salir.className = 'btn-salir';
+        salir.type = 'button';
+        salir.textContent = 'Cerrar sesión';
+        salir.addEventListener('click', () => {
             this.dispatchEvent(new CustomEvent('galeno-cerrar-sesion', { bubbles: true, composed: true }));
         });
+
+        usuario.append(avatar, datos, salir);
+        controles.replaceChildren(menu, usuario);
     }
 }
 customElements.define('galeno-topbar', GalenoTopbar);

@@ -1,3 +1,5 @@
+import { Toast } from './feedback/index.js';
+
 class InstaladorApp extends HTMLElement {
     constructor() {
         super();
@@ -29,6 +31,7 @@ class InstaladorApp extends HTMLElement {
     }
 
     disconnectedCallback() {
+        this.cerrarRecomendacion();
         window.removeEventListener("beforeinstallprompt", this.alOfrecerInstalacion);
         window.removeEventListener("appinstalled", this.alInstalar);
         this.modoStandalone?.removeEventListener('change', this.actualizar);
@@ -50,7 +53,32 @@ class InstaladorApp extends HTMLElement {
     actualizar = () => {
         this.hidden = !this.eventoInstalacion || this.instalada || this.instalando || this.modoStandalone.matches;
         this.boton.hidden = this.hidden;
+        if (this.hidden) this.cerrarRecomendacion();
     };
+
+    programarRecomendacion(mensaje) {
+        if (!this.isConnected || this.hidden) return;
+        clearTimeout(this.temporizadorRecomendacion);
+        this.temporizadorRecomendacion = setTimeout(() => this.recomendar(mensaje), 3000);
+    }
+
+    recomendar(mensaje) {
+        if (!this.isConnected || this.hidden) return null;
+        this.cerrarRecomendacion();
+        this.avisoInstalacion = Toast.info(mensaje, {
+            duration: 6000,
+            anchor: this.closest('galeno-topbar'),
+            action: { label: 'Instalar', run: () => this.instalar() }
+        });
+        return this.avisoInstalacion;
+    }
+
+    cerrarRecomendacion() {
+        clearTimeout(this.temporizadorRecomendacion);
+        this.temporizadorRecomendacion = null;
+        if (this.avisoInstalacion) Toast.dismiss(this.avisoInstalacion);
+        this.avisoInstalacion = null;
+    }
 
     async instalar() {
         if (!this.eventoInstalacion || this.instalada || this.instalando || this.modoStandalone.matches) return;

@@ -48,6 +48,15 @@ export function pruebasDocumentoPaciente() {
             fetchStub.callsFake(async () => respuesta(Array.from({ length: 50 }, (_, i) => documento(i + 1)), 101));
             await rechaza(() => documentoDelPaciente(persona), 'repitió');
         });
+        test('Acepta la persona como identificador escalar, pero rechaza documentos sin UUID', async () => {
+            const escalar = { ...documento(1), idPersona: persona };
+            fetchStub.onFirstCall().resolves(new Response(JSON.stringify([escalar])));
+            fetchStub.onSecondCall().resolves(respuesta([{ ...escalar, idDocumento: null }]));
+            assert.deepEqual(await documentoDelPaciente(persona), escalar);
+            await rechaza(() => documentoDelPaciente(persona), 'identificador válido');
+            sinon.assert.calledTwice(fetchStub);
+        });
+
         test('codifica el parámetro y rechaza un formato de respuesta inesperado', async () => {
             fetchStub.resolves(new Response('{}'));
             await rechaza(() => documentoDelPaciente('persona /?&'), 'lista de documentos');

@@ -65,6 +65,41 @@ suite('Contexto, dashboard y consultas del personal', () => {
         assert.isTrue(esPaciente({ idRol: { nombre: ' PACIENTE ' } }));
         assert.isFalse(esPaciente(medico)); assert.isFalse(esPaciente(null));
     });
+    test('un fallo al cargar contextos permite reintentar y elegir solo inscripciones propias', async () => {
+        const enfermero = { ...medico, idPersonaRol: 'enfermero', idRol: { idRol: 'enf', nombre: 'Enfermería' },
+            idClinica: { idClinica: 'clinica-2', nombre: 'Norte' } };
+        const roles = fetchStub.withArgs(sinon.match(/\/persona_rol\/persona\/persona-1$/));
+        roles.onFirstCall().resolves(new Response('', { status: 503 }));
+        roles.onSecondCall().resolves(new Response(JSON.stringify([
+            medico, enfermero, paciente, { ...enfermero, idPersonaRol: 'ajeno', idPersona: otro.idPersona }
+        ])));
+        const selector = document.createElement('galeno-selector-contexto');
+        selector.usuario = medico;
+        const propuesta = sandbox.spy();
+        selector.addEventListener('galeno-contexto-seleccionado', propuesta);
+        fixture.append(selector);
+
+        const reintentar = selector.querySelector('button');
+        const clinica = selector.querySelector('[name=clinica]');
+        const rol = selector.querySelector('[name=rol]');
+        await settle();
+        assert.include(selector.querySelector('[role=status]').textContent, '503');
+        assert.isFalse(reintentar.hidden);
+        assert.isTrue(clinica.disabled);
+        sinon.assert.notCalled(propuesta);
+
+        reintentar.click();
+        await settle();
+        assert.isTrue(reintentar.hidden);
+        assert.equal(rol.value, medico.idPersonaRol);
+        clinica.value = enfermero.idClinica.idClinica;
+        clinica.dispatchEvent(new Event('change', { bubbles: true }));
+        assert.deepEqual([...rol.options].map(opcion => opcion.value), [enfermero.idPersonaRol]);
+        sinon.assert.calledOnce(propuesta);
+        assert.equal(propuesta.firstCall.args[0].detail.personaRol.idPersonaRol, enfermero.idPersonaRol);
+        sinon.assert.calledTwice(roles);
+    });
+
     test('el personal recibe las consultas de su clínica, no las externas', async () => {
         assert.deepEqual((await listarConsultas(medico)).map(c => c.idConsulta).sort(), ['primera', 'segunda']);
         const resumen = await cargarResumen(medico);
@@ -126,7 +161,6 @@ suite('Contexto, dashboard y consultas del personal', () => {
         const tarjeta = [...fixture.querySelectorAll('tarjeta-consulta')].find(t => t.consulta.idConsulta === 'primera');
         assert.include(tarjeta.shadowRoot.textContent, 'Completado');
         assert.notInclude(tarjeta.shadowRoot.textContent, 'En curso');
-        assert.isNull(tarjeta.resumenEstado);
     });
     test('una nueva asignación o reapertura cambia de Completado a En curso al recargar', async () => {
         const paso = { idConsultaProcedimientoPaso: 'propio', estado: 'COMPLETADO',
@@ -221,5 +255,27 @@ suite('Contexto, dashboard y consultas del personal', () => {
         router.manejarRuta('/consultas'); router.detener(); resolver(new Response(JSON.stringify(consultas))); await settle();
         assert.equal(fixture.querySelector('#test-root').childElementCount, 0);
     });
+    test('Inscripciones incompletas dejan ambos selectores deshabilitados sin emitir cambios', async () => {
+        fetchStub.resolves(new Response(JSON.stringify([
+            paciente,
+            { ...medico, idClinica: {} },
+            { ...medico, idRol: {} },
+            { ...medico, idPersona: otro.idPersona }
+        ])));
+        const selector = document.createElement('galeno-selector-contexto');
+        selector.usuario = medico;
+        const propuesta = sandbox.spy();
+        selector.addEventListener('galeno-contexto-seleccionado', propuesta);
+        fixture.append(selector);
+        await settle();
+        assert.include(selector.querySelector('[role=status]').textContent, 'No hay contextos laborales disponibles');
+        for (const select of selector.querySelectorAll('select')) {
+            assert.isTrue(select.disabled);
+            assert.isEmpty(select.options);
+        }
+        selector.querySelector('[name=clinica]').dispatchEvent(new Event('change', { bubbles: true }));
+        sinon.assert.notCalled(propuesta);
+    });
+
 });
 mocha.run(failures => { document.body.dataset.testFailures = failures; });

@@ -123,6 +123,38 @@ export function pruebasProcedimientos() {
             elecciones.set('decision', 'ajeno');
             assert.sameMembers([...pasosDelCamino(flujo, elecciones)], ['inicio', 'decision']);
         });
+        test('Ignora secuencias ajenas, pero bloquea referencias incompletas en ambos sentidos', () => {
+            const externo = { idProcedimientoPaso: 'externo' };
+            const otro = { idProcedimientoPaso: 'externo-2' };
+            const enlazar = (origen, destino) => ({ idProcedimientoPaso: origen, idProcedimientoPasoReferencia: destino });
+            pasos[0].estado = 'COMPLETADO';
+            secuencias.push(enlazar(externo, otro));
+            assert.strictEqual(opcion().paso, pasos[1]);
+            assert.isTrue(flujoDelProcedimiento(detalle, procedimiento, pasos).habilitado(pasos[1]));
+
+            for (const invalida of [enlazar(externo, definiciones[1]), enlazar(definiciones[1], externo)]) {
+                secuencias.push(invalida);
+                assert.isNull(opcion().paso);
+                assert.throws(() => flujoDelProcedimiento(detalle, procedimiento, pasos), /incompletas/);
+                secuencias.pop();
+            }
+        });
+
+        test('Un procedimiento sin catálogo no se ofrece y una ejecución huérfana se rechaza', () => {
+            detalle.definiciones.delete('proc');
+            assert.isEmpty(procedimientosDelRol(detalle, pasos, contexto));
+            assert.isEmpty(flujoDelProcedimiento(detalle, procedimiento, []).pasos);
+            assert.throws(() => flujoDelProcedimiento(detalle, procedimiento, pasos), /sin una definición/);
+        });
+
+        test('El camino por defecto excluye raíces invalidadas y conserva las independientes', () => {
+            secuencias.length = 0;
+            pasos[0].estado = ' INVALIDO ';
+            const flujo = flujoDelProcedimiento(detalle, procedimiento, pasos);
+            assert.deepEqual([...pasosDelCamino(flujo)], [definiciones[1].idProcedimientoPaso]);
+            assert.deepEqual(flujo.pasos, pasos);
+        });
+
         test('No fabrica ejecuciones faltantes y rechaza duplicados, ciclos y referencias inválidas', () => {
             const flujo = flujoDelProcedimiento(detalle, procedimiento, pasos.slice(0, 1));
             assert.lengthOf(flujo.pasos, 1); assert.lengthOf(flujo.faltantes, 1);

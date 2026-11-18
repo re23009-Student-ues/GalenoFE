@@ -6,7 +6,7 @@ import { TextArea } from '../componentes/form/textarea/index.js';
 import { ConfirmDialog } from '../componentes/overlays/index.js';
 import { Toast } from '../componentes/feedback/index.js';
 import AtencionFlujo from './atencion_flujo.js';
-import { cargarDetalleAtencion, guardarCamposAtencion, documentoDelPaciente, esResponsableDelPaso, esPasoInvalido } from '../../control/atencion_service.js';
+import { cargarDetalleAtencion, documentoDelPaciente, esResponsableDelPaso, esPasoInvalido } from '../../control/atencion_service.js';
 
 function crear(tag, className, text) {
     const node = document.createElement(tag);
@@ -26,7 +26,6 @@ export default class AtencionController extends HTMLElement {
         this.carga = 0;
         this.observaciones = null;
         this.campos = [];
-        this.ediciones = [];
     }
 
     connectedCallback() {
@@ -58,9 +57,9 @@ export default class AtencionController extends HTMLElement {
         this.confirmacion?.destroy(); this.confirmacion = null;
         this.flujo?.destroy(); this.flujo = null;
         this.campos.forEach(campo => campo.destroy()); this.campos = [];
-        this.observaciones = null; this.ediciones = []; this.detalle = null;
+        this.observaciones = null; this.detalle = null;
         this.observacionesProcedimiento = null;
-        this.pasosVerificados = false; this.guardando = false;
+        this.pasosVerificados = false;
         this.consulta = null;
         this.pasosConsulta = []; this.procedimientoSeleccionado = null; this.pasoSeleccionado = null;
         this.controlesProcedimientos = new Map(); this.estadoSeleccion = null;
@@ -73,16 +72,21 @@ export default class AtencionController extends HTMLElement {
         return button;
     }
 
-    async salir() {
+    async salir({ recomendarInstalacion = false } = {}) {
         if (!await this.confirmarDescarte() || !this.isConnected) return false;
+        if (recomendarInstalacion) {
+            this.closest('galeno-app')?.instalador?.programarRecomendacion(
+                'Instala GalenoSV para acceder a tu agenda desde la pantalla de inicio.'
+            );
+        }
         this.dispatchEvent(new CustomEvent('volver-consultas', { bubbles: true }));
         return true;
     }
 
-    hayCambios() { return this.flujo?.hayCambios() || this.ediciones.some(dirty => dirty()); }
+    hayCambios() { return this.flujo?.hayCambios() ?? false; }
 
     async confirmarDescarte() {
-        if (this.guardando || this.flujo?.ocupado) { Toast.info('Espera a que termine el guardado.'); return; }
+        if (this.flujo?.ocupado) { Toast.info('Espera a que termine el guardado.'); return; }
         if (this.confirmacion) return false;
         if (this.hayCambios()) {
             const carga = this.carga;
@@ -250,42 +254,6 @@ export default class AtencionController extends HTMLElement {
         this.campos.push(campo); return campo;
     }
 
-    guardar(host, recurso, registro, campos, editable) {
-        if (!editable) return;
-        let inicial = Object.values(campos).map(c => c.getValue());
-        const edicion = () => Object.values(campos).some((c, index) => c.getValue() !== inicial[index]);
-        edicion.host = host; this.ediciones.push(edicion);
-        const boton = crear('button', 'atencion__boton', 'Guardar cambios'); boton.type = 'button';
-        const estado = crear('p', 'aviso'); estado.setAttribute('role', 'status');
-        boton.addEventListener('click', async () => {
-            if (this.guardando || this.flujo?.ocupado) return;
-            const carga = this.carga;
-            this.guardando = true; boton.disabled = true;
-            this.flujo?.actualizarControles();
-            Object.values(campos).forEach(c => c.setDisabled(true));
-            estado.textContent = 'Guardando…';
-            try {
-                const cambios = Object.fromEntries(Object.entries(campos).map(([key, campo]) => [key, campo.getValue()]));
-                const datos = await guardarCamposAtencion(recurso, registro, cambios, this.usuario, this.consulta.idConsulta);
-                if (!this.isConnected || carga !== this.carga) return;
-                Object.assign(registro, datos); inicial = Object.values(campos).map(c => c.getValue());
-                estado.textContent = 'Cambios guardados.'; Toast.success('Observaciones guardadas.');
-            } catch (error) {
-                if (this.isConnected && carga === this.carga) {
-                    estado.textContent = error.message || 'No fue posible guardar. Tus cambios se conservan para reintentar.';
-                    Toast.error(estado.textContent);
-                }
-            } finally {
-                if (this.isConnected && carga === this.carga) {
-                    this.guardando = false; boton.disabled = false;
-                    Object.values(campos).forEach(c => c.setDisabled(false));
-                    this.flujo?.actualizarControles();
-                }
-            }
-        });
-        host.append(boton, estado);
-    }
-
     mostrarDetalle(detalle) {
         this.selectorHost.replaceChildren(); delete this.selectorHost.dataset.pendiente;
         this.flujo = new AtencionFlujo(this, this.flujoHost, detalle, this.pasosConsulta);
@@ -326,7 +294,7 @@ export default class AtencionController extends HTMLElement {
     }
 
     seleccionarProcedimiento(id, idPaso = null) {
-        if (!this.detalle || this.guardando || this.flujo?.ocupado) return false;
+        if (!this.detalle || this.flujo?.ocupado) return false;
         const p = this.detalle.procedimientos.find(p => p.idConsultaProcedimiento === id);
         if (!p || !(this.detalle.definiciones.get(p.idProcedimiento?.idProcedimiento) || []).some(d => d.idRol?.idRol === this.usuario?.idRol?.idRol)) return false;
         if (!this.flujo.abrir(p, idPaso)) return false;

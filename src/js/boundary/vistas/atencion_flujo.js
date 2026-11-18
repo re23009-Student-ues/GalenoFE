@@ -24,14 +24,11 @@ export default class AtencionFlujo {
     desmontarWizard() {
         this.reporte?.destroy(); this.reporte = null;
         if (!this.wizard) return;
-        this.wizard.root.removeEventListener('click', this.onClick, true);
-        this.wizard.root.removeEventListener('input', this.onEdit);
-        this.wizard.root.removeEventListener('change', this.onEdit);
         this.wizard.destroy(); this.wizard = null;
     }
 
     abrir(procedimiento, idPaso = null) {
-        if (this.ocupado || this.owner.guardando || this.destroyed) return false;
+        if (this.ocupado || this.destroyed) return false;
         let flujo;
         try { flujo = flujoDelProcedimiento(this.detalle, procedimiento, this.pasos); }
         catch (error) {
@@ -72,36 +69,20 @@ export default class AtencionFlujo {
         const destino = crear('div', 'atencion__wizard'); this.host.append(destino);
         const modelos = flujo.pasos.map(paso => this.modelo(paso));
         this.wizard = new Wizard(destino, {
-            linear: false, finishText: 'Guardar y avanzar',
-            steps: modelos.map(m => ({ id: m.paso.idConsultaProcedimientoPaso, title: m.paso.idProcedimientoPaso?.nombre || 'Paso sin nombre',
-                content: m.root, optional: true, enabled: this.visibles.has(m.paso.idProcedimientoPaso?.idProcedimientoPaso) })),
-            isStepComplete: id => flujo.completo(this.modelos.get(id).paso),
-            onStepChange: () => queueMicrotask(() => { if (!this.destroyed) this.actualizarControles(); }),
-            onComplete: () => { Toast.warning('La finalización del procedimiento todavía no está disponible.'); return false; }
+            steps: modelos.map(m => ({ id: m.paso.idConsultaProcedimientoPaso,
+                title: m.paso.idProcedimientoPaso?.nombre || 'Paso sin nombre',
+                content: m.root, enabled: this.visibles.has(m.paso.idProcedimientoPaso?.idProcedimientoPaso) })),
+            onSelect: id => { if (this.puedeVerReporte(id)) this.verReporte(id); else void this.ir(id, false); },
+            onPrevious: () => void this.anterior(),
+            onSave: () => void this.guardarActual(),
+            onNext: () => void this.siguiente(),
+            onEdit: () => this.actualizarControles()
         }).render();
-        this.guardarBoton = crear('button', 'atencion__boton atencion__guardar-paso', 'Guardar'); this.guardarBoton.type = 'button';
-        this.wizard.forward.before(this.guardarBoton);
-        this.onClick = event => {
-            const button = event.target.closest('button');
-            if (button === this.guardarBoton) {
-                event.preventDefault(); event.stopImmediatePropagation(); void this.guardarActual();
-            } else if (button === this.wizard.back || button === this.wizard.forward || button?.parentNode?.parentNode === this.wizard.indicator) {
-                event.preventDefault(); event.stopImmediatePropagation();
-                if (button === this.wizard.back) void this.anterior();
-                else if (button === this.wizard.forward) void this.siguiente();
-                else if (this.puedeVerReporte(button.dataset.step)) this.verReporte(button.dataset.step);
-                else void this.ir(button.dataset.step, false);
-            }
-        };
-        this.onEdit = () => this.actualizarControles();
-        this.wizard.root.addEventListener('click', this.onClick, true);
-        this.wizard.root.addEventListener('input', this.onEdit);
-        this.wizard.root.addEventListener('change', this.onEdit);
         const propios = modelos.filter(m => this.visibles.has(m.paso.idProcedimientoPaso?.idProcedimientoPaso) && esResponsableDelPaso(m.paso, this.owner.usuario));
         const propio = (solicitado && propios.find(m => m.paso.idConsultaProcedimientoPaso === idPaso)) || propios.find(m => !flujo.completo(m.paso) && flujo.habilitado(m.paso) && estadoEditableAtencion(m.paso)) ||
             propios.find(m => !flujo.completo(m.paso) && estadoEditableAtencion(m.paso)) ||
             [...propios].reverse().find(m => flujo.completo(m.paso)) || propios.find(m => flujo.habilitado(m.paso));
-        if (propio) void this.wizard.goToStep(propio.paso.idConsultaProcedimientoPaso);
+        if (propio) this.wizard.goToStep(propio.paso.idConsultaProcedimientoPaso);
         this.actualizarControles(); return true;
     }
 
@@ -175,7 +156,7 @@ export default class AtencionFlujo {
         m.sucesor = crearSelector('atencion__sucesor', 'Camino a seguir');
         m.predecesor = crearSelector('atencion__predecesor', 'Paso anterior');
         m.sucesor.select.addEventListener('change', () => {
-            if (this.ocupado || this.owner.guardando || this.destroyed) return;
+            if (this.ocupado || this.destroyed) return;
             const elegido = this.modelos.get(m.sucesor.select.value)?.paso.idProcedimientoPaso?.idProcedimientoPaso;
             const id = m.paso.idProcedimientoPaso.idProcedimientoPaso;
             if (elegido) this.elecciones.set(id, elegido); else this.elecciones.delete(id);
@@ -217,7 +198,7 @@ export default class AtencionFlujo {
     actual() { return this.wizard ? this.modelos.get(this.wizard.getCurrentStep().id) : null; }
     puedeVerReporte(id) {
         const actual = this.actual(), destino = this.modelos.get(id)?.paso;
-        if (this.destroyed || this.ocupado || this.owner.guardando || !actual || !destino ||
+        if (this.destroyed || this.ocupado || !actual || !destino ||
                 !esResponsableDelPaso(actual.paso, this.owner.usuario) || !this.flujo.completo(destino) ||
                 !this.visibles.has(destino.idProcedimientoPaso?.idProcedimientoPaso)) return false;
         const pendientes = [...this.flujo.anteriores.get(actual.paso.idProcedimientoPaso.idProcedimientoPaso)];
@@ -272,21 +253,9 @@ export default class AtencionFlujo {
         return pasos.length === 1 ? pasos[0].idConsultaProcedimientoPaso : selector.select.value;
     }
     bifurcacion(m) { return m.paso.idProcedimientoPaso?.indicaFin !== true && this.destinos(m, this.flujo.siguientes).length > 1; }
-    actualizarVisibilidad() {
-        this.visibles = pasosDelCamino(this.flujo, this.elecciones);
-        let cambio = false;
-        for (const step of this.wizard.steps) {
-            const visible = this.visibles.has(this.modelos.get(step.id).paso.idProcedimientoPaso?.idProcedimientoPaso);
-            if (step.enabled !== visible) { step.enabled = visible; cambio = true; }
-        }
-        if (cambio) {
-            this.wizard.render(); this.wizard.progress.max = this.wizard.enabled().length;
-            this.wizard.scheduleCarousel(true, false);
-        }
-    }
     actualizarControles() {
         if (!this.wizard || this.destroyed) return;
-        this.actualizarVisibilidad();
+        this.visibles = pasosDelCamino(this.flujo, this.elecciones);
         const m = this.actual(); if (!m) return;
         m.estado.textContent = `Estado: ${m.paso.estado || 'No disponible'}`;
         m.espera.textContent = this.mensajeEspera(m.paso); m.espera.hidden = !m.espera.textContent;
@@ -301,29 +270,34 @@ export default class AtencionFlujo {
         this.anteriorId = historial || this.actualizarSelector(m.predecesor, anteriores);
         if (historial) m.predecesor.wrapper.hidden = true;
         const terminal = m.paso.idProcedimientoPaso?.indicaFin === true || !(this.flujo.siguientes.get(m.paso.idProcedimientoPaso?.idProcedimientoPaso)?.size);
-        const ocupado = this.ocupado || this.owner.guardando;
+        const ocupado = this.ocupado;
         m.sucesor.select.disabled = ocupado; m.predecesor.select.disabled = ocupado;
         const responsable = !m.retrocesoDenegado && esResponsableDelPaso(m.paso, this.owner.usuario);
-        this.wizard.back.title = responsable ? 'Reabrir el paso anterior y reasignar los responsables de ambos pasos' : 'Solo el responsable asignado al paso actual puede regresar';
-        this.wizard.back.setAttribute('aria-label', 'Regresar al paso anterior, reabrirlo y reasignar responsables de ambos pasos');
-        this.wizard.back.disabled = ocupado || !this.anteriorId || !responsable || this.flujo.completo(m.paso) || !this.flujo.habilitado(m.paso);
         const completo = this.flujo.completo(m.paso);
-        this.wizard.forward.textContent = completo && terminal ? 'Paso completado' : m.paso.idProcedimientoPaso?.indicaFin === true ? 'Completar' : 'Guardar y avanzar';
-        this.wizard.forward.disabled = ocupado || this.bifurcacion(m) && !this.siguienteId || !responsable || !this.flujo.habilitado(m.paso) || (completo ? terminal || !this.siguienteId || !esResponsableDelPaso(this.modelos.get(this.siguienteId)?.paso, this.owner.usuario) : !m.editable);
-        this.guardarBoton.disabled = ocupado || !m.editable;
-        for (const step of this.wizard.steps) {
-            const modelo = this.modelos.get(step.id);
-            let responsable = step.button.querySelector('.atencion__paso-responsable');
-            if (!responsable) {
-                responsable = crear('span', 'atencion__paso-responsable');
-                step.stateLabel.before(responsable);
-            }
-            responsable.textContent = [modelo.paso.idPersonaRol?.idPersona?.nombres, modelo.paso.idPersonaRol?.idPersona?.apellidos]
-                .filter(Boolean).join(' ').trim() || 'Sin responsable asignado';
-            step.button.disabled = !this.puedeVerReporte(step.id) && (!step.enabled || ocupado || this.flujo.completo(modelo.paso) || !esResponsableDelPaso(modelo.paso, this.owner.usuario) || step.id === m.paso.idConsultaProcedimientoPaso || !(this.flujo.habilitado(modelo.paso) || this.flujo.completo(modelo.paso)));
-            step.button.title = this.puedeVerReporte(step.id) ? 'Ver reporte del paso completado' : '';
-            step.stateLabel.textContent = `${step.id === m.paso.idConsultaProcedimientoPaso ? 'Actual · ' : ''}${modelo.paso.estado || 'Sin estado'}`;
-        }
+        const previous = {
+            title: responsable ? 'Reabrir el paso anterior y reasignar los responsables de ambos pasos' : 'Solo el responsable asignado al paso actual puede regresar',
+            disabled: ocupado || !this.anteriorId || !responsable || completo || !this.flujo.habilitado(m.paso)
+        };
+        const next = {
+            text: completo && terminal ? 'Paso completado' : m.paso.idProcedimientoPaso?.indicaFin === true ? 'Completar' : 'Guardar y avanzar',
+            disabled: ocupado || this.bifurcacion(m) && !this.siguienteId || !responsable || !this.flujo.habilitado(m.paso) ||
+                (completo ? terminal || !this.siguienteId || !esResponsableDelPaso(this.modelos.get(this.siguienteId)?.paso, this.owner.usuario) : !m.editable)
+        };
+        const steps = this.flujo.pasos.map(paso => {
+            const id = paso.idConsultaProcedimientoPaso;
+            const enabled = this.visibles.has(paso.idProcedimientoPaso?.idProcedimientoPaso);
+            const completed = this.flujo.completo(paso);
+            const reporte = this.puedeVerReporte(id);
+            return {
+                enabled, completed,
+                disabled: !reporte && (ocupado || completed || !esResponsableDelPaso(paso, this.owner.usuario) || !this.flujo.habilitado(paso)),
+                tooltip: reporte ? 'Ver reporte del paso completado' : '',
+                detail: [paso.idPersonaRol?.idPersona?.nombres, paso.idPersonaRol?.idPersona?.apellidos]
+                    .filter(Boolean).join(' ').trim() || 'Sin responsable asignado',
+                status: paso.estado || 'Sin estado'
+            };
+        });
+        this.wizard.updateView({ steps, previous, next, saveDisabled: ocupado || !m.editable });
         this.owner.actualizarCabeceraProcedimiento(this.procedimiento, m.paso);
     }
 
@@ -337,7 +311,7 @@ export default class AtencionFlujo {
 
     async guardarActual(exigirAtencion = false) {
         const m = this.actual();
-        if (!m || !esResponsableDelPaso(m.paso, this.owner.usuario) || this.ocupado || this.owner.guardando || this.destroyed) return false;
+        if (!m || !esResponsableDelPaso(m.paso, this.owner.usuario) || this.ocupado || this.destroyed) return false;
         const elegirCamino = exigirAtencion && this.bifurcacion(m) && !!this.siguienteId && (m.editable || this.flujo.completo(m.paso));
         if (!this.flujo.habilitado(m.paso) || this.flujo.completo(m.paso) && !elegirCamino) return false;
         if (!m.editable && !(elegirCamino && !this.pendiente(m))) return !this.pendiente(m);
@@ -433,17 +407,17 @@ export default class AtencionFlujo {
     }
 
     async ir(id, guardar = true) {
-        if (!this.wizard || this.ocupado || this.owner.guardando || this.destroyed || id === this.wizard.getCurrentStep().id) return false;
+        if (!this.wizard || this.ocupado || this.destroyed || id === this.wizard.getCurrentStep().id) return false;
         const destino = this.modelos.get(id); if (!destino || !this.visibles.has(destino.paso.idProcedimientoPaso?.idProcedimientoPaso) || !esResponsableDelPaso(destino.paso, this.owner.usuario) || this.flujo.completo(destino.paso) || !(this.flujo.habilitado(destino.paso) || this.flujo.completo(destino.paso))) return false;
         const actual = this.actual();
         if (guardar && this.pendiente(actual) && !await this.guardarActual()) return false;
         if (this.destroyed) return false;
-        const cambio = await this.wizard.goToStep(id);
+        const cambio = this.wizard.goToStep(id);
         if (cambio) { this.historial.push(actual.paso.idConsultaProcedimientoPaso); this.actualizarControles(); }
         return cambio;
     }
     async siguiente() {
-        const m = this.actual(); if (!m || !esResponsableDelPaso(m.paso, this.owner.usuario) || this.ocupado || this.owner.guardando || this.destroyed) return false;
+        const m = this.actual(); if (!m || !esResponsableDelPaso(m.paso, this.owner.usuario) || this.ocupado || this.destroyed) return false;
         if (!this.flujo.habilitado(m.paso)) return false;
         if (m.editable && (!this.flujo.completo(m.paso) || this.pendiente(m)) && !m.valor.getValue().trim()) {
             m.valor.setError('Registra la atención brindada para continuar.'); Toast.warning('La atención brindada es obligatoria.'); return false;
@@ -458,8 +432,9 @@ export default class AtencionFlujo {
         this.actualizarControles();
         const siguiente = this.modelos.get(this.siguienteId)?.paso;
         const pendientesPropios = this.pasos.some(paso => esResponsableDelPaso(paso, this.owner.usuario) && !esPasoInvalido(paso) && !this.flujo.completo(paso));
-        if (!pendientesPropios || siguiente && !esResponsableDelPaso(siguiente, this.owner.usuario)) {
-            return this.owner.salir();
+        const sucesorAjeno = !!siguiente && !esResponsableDelPaso(siguiente, this.owner.usuario);
+        if (!pendientesPropios || sucesorAjeno) {
+            return this.owner.salir({ recomendarInstalacion: sucesorAjeno });
         }
         if (!this.siguienteId || !this.flujo.habilitado(this.modelos.get(this.siguienteId).paso) && !this.flujo.completo(this.modelos.get(this.siguienteId).paso)) {
             return this.flujo.completo(m.paso);
@@ -503,7 +478,7 @@ export default class AtencionFlujo {
     }
 
     async anterior() {
-        if (!this.anteriorId || this.ocupado || this.owner.guardando || this.destroyed) return false;
+        if (!this.anteriorId || this.ocupado || this.destroyed) return false;
         const id = this.anteriorId;
         const historial = [...this.historial];
         const actual = this.actual(), destino = this.modelos.get(id);

@@ -69,10 +69,10 @@ suite('Paso 5: DTO de estados y dashboard agregado', () => {
             fetchStub.callsFake(async () => response([estado('a', extra)])); await rejects(() => new ConsultaProcedimientoPasoService().resumirParaConsultas(['a']), 'inválido');
         }
     });
-    test('la tarjeta muestra el estado del DTO sin fabricar pasos ni deducirlo de fechaFin', () => {
+    test('la tarjeta mantiene Programada sin pasos reales aunque exista fechaFin', () => {
         const tarjeta = new TarjetaConsulta(); tarjeta.consulta = { idConsulta: 'a', fechaInicio: '2099-01-01T00:00:00Z', fechaFin: '2020-01-01T00:00:00Z' };
-        tarjeta.resumenEstado = estado('a', { totalPasos: 124, pasosFinalizados: 124, estado: 'Finalizada' }); fixture.append(tarjeta);
-        assert.include(tarjeta.shadowRoot.textContent, 'Finalizada'); assert.deepEqual(tarjeta.pasos, []);
+        fixture.append(tarjeta);
+        assert.include(tarjeta.shadowRoot.textContent, 'Programada'); assert.deepEqual(tarjeta.pasos, []);
     });
     test('las tarjetas no se montan si fallan las asignaciones', async () => {
         fetchStub.callsFake(async raw => new URL(raw).pathname.endsWith('/consulta') ? response([{ idConsulta: 'a', idPersonaRol: { idClinica: usuario.idClinica } }]) : new Response('', { status: 500 }));
@@ -85,10 +85,9 @@ suite('Paso 5: DTO de estados y dashboard agregado', () => {
         const vista = document.createElement('resumen-controller'); vista.usuario = usuario; fixture.append(vista);
         assert.deepEqual([...vista.children].map(n => n.localName), ['galeno-selector-contexto', 'galeno-agenda']);
         assert.strictEqual(vista.firstElementChild.usuario, usuario); assert.strictEqual(vista.lastElementChild.usuario, usuario);
-        await hasta(() => !vista.querySelector('galeno-agenda [type=submit]').disabled);
+        await hasta(() => fetchStub.getCalls().some(c => new URL(c.args[0]).pathname.endsWith('/consulta')));
         assert.isFalse(fetchStub.getCalls().some(c => String(c.args[0]).includes('/consulta/resumen')));
         assert.isNull(vista.querySelector('.stats,.dash-grid,.dona,svg,table'));
-        vista.cargar(); assert.lengthOf(vista.querySelectorAll('galeno-selector-contexto'), 1); assert.lengthOf(vista.querySelectorAll('galeno-agenda'), 1);
     });;
 });
 mocha.run();

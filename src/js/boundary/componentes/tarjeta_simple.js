@@ -5,6 +5,8 @@ class TarjetaSimple  extends HTMLElement {
     }
 
     connectedCallback(){
+        if (this.root.hasChildNodes()) return;
+
         //<div class="header"> <slot name="titulo">agregar encabezado</slot> </div>
         let titulo=document.createElement("div");
         titulo.setAttribute("class","header");

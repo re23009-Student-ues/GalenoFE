@@ -1,10 +1,43 @@
 import { rolesDePersona } from '../../control/sesion_service.js';
 import { esPaciente } from '../../control/roles.js';
-import { esc } from '../util_html.js';
+function campo(nombre, texto) {
+    const etiqueta = document.createElement('label');
+    etiqueta.textContent = texto;
+    const select = document.createElement('select');
+    select.name = nombre;
+    select.disabled = true;
+    etiqueta.append(select);
+    return etiqueta;
+}
+
+function opcion(valor, texto) {
+    const elemento = document.createElement('option');
+    elemento.value = String(valor ?? '');
+    elemento.textContent = String(texto ?? '');
+    return elemento;
+}
+
 class SelectorContexto extends HTMLElement {
     connectedCallback() {
         this.version = (this.version || 0) + 1;
-        this.innerHTML = `<section class="agenda-panel"><h2>Contexto laboral</h2><div class="agenda-form"><label>Clínica<select name="clinica" disabled></select></label><label>Rol en esta clínica<select name="rol" disabled></select></label></div><p role="status" aria-live="polite">Cargando inscripciones…</p><button type="button" hidden>Reintentar</button></section>`;
+        const panel = document.createElement('section');
+        panel.className = 'agenda-panel';
+        const titulo = document.createElement('h2');
+        titulo.textContent = 'Contexto laboral';
+        const formulario = document.createElement('div');
+        formulario.className = 'agenda-form';
+        formulario.append(campo('clinica', 'Clínica'), campo('rol', 'Rol en esta clínica'));
+        const aviso = document.createElement('p');
+        aviso.setAttribute('role', 'status');
+        aviso.setAttribute('aria-live', 'polite');
+        aviso.textContent = 'Cargando inscripciones…';
+        const reintentar = document.createElement('button');
+        reintentar.type = 'button';
+        reintentar.hidden = true;
+        reintentar.textContent = 'Reintentar';
+        panel.append(titulo, formulario, aviso, reintentar);
+        this.replaceChildren(panel);
+
         this.alCambio = e => {
             if (e.target.name === 'clinica') this.roles();
             if (!['clinica', 'rol'].includes(e.target.name)) return;
@@ -13,7 +46,7 @@ class SelectorContexto extends HTMLElement {
         };
         this.alReintentar = () => this.cargar();
         this.addEventListener('change', this.alCambio);
-        this.querySelector('button').addEventListener('click', this.alReintentar);
+        reintentar.addEventListener('click', this.alReintentar);
         this.cargar();
     }
     disconnectedCallback() { this.version++; this.removeEventListener('change', this.alCambio); this.querySelector('button')?.removeEventListener('click', this.alReintentar); }
@@ -25,9 +58,10 @@ class SelectorContexto extends HTMLElement {
             if (!this.isConnected || version !== this.version) return;
             this.contextos = contextos;
             const clinicas = [...new Map(contextos.map(c => [c.idClinica.idClinica, c.idClinica])).values()];
-            this.querySelector('[name="clinica"]').innerHTML = clinicas.map(c => `<option value="${esc(c.idClinica)}">${esc(c.nombre)}</option>`).join('');
-            this.querySelector('[name="clinica"]').value = this.usuario.idClinica.idClinica;
-            this.querySelector('[name="clinica"]').disabled = !clinicas.length;
+            const select = this.querySelector('[name="clinica"]');
+            select.replaceChildren(...clinicas.map(c => opcion(c.idClinica, c.nombre)));
+            select.value = this.usuario.idClinica.idClinica;
+            select.disabled = !clinicas.length;
             this.roles();
             this.querySelector('[role="status"]').textContent = contextos.length ? '' : 'No hay contextos laborales disponibles';
         } catch (e) { if (this.isConnected && version === this.version) { this.querySelector('[role="status"]').textContent = e.message || e.mensaje; this.querySelector('button').hidden = false; } }
@@ -35,7 +69,7 @@ class SelectorContexto extends HTMLElement {
     roles() {
         const opciones = this.contextos.filter(c => c.idClinica.idClinica === this.querySelector('[name="clinica"]').value);
         const select = this.querySelector('[name="rol"]');
-        select.innerHTML = opciones.map(c => `<option value="${esc(c.idPersonaRol)}">${esc(c.idRol.nombre)}</option>`).join('');
+        select.replaceChildren(...opciones.map(c => opcion(c.idPersonaRol, c.idRol.nombre)));
         if (opciones.some(c => c.idPersonaRol === this.usuario.idPersonaRol)) select.value = this.usuario.idPersonaRol;
         select.disabled = !opciones.length;
     }

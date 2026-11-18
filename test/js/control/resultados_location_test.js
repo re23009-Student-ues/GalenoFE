@@ -108,5 +108,28 @@ suite('Paso 6: Location y reintentos de resultados', () => {
         sandbox.stub(crypto, 'randomUUID').value(undefined); await registrar();
         assert.match(posts[0].headers['Idempotency-Key'], /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     });
+    test('Sin randomUUID utiliza una clave v4 y mantiene la recuperación por Location', async () => {
+        sandbox.stub(crypto, 'randomUUID').value(undefined);
+        const resultado = await registrar();
+        const clave = posts[0].headers['Idempotency-Key'];
+        assert.match(clave, /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/);
+        assert.equal(resultado.idExamenResultado, clave);
+        assert.strictEqual(await registrar(), resultado);
+        assert.lengthOf(posts, 1);
+    });
+
+    test('Un 204 no confirma la creación y el siguiente intento conserva la misma clave', async () => {
+        const post = fetchStub.withArgs(sinon.match('/examen_resultado/atencion'), sinon.match({ method: 'POST' }));
+        post.onFirstCall().resolves(new Response(null, { status: 204 }));
+        post.onSecondCall().callsFake(async (url, opciones) => {
+            guardado = { ...JSON.parse(opciones.body), idExamenResultado: opciones.headers['Idempotency-Key'], idOrdenExamen: orden };
+            return created(url);
+        });
+        await rejects(registrar, 'no confirmó');
+        assert.equal((await registrar()).idExamenResultado, guardado.idExamenResultado);
+        assert.equal(post.firstCall.args[1].headers['Idempotency-Key'], post.secondCall.args[1].headers['Idempotency-Key']);
+        sinon.assert.calledTwice(post);
+    });
+
 });
 mocha.run();

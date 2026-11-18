@@ -141,5 +141,49 @@ suite('Paso 7: contrato transaccional de atención', () => {
         const cuerpos = fetchStub.getCalls().map(c => c.args[1].body);
         assert.equal(new Set(cuerpos).size, 1); assert.equal(paso.estado, 'PENDIENTE');
     });
+    test('rechaza el guardado con registro de otra consulta o clínica antes de PUT', async () => {
+        const consulta = paso.idConsultaProcedimiento.idConsulta;
+        for (const ajena of [
+            { ...consulta, idConsulta: 'otra-consulta' },
+            { ...consulta, idPersonaRol: { idClinica: { idClinica: 'externa' } } }
+        ]) {
+            paso.idConsultaProcedimiento.idConsulta = ajena;
+            fetchStub.callsFake(async () => response(orden));
+            await rejects(() => guardarCamposAtencion('orden_examen', orden, { indicaciones: 'Nuevo' }, usuario, 'consulta'),
+                'rol o a la clínica');
+        }
+        assert.deepEqual(fetchStub.getCalls().map(c => c.args[1].method), ['GET', 'GET']);
+        assert.equal(orden.indicaciones, 'Antes');
+    });
+
+    test('completar rechaza un 204 o una fecha imposible en la confirmación', async () => {
+        fetchStub.onFirstCall().resolves(new Response(null, { status: 204 }));
+        fetchStub.onSecondCall().resolves(response({ ...confirmado(paso), fechaFin: 'sin fecha válida' }));
+        const completar = () => completarPasoAtencion(paso, 'Atención nueva', usuario, 'consulta');
+        await rejects(completar, 'no confirmó');
+        await rejects(completar, 'confirmación válida');
+        assert.equal(paso.estado, 'PENDIENTE');
+        assert.equal(paso.valor, 'Original');
+        sinon.assert.calledTwice(fetchStub);
+    });
+
+    test('rechaza una rama retornada que pertenece a otro procedimiento o sigue inválida', async () => {
+        paso.idConsultaProcedimiento.idConsultaProcedimiento = 'proc';
+        const siguiente = { ...paso, idConsultaProcedimientoPaso: 'siguiente' };
+        const camino = { siguiente: 'siguiente', pasos: [paso, siguiente] };
+        const invalido = { ...siguiente, estado: 'INVALIDO' };
+        const externo = { ...siguiente, idConsultaProcedimiento: { ...siguiente.idConsultaProcedimiento, idConsultaProcedimiento: 'externo' } };
+        for (const respuesta of [[confirmado(paso), invalido], [confirmado(paso), externo], [confirmado(paso), confirmado(paso)]]) {
+            fetchStub.callsFake(async (_, opciones) => {
+                assert.equal(JSON.parse(opciones.body).siguiente, 'siguiente');
+                return response({ paso: confirmado(paso), pasos: respuesta });
+            });
+            await rejects(() => completarPasoAtencion(paso, 'Atención nueva', usuario, 'consulta', camino), 'Recarga la atención');
+        }
+        assert.equal(paso.estado, 'PENDIENTE');
+        assert.equal(siguiente.estado, 'PENDIENTE');
+        sinon.assert.calledThrice(fetchStub);
+    });
+
 });
 mocha.run();

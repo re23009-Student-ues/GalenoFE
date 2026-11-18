@@ -114,12 +114,6 @@ export default class Modal {
 
     isOpen() { return this.opened && this.element.open; }
 
-    setTitle(title) {
-        if (typeof title !== 'string' || !title.trim()) throw new TypeError('Modal: título no vacío requerido.');
-        if (!this.destroyed) this.title.textContent = title;
-        return this;
-    }
-
     setContent(content) {
         if (this.destroyed) return this;
         if (typeof content !== 'string' && (!(content instanceof Node) ||

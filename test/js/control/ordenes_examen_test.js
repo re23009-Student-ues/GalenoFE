@@ -95,6 +95,31 @@ export function pruebasOrdenesExamen() {
             await rechaza(registrar); await rechaza(registrar, 'No se pudo confirmar');
             assert.equal(fetchStub.getCalls().filter(c => c.args[1].method === 'POST').length, 1);
         });
+        test('Una orden rechazada explícitamente se puede corregir y reenviar', async () => {
+            const post = fetchStub.withArgs(sinon.match(/\/orden_examen$/), sinon.match({ method: 'POST' }));
+            post.onFirstCall().resolves(new Response('', { status: 422 }));
+            post.onSecondCall().callsFake(async (raw, opciones) => {
+                ordenes.push(orden(JSON.parse(opciones.body).indicaciones));
+                return new Response(null, { status: 201, headers: { Location: `${raw}/${idOrden}` } });
+            });
+            await rechaza(registrar, '422');
+            assert.isEmpty(ordenes);
+            const corregida = await registrarOrdenAtencion(paso, examen, 'Ayuno de ocho horas', contexto, 'consulta');
+            assert.include(corregida.indicaciones, 'Ayuno de ocho horas');
+            sinon.assert.calledTwice(post);
+            assert.lengthOf(ordenes, 1);
+        });
+
+        test('El cliente rechaza una referencia que devuelve una orden distinta y recupera el registro sin otro POST', async () => {
+            const consultaOrden = fetchStub.withArgs(sinon.match(new RegExp('/orden_examen/' + idOrden + '$')));
+            consultaOrden.resolves(response({ ...orden('Indicaciones distintas'), idOrdenExamen: 'otra-orden' }));
+            await rechaza(registrar, 'no corresponde');
+            assert.equal(posts, 1);
+            assert.equal((await registrar()).idOrdenExamen, idOrden);
+            assert.equal(posts, 1);
+            sinon.assert.calledOnce(consultaOrden);
+        });
+
         test('Location ajeno no se sigue y un reintento recupera la orden creada', async () => {
             fetchStub.withArgs(sinon.match(/\/orden_examen$/), sinon.match({ method: 'POST' })).callsFake(async (raw, opciones) => {
                 posts++; ordenes.push(orden(JSON.parse(opciones.body).indicaciones));

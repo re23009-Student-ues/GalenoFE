@@ -6,8 +6,7 @@ import TarjetaSimple from './tarjeta_simple.js';
 class Agenda extends HTMLElement {
     connectedCallback() {
         this.version = (this.version || 0) + 1;
-        const hoy = diaAgenda();
-        this.innerHTML = `<section class="agenda-panel"><h2>Consultas por rol</h2><p>Tus pasos se indican con «-responsable».</p><form class="agenda-form"><label>Buscar por nombre<input name="nombre" type="search" placeholder="Nombre o apellido (mínimo 3 caracteres)"></label><label>Desde<input name="desde" type="date" value="${hoy}" required></label><label>Hasta<input name="hasta" type="date" value="${hoy}" required></label><button type="button" data-hoy>Hoy</button></form><p role="status" aria-live="polite"></p><div data-lista></div></section>`;
+        this.montarPanel();
         this.alSubmit = e => { e.preventDefault(); this.cargar(); };
         this.agenda = null;
         this.alInput = e => {
@@ -34,6 +33,52 @@ class Agenda extends HTMLElement {
         this.addEventListener('click', this.alClick);
         this.cargar();
     }
+    montarPanel() {
+        const panel = document.createElement('section');
+        panel.className = 'agenda-panel';
+        const titulo = document.createElement('h2');
+        titulo.textContent = 'Consultas por rol';
+        const indicaciones = document.createElement('p');
+        indicaciones.textContent = 'Tus pasos se indican con «-responsable».';
+
+        const formulario = document.createElement('form');
+        formulario.className = 'agenda-form';
+        const etiquetaNombre = document.createElement('label');
+        etiquetaNombre.textContent = 'Buscar por nombre';
+        const nombre = document.createElement('input');
+        nombre.name = 'nombre';
+        nombre.type = 'search';
+        nombre.placeholder = 'Nombre o apellido (mínimo 3 caracteres)';
+        etiquetaNombre.append(nombre);
+        formulario.append(etiquetaNombre);
+
+        const hoy = diaAgenda();
+        for (const [campo, texto] of [['desde', 'Desde'], ['hasta', 'Hasta']]) {
+            const etiqueta = document.createElement('label');
+            etiqueta.textContent = texto;
+            const fecha = document.createElement('input');
+            fecha.name = campo;
+            fecha.type = 'date';
+            fecha.defaultValue = hoy;
+            fecha.required = true;
+            etiqueta.append(fecha);
+            formulario.append(etiqueta);
+        }
+        const restablecer = document.createElement('button');
+        restablecer.type = 'button';
+        restablecer.dataset.hoy = '';
+        restablecer.textContent = 'Hoy';
+        formulario.append(restablecer);
+
+        const estado = document.createElement('p');
+        estado.setAttribute('role', 'status');
+        estado.setAttribute('aria-live', 'polite');
+        const lista = document.createElement('div');
+        lista.dataset.lista = '';
+        panel.append(titulo, indicaciones, formulario, estado, lista);
+        this.replaceChildren(panel);
+    }
+
     disconnectedCallback() { clearTimeout(this.esperaNombre); this.esperaNombre = null; this.version++; this.destruirArboles(); this.removeEventListener('submit', this.alSubmit); this.removeEventListener('input', this.alInput); this.removeEventListener('change', this.alChange); this.agenda = null; this.removeEventListener('click', this.alClick); }
     destruirArboles() {
         this.arboles?.forEach(arbol => arbol.destroy());
@@ -148,8 +193,7 @@ class Agenda extends HTMLElement {
             titulo.append(inicio);
             const arbol = new Tree(); arbol.slot = 'contenido';
             const data = this.datosProcedimientos(c.procedimientos);
-            arbol.configure({ title: 'Pasos de la consulta', data,
-                labelKey: 'nombre', theme: 'light', searchable: false, guides: true, expanded: this.expansionAsignada(data),
+            arbol.configure({ data, expanded: this.expansionAsignada(data),
                 renderLabel: nodo => {
                     const etiqueta = document.createElement('span'); etiqueta.className = 'agenda__paso';
                     const nombre = document.createElement('span'); nombre.textContent = nodo.nombre; etiqueta.append(nombre);
@@ -160,10 +204,10 @@ class Agenda extends HTMLElement {
                     }
                     return etiqueta;
                 },
-                selection: 'single', onNodeSelect: ({ node }) => {
-                    if (!node.responsable || !node.idPaso) return;
+                onNodeSelect: nodo => {
+                    if (!nodo.responsable || !nodo.idPaso) return;
                     this.dispatchEvent(new CustomEvent('galeno-navegar', { bubbles: true, composed: true,
-                        detail: { ruta: `/atencion/${encodeURIComponent(c.idConsulta)}/paso/${encodeURIComponent(node.idPaso)}` } }));
+                        detail: { ruta: `/atencion/${encodeURIComponent(c.idConsulta)}/paso/${encodeURIComponent(nodo.idPaso)}` } }));
                 }
             });
             this.arboles.push(arbol);

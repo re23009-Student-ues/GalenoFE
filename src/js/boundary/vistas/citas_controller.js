@@ -1,7 +1,41 @@
 import { listarCompleto, validarPaciente, buscarCitas, validarFormatoDocumento, validarRango } from '../../control/agenda_service.js';
 import { ejemploDocumento } from '../../control/documento_formato.js';
-import { esc } from '../util_html.js';
+import { Toast } from '../componentes/feedback/index.js';
 import '../componentes/tarjeta_cita.js';
+
+const DEMORA_AVISO_INSTALACION = 3000;
+
+function texto(tag, contenido) {
+    const nodo = document.createElement(tag);
+    nodo.textContent = contenido;
+    return nodo;
+}
+
+function etiquetar(nombre, control) {
+    const etiqueta = texto('label', nombre);
+    etiqueta.append(control);
+    return etiqueta;
+}
+
+function fecha(nombre, etiqueta) {
+    const campo = document.createElement('input');
+    campo.name = nombre;
+    campo.type = 'date';
+    return etiquetar(etiqueta, campo);
+}
+
+function opcion(valor, nombre) {
+    const nodo = texto('option', String(nombre ?? ''));
+    nodo.value = String(valor ?? '');
+    return nodo;
+}
+
+function aviso() {
+    const nodo = document.createElement('p');
+    nodo.setAttribute('role', 'status');
+    nodo.setAttribute('aria-live', 'polite');
+    return nodo;
+}
 
 class GalenoCitas extends HTMLElement {
     connectedCallback() {
@@ -9,42 +43,7 @@ class GalenoCitas extends HTMLElement {
         this.citas = [];
         this.contextos = null;
         this.ocupado = false;
-        this.innerHTML = `<section class="agenda-panel">
-            <h2>Buscar mis citas</h2>
-            <form class="agenda-form" data-busqueda novalidate>
-                <label>Tipo de documento
-                    <select name="tipo" disabled><option value="">Cargando…</option></select>
-                </label>
-                <div class="citas-documento">
-                    <label>Número de documento
-                        <input name="numero" autocomplete="off" disabled aria-describedby="indicaciones error-documento">
-                    </label>
-                    <p id="indicaciones"></p>
-                    <p id="error-documento" class="citas-error" aria-live="polite"></p>
-                </div>
-                <button type="submit" data-buscar disabled>Buscar citas</button>
-            </form>
-            <p role="status" aria-live="polite" data-estado></p>
-            <button type="button" data-reintentar hidden>Reintentar catálogo</button>
-            <section data-resultados hidden aria-label="Resultados de citas">
-                <h3>Mis citas</h3>
-                <form class="agenda-form" data-filtros>
-                    <label class="citas-filtro-clinica">Clínica
-                        <select name="clinica"><option value="">Todas las clínicas</option></select>
-                    </label>
-                    <div class="citas-filtro-rango">
-                        <label>Desde<input name="desde" type="date"></label>
-                        <label>Hasta<input name="hasta" type="date"></label>
-                        <div class="citas-filtro-botones">
-                            <button type="submit">Filtrar</button>
-                            <button type="button" data-limpiar>Mostrar todas</button>
-                        </div>
-                    </div>
-                </form>
-                <p role="status" aria-live="polite" data-resumen></p>
-            </section>
-        </section>
-        <section class="citas-grid" data-lista hidden aria-label="Citas encontradas"></section>`;
+        this.montarFormulario();
         this.alCambio = e => this.cambiar(e);
         this.alCambiarClinica = e => { if (e.target.name === 'clinica') this.filtrar(); };
         this.alClick = e => {
@@ -63,15 +62,114 @@ class GalenoCitas extends HTMLElement {
         this.addEventListener('change', this.alCambiarClinica);
         this.addEventListener('click', this.alClick);
         this.addEventListener('submit', this.alSubmit);
+        this.addEventListener('galeno-consulta-descargada', this.programarAvisoInstalacion);
         this.catalogo();
     }
+    montarFormulario() {
+        const panel = document.createElement('section');
+        panel.className = 'agenda-panel';
+
+        const busqueda = document.createElement('form');
+        busqueda.className = 'agenda-form';
+        busqueda.dataset.busqueda = '';
+        busqueda.noValidate = true;
+        const tipo = document.createElement('select');
+        tipo.name = 'tipo';
+        tipo.disabled = true;
+        tipo.append(opcion('', 'Cargando…'));
+
+        const documento = document.createElement('div');
+        documento.className = 'citas-documento';
+        const numero = document.createElement('input');
+        numero.name = 'numero';
+        numero.autocomplete = 'off';
+        numero.disabled = true;
+        numero.setAttribute('aria-describedby', 'indicaciones error-documento');
+        const indicaciones = document.createElement('p');
+        indicaciones.id = 'indicaciones';
+        const error = document.createElement('p');
+        error.id = 'error-documento';
+        error.className = 'citas-error';
+        error.setAttribute('aria-live', 'polite');
+        documento.append(etiquetar('Número de documento', numero), indicaciones, error);
+
+        const buscar = texto('button', 'Buscar citas');
+        buscar.type = 'submit';
+        buscar.dataset.buscar = '';
+        buscar.disabled = true;
+        busqueda.append(etiquetar('Tipo de documento', tipo), documento, buscar);
+
+        const estado = aviso();
+        estado.dataset.estado = '';
+        const reintentar = texto('button', 'Reintentar catálogo');
+        reintentar.type = 'button';
+        reintentar.dataset.reintentar = '';
+        reintentar.hidden = true;
+        panel.append(texto('h2', 'Buscar mis citas'), busqueda, estado, reintentar, this.montarFiltros());
+
+        const lista = document.createElement('section');
+        lista.className = 'citas-grid';
+        lista.dataset.lista = '';
+        lista.hidden = true;
+        lista.setAttribute('aria-label', 'Citas encontradas');
+        this.replaceChildren(panel, lista);
+    }
+
+    montarFiltros() {
+        const resultados = document.createElement('section');
+        resultados.dataset.resultados = '';
+        resultados.hidden = true;
+        resultados.setAttribute('aria-label', 'Resultados de citas');
+        const filtros = document.createElement('form');
+        filtros.className = 'agenda-form';
+        filtros.dataset.filtros = '';
+        const clinica = document.createElement('select');
+        clinica.name = 'clinica';
+        clinica.append(opcion('', 'Todas las clínicas'));
+        const etiquetaClinica = etiquetar('Clínica', clinica);
+        etiquetaClinica.className = 'citas-filtro-clinica';
+
+        const rango = document.createElement('div');
+        rango.className = 'citas-filtro-rango';
+        const botones = document.createElement('div');
+        botones.className = 'citas-filtro-botones';
+        const filtrar = texto('button', 'Filtrar');
+        filtrar.type = 'submit';
+        const limpiar = texto('button', 'Mostrar todas');
+        limpiar.type = 'button';
+        limpiar.dataset.limpiar = '';
+        botones.append(filtrar, limpiar);
+        rango.append(fecha('desde', 'Desde'), fecha('hasta', 'Hasta'), botones);
+        filtros.append(etiquetaClinica, rango);
+
+        const resumen = aviso();
+        resumen.dataset.resumen = '';
+        resultados.append(texto('h3', 'Mis citas'), filtros, resumen);
+        return resultados;
+    }
+
     disconnectedCallback() {
         this.version++;
+        clearTimeout(this.temporizadorInstalacion);
+        this.temporizadorInstalacion = null;
+        if (this.avisoInstalacion) Toast.dismiss(this.avisoInstalacion);
+        this.avisoInstalacion = null;
+        this.removeEventListener('galeno-consulta-descargada', this.programarAvisoInstalacion);
         this.removeEventListener('input', this.alCambio);
         this.removeEventListener('change', this.alCambiarClinica);
         this.removeEventListener('click', this.alClick);
         this.removeEventListener('submit', this.alSubmit);
     }
+
+    programarAvisoInstalacion = () => {
+        if (this.temporizadorInstalacion || this.avisoInstalacion) return;
+        this.temporizadorInstalacion = setTimeout(() => {
+            this.temporizadorInstalacion = null;
+            this.avisoInstalacion = this.closest('galeno-app')?.instalador?.recomendar(
+                'Instala GalenoSV para acceder a tus citas desde la pantalla de inicio.'
+            );
+        }, DEMORA_AVISO_INSTALACION);
+    };
     campo(nombre) { return this.querySelector(`[name="${nombre}"]`); }
     estado(texto) { this.querySelector('[data-estado]').textContent = texto; }
     vigente(version) { return this.isConnected && this.version === version; }
@@ -117,7 +215,7 @@ class GalenoCitas extends HTMLElement {
     limpiarResultados() {
         this.citas = [];
         this.contextos = null;
-        this.campo('clinica').innerHTML = '<option value="">Todas las clínicas</option>';
+        this.campo('clinica').replaceChildren(opcion('', 'Todas las clínicas'));
         this.querySelector('[data-resultados]').hidden = true;
         this.querySelector('[data-filtros]').reset();
         this.querySelector('[data-lista]').replaceChildren();
@@ -132,8 +230,9 @@ class GalenoCitas extends HTMLElement {
             const tipos = (await listarCompleto('tipo_documento?activo=true', 'idTipoDocumento')).filter(t => t.activo === true);
             if (!this.vigente(version)) return;
             this.tipos = tipos;
-            this.campo('tipo').innerHTML = '<option value="">Selecciona un tipo</option>' + tipos.map(t => `<option value="${esc(t.idTipoDocumento)}">${esc(t.nombre)}</option>`).join('');
-            this.campo('tipo').disabled = !tipos.length;
+            const select = this.campo('tipo');
+            select.replaceChildren(opcion('', 'Selecciona un tipo'), ...tipos.map(t => opcion(t.idTipoDocumento, t.nombre)));
+            select.disabled = !tipos.length;
             this.estado(tipos.length ? '' : 'No hay tipos de documento activos');
         } catch (e) { if (this.vigente(version)) { this.estado(e.message || e.mensaje); this.querySelector('[data-reintentar]').hidden = false; } }
     }
@@ -154,8 +253,10 @@ class GalenoCitas extends HTMLElement {
             this.contextos = paciente.contextos;
             const clinicas = new Map(paciente.contextos.filter(c => c.idClinica?.idClinica)
                 .map(c => [c.idClinica.idClinica, c.idClinica]));
-            this.campo('clinica').innerHTML = '<option value="">Todas las clínicas</option>'
-                + [...clinicas.values()].map(c => `<option value="${esc(c.idClinica)}">${esc(c.nombre || 'Clínica sin nombre')}</option>`).join('');
+            this.campo('clinica').replaceChildren(
+                opcion('', 'Todas las clínicas'),
+                ...Array.from(clinicas.values(), c => opcion(c.idClinica, c.nombre || 'Clínica sin nombre'))
+            );
             this.citas = citas;
             this.querySelector('[data-resultados]').hidden = false;
             this.estado('');

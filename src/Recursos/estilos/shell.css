@@ -6,8 +6,13 @@ galeno-app[restaurando] .contenedor-app {
     visibility: hidden;
 }
 
-galeno-menu, galeno-topbar, .topbar-controles {
+galeno-menu, .topbar-controles {
     display: contents;
+}
+
+galeno-topbar {
+    display: block;
+    position: relative;
 }
 
 galeno-app[modo="publico"] .topbar {
@@ -43,6 +48,12 @@ galeno-topbar instalador-app {
 galeno-topbar .usuario,
 galeno-topbar a[href="#/login"] {
     order: 2;
+}
+
+@media (width > 768px) {
+    galeno-app[modo="publico"] .topbar instalador-app {
+        margin-inline-start: auto;
+    }
 }
 
 @media (max-width: 768px) {

@@ -79,11 +79,6 @@ body {
     background-color: var(--marino);
 }
 
-.btn-config {
-    margin-top: auto; /* Empuja este elemento hasta el final */
-    margin-bottom: 12px !important;
-}
-
 /* ===== Área principal ===== */
 .contenido-principal {
     flex: 1;

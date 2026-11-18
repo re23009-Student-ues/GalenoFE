@@ -26,11 +26,6 @@ atencion-controller { display: block; color: var(--texto, #26313f); }
 .atencion__datos dt { color: var(--texto-suave, #6f7b8a); font-size: 14px; }
 .atencion__datos dd { margin: 4px 0 0; font-weight: 600; overflow-wrap: anywhere; }
 .atencion__observaciones { margin-top: 20px; }
-.atencion__tabla { overflow-x: auto; }
-.atencion__tabla table { width: 100%; border-collapse: collapse; }
-.atencion__tabla caption { text-align: left; padding: 8px 0; }
-.atencion__tabla th, .atencion__tabla td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; overflow-wrap: anywhere; }
-.atencion__paso-actual { background: var(--cielo, #d6e9f8); }
 .atencion__wizard { margin-top: 20px; min-width: 0; }
 .atencion__paciente { display: flex; align-items: center; gap: 14px; margin-top: 20px; padding: 16px; background: #fff; border-radius: 14px; }
 .atencion__paciente-avatar { display: grid; place-items: center; flex: 0 0 48px; width: 48px; height: 48px; border-radius: 50%; background: var(--azul-fuerte, #1a73e8); color: #fff; font-weight: bold; }
@@ -46,11 +41,7 @@ atencion-controller { display: block; color: var(--texto, #26313f); }
 .atencion__item h4 { margin: 0 0 12px; }
 .atencion__examen { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; }
 .atencion__examen input { flex-shrink: 0; margin-top: 4px; }
-.atencion__archivo { display: grid; gap: 8px; margin: 16px 0; }
-.atencion__archivo input { max-width: 100%; }
-.atencion__tabla td:last-child { min-width: 240px; }
 .atencion__boton:disabled { opacity: .6; cursor: default; }
-.atencion__seleccionar-procedimiento[aria-pressed="true"] { background: var(--marino, #1f3a5f); color: #fff; opacity: 1; }
 .atencion__selector-procedimiento, .atencion__detalles-generales { margin-top: 16px; padding: 16px; background: #fff; border-radius: 12px; }
 .atencion__selector-procedimiento label, .atencion__sucesor, .atencion__predecesor { display: grid; gap: 8px; margin-top: 12px; }
 .atencion__selector-procedimiento select, .atencion__sucesor select, .atencion__predecesor select { width: 100%; max-width: 100%; padding: 10px; box-sizing: border-box; font: inherit; }

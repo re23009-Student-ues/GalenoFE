@@ -418,6 +418,13 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         assert.notInclude(registro.textContent, 'Ana López');
         assert.notInclude(registro.textContent, '30 años');
         assert.include(etiquetas, 'Fecha de inicio');
+        const inicio = [...registro.querySelectorAll('dt')].find(n => n.textContent === 'Fecha de inicio').nextElementSibling;
+        const fecha = new Date(consultas[0].fechaInicio);
+        assert.deepEqual([...inicio.childNodes].map(n => n.nodeName === 'BR' ? 'BR' : n.textContent), [
+            fecha.toLocaleDateString('es-SV', { dateStyle: 'full' }),
+            'BR',
+            fecha.toLocaleTimeString('es-SV', { timeStyle: 'short' })
+        ]);
         assert.equal(c.querySelector('.atencion__paciente-avatar').textContent, 'AL');
         assert.include(c.querySelector('.atencion__paciente').textContent, 'Ana López');
         assert.include(c.querySelector('.atencion__paciente').textContent, '30 años');
@@ -522,7 +529,7 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         const c = await cargar('paso-2'), f = c.flujo;
         assert.isTrue(f.wizard.back.disabled); assert.isTrue(f.guardarBoton.disabled);
         assert.isTrue(f.actual().valor.control.readOnly);
-        assert.include(f.actual().ayuda.textContent, 'Solo el responsable del siguiente paso');
+        assert.notInclude(f.actual().root.textContent, 'Solo el responsable del siguiente paso');
         assert.isFalse(await f.anterior()); assert.isFalse(await f.guardarActual());
         sinon.assert.notCalled(retrocesoStub); assert.lengthOf(escrituras(), 0);
     });
@@ -715,6 +722,7 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         confirmacionStub.restore(); pasos[0].idProcedimientoPaso.indicaFin = true;
         const c = await cargar(), f = c.flujo; f.actual().valor.setValue('Atención final');
         assert.equal(f.wizard.forward.textContent, 'Completar');
+        assert.notInclude(f.actual().root.textContent, 'Completar guarda la atención');
         const pendiente = f.siguiente(); await espera(() => !!document.querySelector('.confirm-dialog__confirm'));
         assert.equal(document.querySelector('.confirm-dialog__confirm').textContent, 'Completar');
         document.querySelector('.confirm-dialog__cancel').click();
@@ -959,6 +967,7 @@ suite('Consulta → Atención SPA (REST simulado solo en pruebas)', () => {
         assert.notExists(c.flujo.wizard.root.querySelector('[name=observaciones]'));
         assert.lengthOf(c.querySelectorAll('[name=observaciones]'), 1);
         assert.isTrue(c.observaciones.control.readOnly);
+        assert.notInclude(c.detallesGenerales.textContent, 'guardar observaciones requiere una operación del servidor');
         assert.notExists(c.detallesGenerales.querySelector('button'));
         assert.lengthOf(escrituras(), 0);
     });

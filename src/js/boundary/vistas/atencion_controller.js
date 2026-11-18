@@ -1,7 +1,7 @@
 import { leer } from '../../control/agenda_service.js';
 import { esPaciente } from '../../control/roles.js';
 import ConsultaProcedimientoPasoService from '../../control/consultaProcedimientoPaso_service.js';
-import { formatoFecha, estadoConsulta, calcularEdad } from '../../control/fechas.js';
+import { parseFecha, estadoConsulta, calcularEdad } from '../../control/fechas.js';
 import { TextArea } from '../componentes/form/textarea/index.js';
 import { ConfirmDialog } from '../componentes/overlays/index.js';
 import { Toast } from '../componentes/feedback/index.js';
@@ -159,8 +159,16 @@ export default class AtencionController extends HTMLElement {
         const panel = crear('section', 'atencion__registro');
         panel.append(crear('h2', '', 'Registro de atención'));
         const datos = crear('dl', 'atencion__datos');
+        const inicio = crear('div');
+        const fechaInicio = crear('dd');
+        const fecha = parseFecha(consulta.fechaInicio);
+        if (fecha && Number.isFinite(fecha.getTime())) {
+            fechaInicio.append(fecha.toLocaleDateString('es-SV', { dateStyle: 'full' }),
+                crear('br'), fecha.toLocaleTimeString('es-SV', { timeStyle: 'short' }));
+        }
+        inicio.append(crear('dt', '', 'Fecha de inicio'), fechaInicio);
+        datos.append(inicio);
         for (const [label, value] of [
-            ['Fecha de inicio', formatoFecha(consulta.fechaInicio)],
             ['Empleado responsable', 'Verificando responsables de los pasos…'],
             ['Referencia externa', consulta.referenciaExterna || 'Sin referencia externa'],
             ['Estado de la consulta', 'Verificando pasos…']
@@ -199,7 +207,6 @@ export default class AtencionController extends HTMLElement {
             label: 'Observaciones de la consulta',
             value: typeof consulta.observaciones === 'string' ? consulta.observaciones : '',
             placeholder: 'Sin observaciones registradas.',
-            helperText: 'Información registrada en la consulta. Campo de solo lectura.',
             readOnly: true,
             autoResize: true,
             minRows: 3,
@@ -316,7 +323,6 @@ export default class AtencionController extends HTMLElement {
             this.seleccionarProcedimiento(id, solicitado);
             const selector = this.querySelector('.atencion__elegir-procedimiento'); if (selector) selector.value = id;
         } else if (procedimientos.length === 1) this.seleccionarProcedimiento(procedimientos[0].idConsultaProcedimiento);
-        this.observaciones.setReadOnly(true).setHelperText('Solo lectura: guardar observaciones requiere una operación del servidor que conserve los procedimientos y sus pasos.');
     }
 
     seleccionarProcedimiento(id, idPaso = null) {

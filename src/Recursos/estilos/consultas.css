@@ -60,7 +60,6 @@ atencion-controller { display: block; color: var(--texto, #26313f); }
 .atencion__examen-opcion, .atencion__resultado-paso { padding: 12px 0; border-bottom: 1px solid #cbd5e1; }
 .atencion__detalles-generales summary { cursor: pointer; font-weight: 600; }
 .atencion__detalles-generales[open] summary { margin-bottom: 16px; }
-.atencion__limite-transicion { margin-top: 16px; }
 .atencion__sucesor[hidden], .atencion__predecesor[hidden] { display: none; }
 .atencion__examen input:focus-visible { outline: 3px solid var(--marino, #1f3a5f); outline-offset: 3px; }
 .atencion__estado { display: inline-block; padding: 4px 10px; border-radius: 20px; background: #e2e8f0; }

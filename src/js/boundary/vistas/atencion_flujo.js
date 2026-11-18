@@ -168,7 +168,6 @@ export default class AtencionFlujo {
             }
             this.montarResultados(m, orden, nombreOrden);
         }
-        m.ayuda = crear('p', 'aviso atencion__limite-transicion'); root.append(m.ayuda);
         const crearSelector = (clase, label) => {
             const wrapper = crear('label', clase, label), select = crear('select');
             select.id = `${this.id}-${clase}-${id}`; wrapper.append(select); root.append(wrapper); return { wrapper, select };
@@ -209,7 +208,7 @@ export default class AtencionFlujo {
                 item.append(referencia);
             }
             if (nuevo && abrir) item.open = true;
-            if (m.ayuda) m.ayuda.before(item); else m.root.append(item);
+            if (m.sucesor) m.sucesor.wrapper.before(item); else m.root.append(item);
             campos.push(valor, interpretacion);
         }
         return campos;
@@ -312,8 +311,6 @@ export default class AtencionFlujo {
         this.wizard.forward.textContent = completo && terminal ? 'Paso completado' : m.paso.idProcedimientoPaso?.indicaFin === true ? 'Completar' : 'Guardar y avanzar';
         this.wizard.forward.disabled = ocupado || this.bifurcacion(m) && !this.siguienteId || !responsable || !this.flujo.habilitado(m.paso) || (completo ? terminal || !this.siguienteId || !esResponsableDelPaso(this.modelos.get(this.siguienteId)?.paso, this.owner.usuario) : !m.editable);
         this.guardarBoton.disabled = ocupado || !m.editable;
-        m.ayuda.textContent = completo ? 'Paso completado. Solo el responsable del siguiente paso puede solicitar su reapertura con Anterior.' :
-            !m.espera.hidden ? '' : 'Completar guarda la atención y confirma el paso en el servidor. Los exámenes son opcionales.';
         for (const step of this.wizard.steps) {
             const modelo = this.modelos.get(step.id);
             let responsable = step.button.querySelector('.atencion__paso-responsable');

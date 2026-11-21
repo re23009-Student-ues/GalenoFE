@@ -35,8 +35,10 @@ galeno-citas galeno-tarjeta-cita { min-width: 0; overflow-wrap: anywhere; }
     galeno-citas .citas-documento { flex: auto; }
 }
 
-galeno-citas [hidden] { display: none; }
 galeno-citas .citas-grid { margin: 24px 0; }
+galeno-citas .citas-paginacion { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; }
+galeno-citas .citas-paginacion p { margin: 0; }
+galeno-citas [hidden] { display: none; }
 galeno-citas galeno-tarjeta-cita [slot="pie"] p { margin-top: 8px; }
 
 /* El scroll queda dentro de cada árbol, incluso con registros largos. */

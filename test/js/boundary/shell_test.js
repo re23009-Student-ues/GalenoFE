@@ -3,6 +3,8 @@ import sinon from '../lib/sinon/sinon-esm.js';
 import '../../../src/js/boundary/galeno_app.js';
 import { guardarSesion, establecerContexto, obtenerSesion, obtenerContexto, cerrarSesion } from '../../../src/js/control/sesion_service.js';
 
+import { solicitarREST } from '../../../src/js/control/transporte_rest.js';
+
 mocha.setup('tdd');
 suite('Shell en Web Components', () => {
     const usuario = { idPersonaRol: 'medico-1', idPersona: { nombres: 'Ana', apellidos: 'López' }, idRol: { nombre: 'Médico' }, idClinica: { nombre: 'Central' } };
@@ -123,7 +125,7 @@ suite('Shell en Web Components', () => {
         estado.remove();
         app.querySelector('.contenido-principal').prepend(estado);
         assert.isFalse(estado.hidden);
-        assert.equal(estado.textContent, 'Sin conexión: los datos visibles pueden estar desactualizados.');
+        assert.equal(estado.querySelector('[role="status"]').textContent, 'No hay conexión a internet.');
         online = true;
         window.dispatchEvent(new Event('online'));
         assert.isTrue(estado.hidden);
@@ -134,6 +136,29 @@ suite('Shell en Web Components', () => {
         estado.remove();
         sinon.assert.calledWith(quitar, 'online', sinon.match.func);
         sinon.assert.calledWith(quitar, 'offline', sinon.match.func);
+    });
+
+    test('avisa si el servidor deja de responder aunque el navegador siga en línea', async () => {
+        sandbox.stub(navigator, 'onLine').get(() => true);
+        const fetchREST = sandbox.stub(window, 'fetch').rejects(new TypeError('Failed to fetch'));
+        const estado = app.querySelector('galeno-estado-conexion');
+        const url = '/GalenoSV-1.0-SNAPSHOT/resources/v1/tipo_documento';
+        try {
+            await solicitarREST(url);
+            assert.fail('La petición debía fallar');
+        } catch (error) {
+            assert.instanceOf(error, TypeError);
+        }
+        assert.isFalse(estado.hidden);
+        assert.equal(estado.querySelector('[role="status"]').textContent, 'No hay conexión con el servidor.');
+
+        fetchREST.resolves(new Response('[]'));
+        const reintentar = estado.querySelector('button');
+        reintentar.click();
+        assert.isTrue(reintentar.disabled);
+        await pausa();
+        assert.isFalse(reintentar.disabled);
+        assert.isTrue(estado.hidden);
     });
 
     test('personal: menú, usuario del contexto y cierre de sesión', () => {

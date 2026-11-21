@@ -1,8 +1,9 @@
-import { listarCompleto, validarPaciente, buscarCitas, validarFormatoDocumento, validarRango } from '../../control/agenda_service.js';
+import { listarCompleto, validarPaciente, buscarCitas, diaAgenda, validarFormatoDocumento, validarRango } from '../../control/agenda_service.js';
 import { ejemploDocumento } from '../../control/documento_formato.js';
 import { Toast } from '../componentes/feedback/index.js';
 import '../componentes/tarjeta_cita.js';
 
+const CITAS_POR_PAGINA = 5;
 const DEMORA_AVISO_INSTALACION = 3000;
 
 function texto(tag, contenido) {
@@ -43,11 +44,18 @@ class GalenoCitas extends HTMLElement {
         this.citas = [];
         this.contextos = null;
         this.ocupado = false;
+        this.avisoConexion = this.closest('galeno-app')?.querySelector('galeno-estado-conexion');
         this.montarFormulario();
         this.alCambio = e => this.cambiar(e);
         this.alCambiarClinica = e => { if (e.target.name === 'clinica') this.filtrar(); };
         this.alClick = e => {
-            if (e.target.closest('[data-reintentar]')) this.catalogo();
+            const botonPagina = e.target.closest('[data-cambiar-pagina]');
+            if (botonPagina && !botonPagina.disabled) {
+                this.pagina += Number(botonPagina.dataset.cambiarPagina);
+                this.mostrarCitas();
+                if (botonPagina.disabled) this.querySelector('[data-pagina]').focus();
+            }
+            if (e.target.closest('[data-nueva-busqueda]')) this.nuevaBusqueda();
             if (e.target.closest('[data-limpiar]')) {
                 this.querySelector('[data-filtros]').reset();
                 this.filtrar();
@@ -97,22 +105,37 @@ class GalenoCitas extends HTMLElement {
         buscar.type = 'submit';
         buscar.dataset.buscar = '';
         buscar.disabled = true;
-        busqueda.append(etiquetar('Tipo de documento', tipo), documento, buscar);
+        const nuevaBusqueda = texto('button', 'Nueva búsqueda');
+        nuevaBusqueda.type = 'button';
+        nuevaBusqueda.dataset.nuevaBusqueda = '';
+        nuevaBusqueda.hidden = true;
+        busqueda.append(etiquetar('Tipo de documento', tipo), documento, buscar, nuevaBusqueda);
 
         const estado = aviso();
         estado.dataset.estado = '';
-        const reintentar = texto('button', 'Reintentar catálogo');
-        reintentar.type = 'button';
-        reintentar.dataset.reintentar = '';
-        reintentar.hidden = true;
-        panel.append(texto('h2', 'Buscar mis citas'), busqueda, estado, reintentar, this.montarFiltros());
+        panel.append(texto('h2', 'Buscar mis citas'), busqueda, estado, this.montarFiltros());
 
         const lista = document.createElement('section');
         lista.className = 'citas-grid';
         lista.dataset.lista = '';
         lista.hidden = true;
         lista.setAttribute('aria-label', 'Citas encontradas');
-        this.replaceChildren(panel, lista);
+        const paginacion = document.createElement('nav');
+        paginacion.className = 'agenda-panel citas-paginacion';
+        paginacion.dataset.paginacion = '';
+        paginacion.hidden = true;
+        paginacion.setAttribute('aria-label', 'Paginación de citas');
+        const pagina = aviso();
+        pagina.dataset.pagina = '';
+        pagina.tabIndex = -1;
+        const anterior = texto('button', 'Anterior');
+        anterior.type = 'button';
+        anterior.dataset.cambiarPagina = '-1';
+        const siguiente = texto('button', 'Siguiente');
+        siguiente.type = 'button';
+        siguiente.dataset.cambiarPagina = '1';
+        paginacion.append(anterior, pagina, siguiente);
+        this.replaceChildren(panel, lista, paginacion);
     }
 
     montarFiltros() {
@@ -125,7 +148,7 @@ class GalenoCitas extends HTMLElement {
         filtros.dataset.filtros = '';
         const clinica = document.createElement('select');
         clinica.name = 'clinica';
-        clinica.append(opcion('', 'Todas las clínicas'));
+        clinica.append(opcion('', 'Todas mis clínicas'));
         const etiquetaClinica = etiquetar('Clínica', clinica);
         etiquetaClinica.className = 'citas-filtro-clinica';
 
@@ -150,6 +173,8 @@ class GalenoCitas extends HTMLElement {
 
     disconnectedCallback() {
         this.version++;
+        this.limpiarReintentoCatalogo();
+        this.avisoConexion = null;
         clearTimeout(this.temporizadorInstalacion);
         this.temporizadorInstalacion = null;
         if (this.avisoInstalacion) Toast.dismiss(this.avisoInstalacion);
@@ -178,19 +203,25 @@ class GalenoCitas extends HTMLElement {
         if (['desde', 'hasta'].includes(e.target.name)) {
             this.version++;
             this.ocupado = false;
-            this.citas = [];
-            this.querySelector('[data-lista]').replaceChildren();
-            this.querySelector('[data-lista]').hidden = true;
+            this.limpiarLista();
             this.querySelector('[data-resumen]').textContent = 'Aplica el filtro para consultar la selección';
             this.sincronizar();
             return;
         }
-        if (!['tipo', 'numero'].includes(e.target.name)) return;
+        if (e.target.disabled || !['tipo', 'numero'].includes(e.target.name)) return;
+        this.actualizarDocumento();
+    }
+    nuevaBusqueda() {
+        this.campo('tipo').value = '';
+        this.campo('numero').value = '';
+        this.actualizarDocumento();
+        this.campo('tipo').focus();
+    }
+    actualizarDocumento() {
         this.version++;
         this.ocupado = false;
         this.limpiarResultados();
         this.estado('');
-        this.campo('numero').disabled = !this.tipoSeleccionado();
         const ejemplo = ejemploDocumento(this.tipoSeleccionado());
         this.campo('numero').placeholder = ejemplo ? `Ej.: ${ejemplo}` : '';
         this.querySelector('#indicaciones').textContent = this.tipoSeleccionado()?.indicaciones || '';
@@ -208,24 +239,41 @@ class GalenoCitas extends HTMLElement {
         this.querySelector('#error-documento').textContent = mostrarError ? error : '';
     }
     sincronizar() {
-        this.querySelector('[data-buscar]').disabled = this.ocupado
-            || !this.tipoSeleccionado() || !this.campo('numero').value.trim()
-            || !this.campo('numero').validity.valid;
+        const bloqueado = this.ocupado || Boolean(this.contextos);
+        const tipoSeleccionado = this.tipoSeleccionado();
+        const numero = this.campo('numero');
+        this.campo('tipo').disabled = bloqueado || !this.tipos?.length;
+        numero.disabled = bloqueado || !tipoSeleccionado;
+        this.querySelector('[data-buscar]').disabled = numero.disabled
+            || !numero.value.trim() || !numero.validity.valid;
+        this.querySelector('[data-nueva-busqueda]').hidden = !bloqueado;
     }
-    limpiarResultados() {
+    limpiarLista() {
         this.citas = [];
-        this.contextos = null;
-        this.campo('clinica').replaceChildren(opcion('', 'Todas las clínicas'));
-        this.querySelector('[data-resultados]').hidden = true;
-        this.querySelector('[data-filtros]').reset();
+        this.pagina = 1;
         this.querySelector('[data-lista]').replaceChildren();
         this.querySelector('[data-lista]').hidden = true;
+        this.querySelector('[data-paginacion]').hidden = true;
+    }
+    limpiarResultados() {
+        this.limpiarLista();
+        this.contextos = null;
+        this.campo('clinica').replaceChildren(opcion('', 'Todas mis clínicas'));
+        this.querySelector('[data-resultados]').hidden = true;
+        this.querySelector('[data-filtros]').reset();
         this.querySelector('[data-resumen]').textContent = '';
     }
+    reintentarCatalogo = () => this.catalogo();
+
+    limpiarReintentoCatalogo() {
+        if (this.avisoConexion?.reintentoCatalogo === this.reintentarCatalogo) {
+            this.avisoConexion.reintentoCatalogo = null;
+        }
+    }
+
     async catalogo() {
         const version = ++this.version;
         this.estado('Cargando tipos de documento…');
-        this.querySelector('[data-reintentar]').hidden = true;
         try {
             const tipos = (await listarCompleto('tipo_documento?activo=true', 'idTipoDocumento')).filter(t => t.activo === true);
             if (!this.vigente(version)) return;
@@ -234,34 +282,44 @@ class GalenoCitas extends HTMLElement {
             select.replaceChildren(opcion('', 'Selecciona un tipo'), ...tipos.map(t => opcion(t.idTipoDocumento, t.nombre)));
             select.disabled = !tipos.length;
             this.estado(tipos.length ? '' : 'No hay tipos de documento activos');
-        } catch (e) { if (this.vigente(version)) { this.estado(e.message || e.mensaje); this.querySelector('[data-reintentar]').hidden = false; } }
+            this.limpiarReintentoCatalogo();
+        } catch (e) {
+            if (!this.vigente(version)) return;
+            this.estado(e.message || e.mensaje);
+            if (this.avisoConexion) this.avisoConexion.reintentoCatalogo = this.reintentarCatalogo;
+        }
     }
     async buscar() {
         this.validarEntrada();
         this.sincronizar();
         if (this.querySelector('[data-buscar]').disabled) return;
         const version = ++this.version;
+        let desde = this.campo('desde').value;
+        let hasta = this.campo('hasta').value;
+        if (!desde && !hasta) desde = hasta = diaAgenda();
         this.limpiarResultados();
+        this.campo('desde').value = desde;
+        this.campo('hasta').value = hasta;
         this.ocupado = true;
         this.sincronizar();
         this.estado('Buscando citas…');
         try {
             const paciente = await validarPaciente(this.tipoSeleccionado(), this.campo('numero').value.trim());
             if (!this.vigente(version)) return;
-            const citas = await buscarCitas(paciente.contextos);
+            const citas = await buscarCitas(paciente.contextos, desde, hasta);
             if (!this.vigente(version)) return;
             this.contextos = paciente.contextos;
             const clinicas = new Map(paciente.contextos.filter(c => c.idClinica?.idClinica)
                 .map(c => [c.idClinica.idClinica, c.idClinica]));
             this.campo('clinica').replaceChildren(
-                opcion('', 'Todas las clínicas'),
+                opcion('', 'Todas mis clínicas'),
                 ...Array.from(clinicas.values(), c => opcion(c.idClinica, c.nombre || 'Clínica sin nombre'))
             );
             this.citas = citas;
             this.querySelector('[data-resultados]').hidden = false;
             this.estado('');
             this.mostrarCitas();
-        } catch (e) { if (this.vigente(version)) { this.estado(e.message || e.mensaje); this.campo('numero').focus(); } }
+        } catch (e) { if (this.vigente(version)) { this.estado(e.message || e.mensaje); this.ocupado = false; this.sincronizar(); this.campo('numero').focus(); } }
         finally { if (this.vigente(version)) { this.ocupado = false; this.sincronizar(); } }
     }
     async filtrar() {
@@ -269,9 +327,7 @@ class GalenoCitas extends HTMLElement {
         const version = ++this.version;
         const desde = this.campo('desde').value, hasta = this.campo('hasta').value;
         const resumen = this.querySelector('[data-resumen]');
-        this.citas = [];
-        this.querySelector('[data-lista]').replaceChildren();
-        this.querySelector('[data-lista]').hidden = true;
+        this.limpiarLista();
         this.ocupado = true;
         this.sincronizar();
         try {
@@ -288,13 +344,19 @@ class GalenoCitas extends HTMLElement {
     }
     mostrarCitas() {
         const citas = this.citas;
-        const tarjetas = citas.map(cita => {
+        const inicio = (this.pagina - 1) * CITAS_POR_PAGINA;
+        const tarjetas = citas.slice(inicio, inicio + CITAS_POR_PAGINA).map(cita => {
             const tarjeta = document.createElement('galeno-tarjeta-cita');
             tarjeta.cita = cita;
             return tarjeta;
         });
         this.querySelector('[data-lista]').replaceChildren(...tarjetas);
         this.querySelector('[data-lista]').hidden = !tarjetas.length;
+        const totalPaginas = Math.ceil(citas.length / CITAS_POR_PAGINA);
+        this.querySelector('[data-paginacion]').hidden = totalPaginas <= 1;
+        this.querySelector('[data-cambiar-pagina="-1"]').disabled = this.pagina <= 1;
+        this.querySelector('[data-cambiar-pagina="1"]').disabled = this.pagina >= totalPaginas;
+        this.querySelector('[data-pagina]').textContent = totalPaginas > 1 ? `Página ${this.pagina} de ${totalPaginas}` : '';
         this.querySelector('[data-resumen]').textContent = citas.length
             ? `${citas.length} ${citas.length === 1 ? 'cita encontrada asociada' : 'citas encontradas asociadas'} al documento`
             : this.campo('clinica').value ? 'No hay citas para los filtros seleccionados'

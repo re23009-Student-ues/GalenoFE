@@ -63,10 +63,54 @@ galeno-topbar a[href="#/login"] {
 }
 
 galeno-estado-conexion {
-    display: block;
-    padding: 12px 24px;
-    background: var(--cielo);
-    color: var(--marino);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 16px clamp(12px, 4vw, 32px);
+    padding: 14px 16px;
+    border: 1px solid #e6b83d;
+    border-radius: 12px;
+    background: #fff3c4;
+    color: #4a3500;
+}
+
+galeno-estado-conexion .conexion-icono {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #ffdf66;
+    font-weight: 800;
+}
+
+galeno-estado-conexion p {
+    flex: 1 1 180px;
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+galeno-estado-conexion button {
+    min-height: 44px;
+    padding: 8px 16px;
+    border: 1px solid #775300;
+    border-radius: 8px;
+    background: #775300;
+    color: white;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+galeno-estado-conexion button:hover:not(:disabled) {
+    background: #563b00;
+}
+
+galeno-estado-conexion button:disabled {
+    opacity: .7;
+    cursor: wait;
 }
 
 galeno-estado-conexion[hidden] {

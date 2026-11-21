@@ -72,7 +72,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
  test('días de negocio independientes de zona del navegador', () => { assert.equal(diaAgenda('2026-11-13T05:59:59Z'),'2026-11-12'); assert.equal(diaAgenda('2026-11-13T06:00:00Z'),'2026-11-13'); });
  test('PDF rechaza HTML, 404 y archivos vacíos', async () => { for (const response of [new Response('<html/>'), new Response('',{status:404}),new Response('',{headers:{'Content-Type':'application/pdf'}})]) { fetchStub.resolves(response); let fallo=false; try { await ticketPDF('c1'); } catch { fallo=true; } assert.isTrue(fallo); } });
  test('PDF conserva binario y Accept', async () => { fetchStub.resolves(new Response('%PDF-1.4', { headers:{'Content-Type':'application/pdf'} })); assert.equal((await ticketPDF('c1')).type,'application/pdf'); assert.equal(fetchStub.firstCall.args[1].headers.Accept,'application/pdf'); });
- test('HU1 descarta validación antigua al cambiar documento', async () => { const vista=document.createElement('galeno-citas'); fixture.append(vista); await settle(); vista.campo('tipo').value='dui'; vista.campo('tipo').dispatchEvent(new Event('input',{bubbles:true})); vista.campo('numero').value='00000000-0'; vista.campo('numero').dispatchEvent(new Event('input',{bubbles:true})); let resolver; fetchStub.callsFake(()=>new Promise(r=>resolver=r)); const pendiente=vista.buscar(); vista.campo('numero').value='nuevo'; vista.campo('numero').dispatchEvent(new Event('input',{bubbles:true})); fetchStub.resolves(respuesta([paciente])); resolver(respuesta({ idPersona: paciente.idPersona })); await pendiente; assert.lengthOf(vista.citas,0); assert.isTrue(vista.querySelector('[data-buscar]').disabled); });
+ test('HU1 descarta validación antigua al reiniciar la búsqueda', async () => { const vista=document.createElement('galeno-citas'); fixture.append(vista); await settle(); vista.campo('tipo').value='dui'; vista.campo('tipo').dispatchEvent(new Event('input',{bubbles:true})); vista.campo('numero').value='00000000-0'; vista.campo('numero').dispatchEvent(new Event('input',{bubbles:true})); let resolver; fetchStub.callsFake(()=>new Promise(r=>resolver=r)); const pendiente=vista.buscar(); vista.querySelector('[data-nueva-busqueda]').click(); fetchStub.resolves(respuesta([paciente])); resolver(respuesta({ idPersona: paciente.idPersona })); await pendiente; assert.lengthOf(vista.citas,0); assert.isTrue(vista.querySelector('[data-buscar]').disabled); });
  test('HU1 no actualiza catálogo después de desmontar', async () => { let resolver; fetchStub.callsFake(()=>new Promise(r=>resolver=r)); const vista=document.createElement('galeno-citas'); fixture.append(vista); vista.remove(); resolver(respuesta([tipo])); await settle(); assert.isTrue(vista.campo('tipo').disabled); });
  test('agenda cruza ramas por secuencia, no por fecha', async () => {
   const segundo = { ...origen, idProcedimientoPaso:'lab', nombre:'Laboratorio' };
@@ -430,6 +430,8 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
    .callsFake(() => new Promise(resolve => { responder = resolve; }));
   buscar.form.requestSubmit(buscar);
   assert.isTrue(buscar.disabled);
+  assert.isTrue(tipoDocumento.disabled);
+  assert.isTrue(numero.disabled);
   buscar.form.requestSubmit();
   const busquedas = fetchStub.getCalls().filter(call => new URL(call.args[0]).pathname.endsWith('/documento/buscar'));
   assert.lengthOf(busquedas, 1);
@@ -437,7 +439,19 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   responder(respuesta({ idPersona: paciente.idPersona }));
   await settle();
   assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'), 1);
-  assert.isFalse(buscar.disabled);
+  assert.isTrue(buscar.disabled);
+  assert.isTrue(tipoDocumento.disabled);
+  assert.isTrue(numero.disabled);
+  const nueva = vista.querySelector('[data-nueva-busqueda]');
+  assert.isFalse(nueva.hidden);
+  nueva.click();
+  assert.equal(tipoDocumento.value, '');
+  assert.equal(numero.value, '');
+  assert.equal(vista.campo('desde').value, '');
+  assert.isEmpty(vista.querySelectorAll('galeno-tarjeta-cita'));
+  assert.isFalse(tipoDocumento.disabled);
+  assert.strictEqual(document.activeElement, tipoDocumento);
+  assert.isTrue(nueva.hidden);
   assert.isNull(sessionStorage.getItem('sesionPersona'));
  });
  test('Un documento sin persona o sin inscripción de paciente bloquea la búsqueda de citas', async () => {
@@ -469,18 +483,21 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
 
  test('HU1 recupera el catálogo tras un error y anuncia si el reintento no trae tipos activos', async () => {
   const catalogo = fetchStub.withArgs(sinon.match(/tipo_documento/));
-  catalogo.onFirstCall().resolves(new Response('', { status: 503 }));
+  catalogo.onFirstCall().resolves(new Response('', { status: 500 }));
   catalogo.onSecondCall().resolves(respuesta([{ ...tipo, activo: false }]));
-  const vista = document.createElement('galeno-citas');
-  fixture.append(vista);
-  const reintentar = vista.querySelector('[data-reintentar]');
+  const app = document.createElement('galeno-app');
+  fixture.append(app);
+  const vista = app.outlet.appendChild(document.createElement('galeno-citas'));
+  const aviso = app.querySelector('galeno-estado-conexion');
   const estado = vista.querySelector('[data-estado]');
   await settle();
-  assert.include(estado.textContent, '503');
-  assert.isFalse(reintentar.hidden);
-  reintentar.click();
+  assert.include(estado.textContent, '500');
+  assert.isNull(vista.querySelector('[data-reintentar]'));
+  assert.isFalse(aviso.hidden);
+  aviso.querySelector('button').click();
   await settle();
-  assert.isTrue(reintentar.hidden);
+  assert.isTrue(aviso.hidden);
+  sinon.assert.calledTwice(catalogo);
   assert.isTrue(vista.campo('tipo').disabled);
   assert.isTrue(vista.querySelector('[data-buscar]').disabled);
   assert.include(estado.textContent, 'No hay tipos de documento activos');
@@ -507,7 +524,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'), 1);
  });
 
- test('HU1 descarta citas tardías al cambiar documento durante una búsqueda', async () => {
+ test('HU1 descarta citas tardías al reiniciar durante una búsqueda', async () => {
   const vista=document.createElement('galeno-citas');fixture.append(vista);await settle();
   vista.campo('tipo').value='dui';vista.campo('tipo').dispatchEvent(new Event('input',{bubbles:true}));
   vista.campo('numero').value='00000000-0';vista.campo('numero').dispatchEvent(new Event('input',{bubbles:true}));
@@ -520,7 +537,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
    return respuestaRelacionesFixture(url, [procedimiento]);
   });
   const pendiente=vista.buscar();await settle();
-  vista.campo('numero').value='nuevo';vista.campo('numero').dispatchEvent(new Event('input',{bubbles:true}));
+  vista.querySelector('[data-nueva-busqueda]').click();
   resolver(respuesta([consulta]));await pendiente;
   assert.isNull(vista.querySelector('galeno-tarjeta-cita'));
   assert.isTrue(vista.querySelector('[data-buscar]').disabled);
@@ -540,20 +557,24 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   await vista.buscar();
   assert.isFalse(vista.querySelector('[data-resultados]').hidden);
   assert.equal(vista.campo('clinica').options[1].textContent, 'Central');
-  assert.equal(vista.campo('desde').value,'');assert.equal(vista.campo('hasta').value,'');
+  assert.equal(vista.campo('desde').value,diaAgenda());assert.equal(vista.campo('hasta').value,diaAgenda());
   assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'),1);
+  assert.equal(getComputedStyle(vista.querySelector('[data-paginacion]')).display, 'none');
   assert.include(vista.querySelector('galeno-tarjeta-cita').textContent,'Central');
   assert.isNull(vista.querySelector('galeno-tarjeta-cita').closest('.agenda-panel'));
   assert.equal(vista.campo('numero').placeholder,'Ej.: 00000000-0');
   const peticiones=fetchStub.callCount;
   fetchStub.withArgs(sinon.match(raw => new URL(raw).pathname.endsWith('/consulta') && new URL(raw).searchParams.has('desde'))).callsFake(async () => respuesta([]));
-  vista.campo('desde').value='2026-11-13';await vista.filtrar();
+  vista.campo('desde').value='2026-11-13';vista.campo('hasta').value='';await vista.filtrar();
   assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'),0);
   vista.querySelector('[data-limpiar]').click();await settle();
   assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'),1);
   assert.isAbove(fetchStub.callCount,peticiones);
   const urls=fetchStub.getCalls().map(c=>new URL(c.args[0])).filter(u=>u.pathname.endsWith('/consulta'));
-  assert.lengthOf(urls,3);assert.equal(urls[1].searchParams.get('desde'),'2026-11-13');
+  assert.lengthOf(urls,3);
+  assert.equal(urls[0].searchParams.get('desde'),diaAgenda());
+  assert.equal(urls[0].searchParams.get('hasta'),diaAgenda());
+  assert.equal(urls[1].searchParams.get('desde'),'2026-11-13');
   assert.isFalse(urls[2].searchParams.has('desde'));assert.isFalse(urls[2].searchParams.has('hasta'));
  });
  async function citasBuscadas() {
@@ -562,15 +583,41 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   vista.campo('numero').value='00000000-0';vista.campo('numero').dispatchEvent(new Event('input',{bubbles:true}));
   await vista.buscar();return vista;
  }
+ test('HU1 pagina 803 citas de cinco en cinco y vuelve a la primera página al filtrar', async () => {
+  const citas = Array.from({ length: 803 }, (_, i) => ({ ...consulta, idConsulta: `cita-${i}` }));
+  fetchStub.withArgs(sinon.match(raw => new URL(raw).pathname.endsWith('/consulta')))
+   .callsFake(async url => respuestaRelacionesFixture(url, citas));
+  const vista = await citasBuscadas();
+  const paginacion = vista.querySelector('[data-paginacion]');
+  const pagina = vista.querySelector('[data-pagina]');
+  const [anterior, siguiente] = paginacion.querySelectorAll('button');
+  const idsVisibles = () => [...vista.querySelectorAll('galeno-tarjeta-cita')].map(t => t.cita.idConsulta);
+  assert.isFalse(paginacion.hidden);
+  assert.isTrue(anterior.disabled);
+  assert.equal(pagina.textContent, 'Página 1 de 161');
+  assert.deepEqual(idsVisibles(), citas.slice(0, 5).map(c => c.idConsulta));
+  const peticiones = fetchStub.callCount;
+  for (let i = 0; i < 160; i++) siguiente.click();
+  assert.equal(pagina.textContent, 'Página 161 de 161');
+  assert.isTrue(siguiente.disabled);
+  assert.deepEqual(idsVisibles(), citas.slice(-3).map(c => c.idConsulta));
+  anterior.click();
+  assert.equal(pagina.textContent, 'Página 160 de 161');
+  assert.equal(fetchStub.callCount, peticiones);
+  await vista.filtrar();
+  assert.equal(pagina.textContent, 'Página 1 de 161');
+  assert.lengthOf(idsVisibles(), 5);
+ });
  test('HU1 combina clínica y rango y permite volver a todas las clínicas', async () => {
   const norte={...paciente,idPersonaRol:'pac-norte',idClinica:{idClinica:'norte',nombre:'Norte'}};
   const citaNorte={...consulta,idConsulta:'c2',idPersonaRol:norte};
-  fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/persona_rol/persona/persona'))).resolves(respuesta([paciente,norte]));
+  const clinicaLaboral = { ...empleado, idClinica: { idClinica: 'laboral', nombre: 'Laboral' } };
+  fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/persona_rol/persona/persona'))).resolves(respuesta([paciente,norte,clinicaLaboral]));
   fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/consulta'))).callsFake(async url=>respuestaRelacionesFixture(url,[consulta,citaNorte]));
   const vista=await citasBuscadas();
-  assert.lengthOf(vista.campo('clinica').options,3);
+  assert.deepEqual([...vista.campo('clinica').options].map(o => o.value), ['', 'cli', 'norte']);
   assert.lengthOf(vista.querySelectorAll('galeno-tarjeta-cita'),2);
-  vista.campo('desde').value='2026-11-12';vista.campo('clinica').value='norte';
+  vista.campo('desde').value='2026-11-12';vista.campo('hasta').value='2026-11-14';vista.campo('clinica').value='norte';
   vista.campo('clinica').dispatchEvent(new Event('change',{bubbles:true}));await settle();
   assert.lengthOf(vista.citas,1);assert.equal(vista.citas[0].idConsulta,'c2');
   const url=new URL(fetchStub.getCalls().filter(c=>new URL(c.args[0]).pathname.endsWith('/consulta')).at(-1).args[0]);
@@ -583,13 +630,13 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   vista.campo('desde').value='2026-11-13';vista.campo('hasta').value='2026-11-12';await vista.filtrar();
   assert.equal(fetchStub.callCount,llamadas);assert.isEmpty(vista.querySelectorAll('galeno-tarjeta-cita'));
   assert.include(vista.querySelector('[data-resumen]').textContent,'Desde debe ser anterior');
-  assert.isFalse(vista.querySelector('[data-buscar]').disabled);
+  assert.isTrue(vista.querySelector('[data-buscar]').disabled);
  });
  test('HU1 un error de fechas no se presenta como cero citas y permite reintentar', async () => {
-  const vista=await citasBuscadas();vista.campo('hasta').value='2026-11-12';
+  const vista=await citasBuscadas();vista.campo('desde').value='';vista.campo('hasta').value='2026-11-12';
   fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/consulta'))).callsFake(async()=>new Response('',{status:500}));
   await vista.filtrar();assert.include(vista.querySelector('[data-resumen]').textContent,'500');
-  assert.isEmpty(vista.querySelectorAll('galeno-tarjeta-cita'));assert.isFalse(vista.querySelector('[data-buscar]').disabled);
+  assert.isEmpty(vista.querySelectorAll('galeno-tarjeta-cita'));assert.isTrue(vista.querySelector('[data-buscar]').disabled);
   fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/consulta'))).callsFake(async()=>respuesta([]));
   await vista.filtrar();assert.include(vista.querySelector('[data-resumen]').textContent,'No hay citas en el rango');
  });
@@ -597,7 +644,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   const vista=await citasBuscadas();let resolver;
   fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/consulta') && new URL(raw).searchParams.get('desde')==='2026-11-12'))
    .callsFake(()=>new Promise(r=>resolver=r));
-  vista.campo('desde').value='2026-11-12';const anterior=vista.filtrar();
+  vista.campo('desde').value='2026-11-12';vista.campo('hasta').value='2026-11-14';const anterior=vista.filtrar();
   vista.campo('desde').value='2026-11-13';
   fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/consulta') && new URL(raw).searchParams.get('desde')==='2026-11-13'))
    .callsFake(async()=>respuesta([]));
@@ -607,20 +654,20 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
  test('HU1 editar fechas invalida una respuesta pendiente antes de aplicar otra vez', async () => {
   const vista=await citasBuscadas();let resolver;
   fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/consulta'))).callsFake(()=>new Promise(r=>resolver=r));
-  vista.campo('desde').value='2026-11-12';const pendiente=vista.filtrar();
-  vista.campo('hasta').value='2026-11-14';vista.campo('hasta').dispatchEvent(new Event('input',{bubbles:true}));
+  vista.campo('desde').value='2026-11-12';vista.campo('hasta').value='2026-11-14';const pendiente=vista.filtrar();
+  vista.campo('hasta').value='2026-11-15';vista.campo('hasta').dispatchEvent(new Event('input',{bubbles:true}));
   resolver(respuesta([consulta]));await pendiente;
   assert.isEmpty(vista.citas);assert.isEmpty(vista.querySelectorAll('galeno-tarjeta-cita'));
   assert.include(vista.querySelector('[data-resumen]').textContent,'Aplica el filtro');
  });
- test('HU1 cambiar documento o desconectar descarta respuestas del filtro', async () => {
+ test('HU1 reiniciar la búsqueda o desconectar descarta respuestas del filtro', async () => {
   for(const desmontar of [false,true]) {
    const vista=await citasBuscadas();let resolver;
    const regla=fetchStub.withArgs(sinon.match(raw=>new URL(raw).pathname.endsWith('/consulta')));
    regla.callsFake(()=>new Promise(r=>resolver=r));
-   vista.campo('desde').value='2026-11-12';const pendiente=vista.filtrar();
+   vista.campo('desde').value='2026-11-12';vista.campo('hasta').value='2026-11-14';const pendiente=vista.filtrar();
    if(desmontar) vista.remove();
-   else {vista.campo('numero').value='11111111-1';vista.campo('numero').dispatchEvent(new Event('input',{bubbles:true}));}
+   else vista.querySelector('[data-nueva-busqueda]').click();
    resolver(respuesta([consulta]));await pendiente;assert.isEmpty(vista.querySelectorAll('galeno-tarjeta-cita'));
    regla.callsFake(async()=>respuesta([consulta]));vista.remove();
   }
@@ -631,7 +678,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   assert.equal(ejemploDocumento(pasaporte),'A00000000');
   assert.equal(ejemploDocumento({expresionRegular:'['}),'');
  });
- test('una búsqueda informa cuando no hay citas asociadas', async () => {
+ test('una búsqueda informa cuando no hay citas para hoy', async () => {
   const vista=document.createElement('galeno-citas');fixture.append(vista);await settle();
   vista.campo('tipo').value='dui';vista.campo('tipo').dispatchEvent(new Event('input',{bubbles:true}));
   vista.campo('numero').value='00000000-0';vista.campo('numero').dispatchEvent(new Event('input',{bubbles:true}));
@@ -642,7 +689,7 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
    return respuesta([]);
   });
   await vista.buscar();
-  assert.include(vista.querySelector('[data-resumen]').textContent,'No se encontraron citas asociadas al documento');
+  assert.include(vista.querySelector('[data-resumen]').textContent,'No hay citas en el rango seleccionado');
   assert.isTrue(vista.querySelector('[data-lista]').hidden);
  });
  test('consulta PDF habilitada y error permite reintentar', async () => { const tarjeta=document.createElement('galeno-tarjeta-cita');tarjeta.cita={...consulta,procedimientos:[procedimiento]};fixture.append(tarjeta);assert.isFalse(tarjeta.querySelector('button').disabled);assert.include(tarjeta.querySelector('button').textContent,'consulta PDF');fetchStub.resolves(new Response('',{status:500}));await tarjeta.descargar();assert.include(tarjeta.querySelector('[role="status"]').textContent,'500');assert.isFalse(tarjeta.querySelector('button').disabled);assert.equal(fetchStub.callCount,1); });

@@ -5,6 +5,17 @@ const POLITICA = 'sin-cache-rest-v1';
 const lecturas = new Map();
 const workers = new WeakMap();
 let revision = 0;
+let servidorNoDisponible = false;
+
+export function sinConexionAlServidor() {
+    return servidorNoDisponible;
+}
+
+function actualizarConexionREST(noDisponible) {
+    if (servidorNoDisponible === noDisponible) return;
+    servidorNoDisponible = noDisponible;
+    window.dispatchEvent(new Event('galeno-conexion-rest'));
+}
 const contexto = () => `${sessionStorage.getItem('sesionPersona') ?? ''}|${sessionStorage.getItem('sesionPersonaRol') ?? ''}`;
 const fallo = (codigo, mensaje) => Object.assign(new Error(mensaje), { codigo });
 
@@ -89,8 +100,14 @@ export async function solicitarREST(url, opciones = {}) {
         const pendiente = fetch(url, { method: 'GET', ...opciones, cache: 'no-store', ...(controller ? { signal: controller.signal } : {}) });
         respuesta = await Promise.race([pendiente, limite]);
         if (lectura) comprobar();
+        actualizarConexionREST([502, 503, 504].includes(respuesta.status));
     } catch (error) {
-        limpiar(); comprobar(); throw error;
+        limpiar();
+        comprobar();
+        if (!opciones.signal?.aborted && (error instanceof TypeError || error?.codigo === 'TIEMPO_AGOTADO')) {
+            actualizarConexionREST(true);
+        }
+        throw error;
     }
     // Una escritura no se aborta por plazo o cambio de contexto: puede estar ya confirmada.
     // Su cuerpo tampoco debe aplicarse a otro contexto. Los consumidores conservan status/Location.

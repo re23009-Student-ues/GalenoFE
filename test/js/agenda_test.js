@@ -318,6 +318,86 @@ suite('HU1/HU3: contratos, datos y ciclo de vida', () => {
   await new Promise(r => setTimeout(r, 310));
   assert.exists(vista.querySelector('tarjeta-simple'));
  });
+ test('la agenda inicial incluye consultas asignadas de días anteriores', async () => {
+  const peticiones = fetchStub.withArgs(sinon.match(raw => new URL(raw).pathname.endsWith('/consulta')));
+  peticiones.callsFake(async raw => {
+   const params = new URL(raw).searchParams;
+   return respuestaRelacionesFixture(raw, params.has('desde') || params.has('hasta') ? [] : [consulta]);
+  });
+  const vista = document.createElement('galeno-agenda');
+  vista.usuario = empleado;
+  fixture.append(vista);
+  await settle();
+  assert.exists(vista.querySelector('tarjeta-simple'));
+  vista.querySelector('[data-hoy]').click();
+  await settle();
+  assert.notExists(vista.querySelector('tarjeta-simple'));
+  vista.querySelector('[data-sin-fechas]').click();
+  await settle();
+  assert.exists(vista.querySelector('tarjeta-simple'));
+ });
+ test('Inicio y Agenda Médica paginan de cuatro en cuatro y el documento filtra todas las páginas', async () => {
+  const otro = { ...paciente, idPersona: { idPersona: 'otra-persona', nombres: 'Otro' } };
+  const consultas = Array.from({ length: 6 }, (_, i) => ({
+   ...consulta, idConsulta: `consulta-${i}`, idPersonaRol: i === 5 ? otro : paciente
+  }));
+  const pasos = consultas.map((c, i) => ({
+   idConsultaProcedimientoPaso: `paso-${i}`,
+   idConsultaProcedimiento: { ...procedimiento, idConsultaProcedimiento: `procedimiento-${i}`, idConsulta: c },
+   idProcedimientoPaso: destino, idPersonaRol: empleado, estado: i === 5 ? 'COMPLETADO' : 'PENDIENTE'
+  }));
+  fetchStub.callsFake(async raw => {
+   const url = new URL(raw);
+   const recurso = url.pathname.split('/resources/v1/')[1];
+   if (recurso === 'documento/buscar') {
+    assert.equal(url.searchParams.get('tipo'), 'dui');
+    assert.equal(url.searchParams.get('valor'), '00000000-0');
+    return respuesta({ idPersona: otro.idPersona });
+   }
+   const datos = {
+    consulta: consultas, consulta_procedimiento: pasos.map(p => p.idConsultaProcedimiento),
+    consulta_procedimiento_paso: pasos, procedimiento_paso: [destino], tipo_documento: [tipo]
+   };
+   return respuestaRelacionesFixture(raw, datos[recurso] || []);
+  });
+  const resumen = document.createElement('resumen-controller');
+  const agenda = document.createElement('consulta-controller');
+  resumen.usuario = agenda.usuario = empleado;
+  fixture.append(resumen, agenda);
+  await settle();
+  const inicio = resumen.querySelector('galeno-agenda');
+  for (const [vista, selector, restantes] of [
+   [inicio, '[data-lista] > tarjeta-simple', 1], [agenda, 'tarjeta-consulta', 2]
+  ]) {
+   assert.lengthOf(vista.querySelectorAll(selector), 4);
+   vista.querySelector('.consultas-paginacion button:last-child').click();
+   assert.lengthOf(vista.querySelectorAll(selector), restantes);
+   const nav = vista.querySelector('.consultas-paginacion');
+   assert.isTrue(nav.lastElementChild.disabled);
+   nav.firstElementChild.click();
+   assert.lengthOf(vista.querySelectorAll(selector), 4);
+   assert.isTrue(nav.firstElementChild.disabled);
+  }
+  const filtro = agenda.querySelector('form');
+  const { tipo: selectorTipo, documento } = filtro.elements;
+  selectorTipo.value = 'dui';
+  selectorTipo.dispatchEvent(new Event('change'));
+  documento.value = '00000000-0';
+  filtro.requestSubmit();
+  assert.isTrue(selectorTipo.disabled);
+  assert.isTrue(documento.disabled);
+  await settle();
+  assert.isTrue(selectorTipo.disabled);
+  assert.isTrue(documento.disabled);
+  assert.deepEqual([...agenda.querySelectorAll('tarjeta-consulta')].map(t => t.consulta.idConsulta), ['consulta-5']);
+  assert.isTrue(agenda.querySelector('.consultas-paginacion').hidden);
+  filtro.querySelector('button[type="reset"]').click();
+  assert.equal(selectorTipo.value, '');
+  assert.equal(documento.value, '');
+  assert.isFalse(selectorTipo.disabled);
+  assert.lengthOf(agenda.querySelectorAll('tarjeta-consulta'), 4);
+  assert.include(agenda.querySelector('.consultas-paginacion').textContent, 'Página 1 de 2');
+ });
  test('Hoy restablece solo fechas y navegación no se activa al expandir', async () => {
   const vista = document.createElement('galeno-agenda'); vista.usuario = empleado; fixture.append(vista); await vista.cargar();
   const navegar = sandbox.spy(); vista.addEventListener('galeno-navegar', navegar);

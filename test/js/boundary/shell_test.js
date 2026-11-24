@@ -152,12 +152,19 @@ suite('Shell en Web Components', () => {
         assert.isFalse(estado.hidden);
         assert.equal(estado.querySelector('[role="status"]').textContent, 'No hay conexión con el servidor.');
 
-        fetchREST.resolves(new Response('[]'));
         const reintentar = estado.querySelector('button');
         reintentar.click();
         assert.isTrue(reintentar.disabled);
+        assert.include(estado.textContent, 'Comprobando la conexión');
+        reintentar.click();
         await pausa();
+        sinon.assert.calledTwice(fetchREST);
         assert.isFalse(reintentar.disabled);
+        assert.isFalse(estado.hidden);
+
+        fetchREST.resolves(new Response('[]'));
+        reintentar.click();
+        await pausa();
         assert.isTrue(estado.hidden);
     });
 

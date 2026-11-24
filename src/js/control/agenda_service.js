@@ -168,10 +168,10 @@ export async function ticketPDF(idConsulta) {
 export async function listarConsultasDelRol(contexto, desde, hasta) {
     const clinica = contexto?.idClinica?.idClinica, rol = contexto?.idRol?.idRol;
     if (!clinica || !rol || esPaciente(contexto)) return [];
-    if (desde !== undefined || hasta !== undefined) validarRango(desde, hasta);
+    if (desde || hasta) validarRango(desde || hasta, hasta || desde);
     const filtros = new URLSearchParams({ clinica, rol });
-    if (desde !== undefined) filtros.set('desde', desde);
-    if (hasta !== undefined) filtros.set('hasta', hasta);
+    if (desde) filtros.set('desde', desde);
+    if (hasta) filtros.set('hasta', hasta);
     return (await listarCompleto(`consulta?${filtros}`, 'idConsulta'))
         .filter(c => c.idPersonaRol?.idClinica?.idClinica === clinica);
 }
@@ -185,7 +185,6 @@ export async function filtrarConsultasPorRol(consultas, contexto) {
 
 /** Solo lectura: el rol permite localizar pasos; su elegibilidad no se infiere de estados sin contrato. */
 export async function cargarAgenda(contexto, desde, hasta) {
-    validarRango(desde, hasta);
     if (!contexto?.idPersonaRol || !contexto.idClinica?.idClinica || !contexto.idRol?.idRol || esPaciente(contexto)) throw new Error('Selecciona un contexto laboral válido');
     const consultas = await listarConsultasDelRol(contexto, desde, hasta);
     if (!consultas.length) return [];

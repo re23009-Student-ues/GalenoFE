@@ -1,6 +1,7 @@
 import { cargarAgenda, diaAgenda, ZONA_AGENDA } from '../../control/agenda_service.js';
 import { calcularEdad } from '../../control/fechas.js';
 import { documentoDelPaciente } from '../../control/atencion_service.js';
+import { crearPaginacionConsultas } from './paginacion_consultas.js';
 import Tree from './data-display/Tree.js';
 import TarjetaSimple from './tarjeta_simple.js';
 class Agenda extends HTMLElement {
@@ -23,7 +24,12 @@ class Agenda extends HTMLElement {
             if (e.target.matches('.agenda-form input[type="date"]')) this.cargar();
         };
         this.alClick = e => {
-            if (e.target.closest('[data-hoy]')) { this.querySelectorAll('.agenda-form input[type="date"]').forEach(i => i.value = diaAgenda()); this.cargar(); }
+            const botonFecha = e.target.closest('[data-hoy], [data-sin-fechas]');
+            if (botonFecha) {
+                const fecha = botonFecha.matches('[data-hoy]') ? diaAgenda() : '';
+                this.querySelectorAll('.agenda-form input[type="date"]').forEach(campo => campo.value = fecha);
+                this.cargar();
+            }
             const abrir = e.target.closest('[data-consulta]');
             if (abrir) this.dispatchEvent(new CustomEvent('galeno-navegar', { detail: { ruta: '/atencion/' + encodeURIComponent(abrir.dataset.consulta) }, bubbles: true, composed: true }));
         };
@@ -52,15 +58,12 @@ class Agenda extends HTMLElement {
         etiquetaNombre.append(nombre);
         formulario.append(etiquetaNombre);
 
-        const hoy = diaAgenda();
         for (const [campo, texto] of [['desde', 'Desde'], ['hasta', 'Hasta']]) {
             const etiqueta = document.createElement('label');
             etiqueta.textContent = texto;
             const fecha = document.createElement('input');
             fecha.name = campo;
             fecha.type = 'date';
-            fecha.defaultValue = hoy;
-            fecha.required = true;
             etiqueta.append(fecha);
             formulario.append(etiqueta);
         }
@@ -68,14 +71,22 @@ class Agenda extends HTMLElement {
         restablecer.type = 'button';
         restablecer.dataset.hoy = '';
         restablecer.textContent = 'Hoy';
-        formulario.append(restablecer);
+        const sinFechas = document.createElement('button');
+        sinFechas.type = 'button';
+        sinFechas.dataset.sinFechas = '';
+        sinFechas.textContent = 'Sin filtro de fecha';
+        formulario.append(restablecer, sinFechas);
 
         const estado = document.createElement('p');
         estado.setAttribute('role', 'status');
         estado.setAttribute('aria-live', 'polite');
         const lista = document.createElement('div');
         lista.dataset.lista = '';
-        panel.append(titulo, indicaciones, formulario, estado, lista);
+        this.paginacion = crearPaginacionConsultas(consultas => {
+            this.destruirArboles();
+            this.montarConsultas(consultas);
+        });
+        panel.append(titulo, indicaciones, formulario, estado, lista, this.paginacion.nav);
         this.replaceChildren(panel);
     }
 
@@ -245,9 +256,8 @@ class Agenda extends HTMLElement {
             const persona = c.idPersonaRol?.idPersona;
             return normalizar([persona?.nombres, persona?.apellidos].filter(Boolean).join(' ')).includes(nombre);
         });
-        this.destruirArboles();
         this.querySelector('[role="status"]').textContent = consultas.length ? `${consultas.length} ${consultas.length === 1 ? 'consulta con pasos asignados' : 'consultas con pasos asignados'} a tu contexto activo` : nombre ? 'No hay consultas que coincidan con el nombre y el rango seleccionados' : 'No hay consultas con pasos asignados a tu contexto activo en este rango';
-        this.montarConsultas(consultas);
+        this.paginacion.mostrar(consultas);
     }
 
     async cargar() {
@@ -258,8 +268,7 @@ class Agenda extends HTMLElement {
         this.nombreAplicado = undefined;
         const estado = this.querySelector('[role="status"]');
         estado.textContent = 'Cargando agenda…';
-        this.destruirArboles();
-        this.querySelector('[data-lista]').replaceChildren();
+        this.paginacion.mostrar([]);
         try {
             const agenda = await cargarAgenda(this.usuario, this.querySelector('[name="desde"]').value, this.querySelector('[name="hasta"]').value);
             if (!this.isConnected || version !== this.version) return;

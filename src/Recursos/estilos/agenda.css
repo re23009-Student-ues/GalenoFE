@@ -113,3 +113,15 @@ galeno-citas .citas-filtro-botones button { flex: 1; min-width: 0; }
     galeno-citas [data-filtros] { grid-template-columns: minmax(0, 1fr); }
     galeno-citas .citas-filtro-botones { flex-wrap: wrap; }
 }
+
+.consultas-paginacion {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+}
+
+.consultas-paginacion[hidden] {
+    display: none;
+}

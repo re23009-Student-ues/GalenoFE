@@ -1,5 +1,5 @@
 // HU4: solo el responsable actual puede regresar y se reasignan ambos pasos.
-const CACHE = 'galenosv-v68';
+const CACHE = 'galenosv-v71';
 const POLITICA_API = 'sin-cache-rest-v1';
 const ARCHIVOS = [
   'js/boundary/componentes/reporte_paso.js',
@@ -17,6 +17,7 @@ const ARCHIVOS = [
   'js/boundary/componentes/tarjeta_cita.js',
   'js/boundary/componentes/selector_contexto.js',
   'js/boundary/componentes/agenda.js',
+  'js/boundary/componentes/paginacion_consultas.js',
   'Recursos/estilos/agenda.css',
   'index.html',
   'manifest.json',

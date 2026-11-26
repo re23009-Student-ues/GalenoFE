@@ -105,7 +105,7 @@ self.addEventListener('fetch', event => {
   // API de Galeno: solo red, incluso ante timeout, no-store o cachés históricas existentes.
   const origen = new URL(self.registration.scope);
   if (url.hostname === origen.hostname && ['http:', 'https:'].includes(url.protocol) &&
-      url.pathname.startsWith('/GalenoSV-1.0-SNAPSHOT/resources/v1/')) {
+      url.pathname.startsWith('/galeno/resources/v1/')) {
     event.respondWith((async () => {
       const controller = new AbortController();
       let temporizador;

@@ -4,7 +4,7 @@ import DefaultResponse from "../entity/default_response.js";
 
 class DefaultService {
     constructor() {
-        this.BASE_URL = `http://${location.hostname}:9080/GalenoSV-1.0-SNAPSHOT/resources/v1/`;
+        this.BASE_URL = `${location.origin}/galeno/resources/v1/`;
         this.URL = this.BASE_URL;
     }
 
